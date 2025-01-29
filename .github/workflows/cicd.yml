@@ -21,10 +21,10 @@ jobs:
     needs: build
     runs-on: aws-ec2
     steps:
-      -name: Pull image from DockerHub
+      - name: Pull image from DockerHub
         run: docker pull shreyasladhe23/employeeos_f13technologies:latest
-      -name: Delete existing container
+      - name: Delete existing container
         run: docker rm -f employeeos
-      -name: Run new container
+      - name: Run new container
         run: docker run -d -p 5173:80 --name employeeos shreyasladhe23/employeeos_f13technologies
 
