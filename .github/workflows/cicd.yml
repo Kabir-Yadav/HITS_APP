@@ -19,7 +19,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: aws-ec2
+    runs-on: self-hosted
     steps:
       - name: Pull image from DockerHub
         run: docker pull shreyasladhe23/employeeos_f13technologies:latest
