@@ -1,0 +1,30 @@
+name: EmployeeOS
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+      - name: Login to DockerHub
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Build Docker Image
+        run: docker build -t shreyasladhe23/employeeos_f13technologies .
+      - name: Push Docker Image to DockerHub
+        run: docker push shreyasladhe23/employeeos_f13technologies:latest
+
+  deploy:
+    needs: build
+    runs-on: aws-ec2
+    steps:
+      -name: Pull image from DockerHub
+        run: docker pull shreyasladhe23/employeeos_f13technologies:latest
+      -name: Delete existing container
+        run: docker rm -f employeeos
+      -name: Run new container
+        run: docker run -d -p 5173:80 --name employeeos shreyasladhe23/employeeos_f13technologies
+
