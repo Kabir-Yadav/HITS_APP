@@ -12,7 +12,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { EmailInboxIcon } from 'src/assets/icons';
 
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { FormHead } from '../../components/form-head';
 import { FormReturnLink } from '../../components/form-return-link';
@@ -116,9 +116,9 @@ export function AmplifyVerifyView() {
         description={`We've emailed a 6-digit confirmation code. \nPlease enter the code in the box below to verify your email.`}
       />
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {renderForm()}
-      </Form>
+      </FormProvider>
 
       <FormResendCode
         onResendCode={handleResendCode}

@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { SentIcon } from 'src/assets/icons';
 
 import { Iconify } from 'src/components/iconify';
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { FormHead } from '../../components/form-head';
 import { FormReturnLink } from '../../components/form-return-link';
@@ -175,9 +175,9 @@ export function AmplifyUpdatePasswordView() {
         description={`We've sent a 6-digit confirmation email to your email. \nPlease enter the code in below box to verify your email.`}
       />
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {renderForm()}
-      </Form>
+      </FormProvider>
 
       <FormResendCode
         onResendCode={handleResendCode}

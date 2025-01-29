@@ -53,7 +53,7 @@ export function OtherDemo({ debug, onClose }) {
         </Backdrop>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {debug && <ValuesPreview onCloseDebug={onClose} />}
 
         <FormActions
@@ -91,7 +91,7 @@ export function OtherDemo({ debug, onClose }) {
             <Field.Editor fullItem name="editor" sx={{ maxHeight: 480 }} />
           </ComponentBox>
         </FormGrid>
-      </Form>
+      </FormProvider>
     </>
   );
 }

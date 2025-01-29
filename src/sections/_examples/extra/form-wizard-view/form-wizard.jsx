@@ -120,7 +120,7 @@ export function FormWizard() {
     >
       <Stepper steps={STEPS} activeStep={activeStep} />
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         <Box
           sx={[
             (theme) => ({
@@ -166,7 +166,7 @@ export function FormWizard() {
             )}
           </Box>
         )}
-      </Form>
+      </FormProvider>
     </Card>
   );
 }

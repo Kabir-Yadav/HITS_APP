@@ -13,8 +13,8 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
-import { FormProvider, Field } from 'src/components/hook-form';
 import { AnimateLogoRotate } from 'src/components/animate';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { FormHead } from '../../../components/form-head';
 import { FormSocials } from '../../../components/form-socials';

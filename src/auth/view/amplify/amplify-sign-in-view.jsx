@@ -16,7 +16,7 @@ import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { useAuthContext } from '../../hooks';
 import { getErrorMessage } from '../../utils';
@@ -147,9 +147,9 @@ export function AmplifySignInView() {
         </Alert>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {renderForm()}
-      </Form>
+      </FormProvider>
     </>
   );
 }

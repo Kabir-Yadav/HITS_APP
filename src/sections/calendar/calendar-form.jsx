@@ -19,8 +19,8 @@ import { createEvent, updateEvent, deleteEvent } from 'src/actions/calendar';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-import { Form, Field } from 'src/components/hook-form';
 import { ColorPicker } from 'src/components/color-utils';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
 
@@ -100,7 +100,7 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
   }, [currentEvent?.id, onClose]);
 
   return (
-    <Form methods={methods} onSubmit={onSubmit}>
+    <FormProvider methods={methods} onSubmit={onSubmit}>
       <Scrollbar sx={{ p: 3, bgcolor: 'background.neutral' }}>
         <Stack spacing={3}>
           <Field.Text name="title" label="Title" />
@@ -160,6 +160,6 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
           Save changes
         </LoadingButton>
       </DialogActions>
-    </Form>
+    </FormProvider>
   );
 }

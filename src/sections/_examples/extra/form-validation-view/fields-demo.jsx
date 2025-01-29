@@ -13,7 +13,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { today } from 'src/utils/format-time';
 
 import { Iconify } from 'src/components/iconify';
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { FieldsSchema } from './schema';
 import { ComponentBox } from '../../layout';
@@ -285,7 +285,7 @@ export function FieldsDemo({ debug, onCloseDebug }) {
         </Backdrop>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {debug && <ValuesPreview onCloseDebug={onCloseDebug} />}
 
         <FormActions
@@ -319,7 +319,7 @@ export function FieldsDemo({ debug, onCloseDebug }) {
             {renderSelect()}
           </ComponentBox>
         </FormGrid>
-      </Form>
+      </FormProvider>
     </>
   );
 }

@@ -10,7 +10,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { PasswordIcon } from 'src/assets/icons';
 
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { FormHead } from '../../components/form-head';
 import { sendPasswordResetEmail } from '../../context/firebase';
@@ -92,9 +92,9 @@ export function FirebaseResetPasswordView() {
         description={`Please enter the email address associated with your account and we'll email you a link to reset your password.`}
       />
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {renderForm()}
-      </Form>
+      </FormProvider>
 
       <FormReturnLink href={paths.auth.firebase.signIn} />
     </>

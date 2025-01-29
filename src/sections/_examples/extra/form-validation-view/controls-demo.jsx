@@ -5,7 +5,7 @@ import Divider from '@mui/material/Divider';
 import Backdrop from '@mui/material/Backdrop';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { Form, Field } from 'src/components/hook-form';
+import { FormProvider, Field } from 'src/components/hook-form';
 
 import { ControlsSchema } from './schema';
 import { ComponentBox } from '../../layout';
@@ -111,7 +111,7 @@ export function ControlsDemo({ debug, onClose }) {
         </Backdrop>
       )}
 
-      <Form methods={methods} onSubmit={onSubmit}>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
         {debug && <ValuesPreview onCloseDebug={onClose} />}
 
         <FormActions
@@ -141,7 +141,7 @@ export function ControlsDemo({ debug, onClose }) {
             {renderSlider()}
           </ComponentBox>
         </FormGrid>
-      </Form>
+      </FormProvider>
     </>
   );
 }
