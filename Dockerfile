@@ -1,5 +1,5 @@
 # Build stage
-FROM node:alpine3.18 as build
+FROM node:18 as build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm install
@@ -10,7 +10,7 @@ RUN npm run build
 FROM nginx:alpine
 WORKDIR /usr/share/nginx/html
 RUN rm -rf *
-COPY --from=build /app/build .
+COPY --from=build /app/dist .
 EXPOSE 80
 ENTRYPOINT ["nginx", "-g", "daemon off;"]
 
