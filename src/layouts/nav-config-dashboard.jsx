@@ -63,6 +63,11 @@ export const navData = [
     subheader: 'Services',
     items: [
       {
+        title:'Chat',
+        path: paths.dashboard.chat, 
+        icon: ICONS.chat,
+      },
+      {
         title: 'Recruitment',
         path: paths.dashboard.recruitment.root,
         icon: ICONS.external,
