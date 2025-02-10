@@ -7,12 +7,12 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
+import { useGetContacts, useGetConversation, useGetConversations} from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
-import { useMockedUser } from 'src/auth/hooks';
-import { useAuthContext } from 'src/auth/hooks';
+import { useMockedUser } from'src/auth/hooks';
+import { useSendUserEmail } from 'src/auth/hooks/useSendUserEmail';
 
 import { ChatNav } from '../chat-nav';
 import { ChatLayout } from '../layout';
@@ -23,13 +23,18 @@ import { ChatHeaderDetail } from '../chat-header-detail';
 import { ChatHeaderCompose } from '../chat-header-compose';
 import { useCollapseNav } from '../hooks/use-collapse-nav';
 
-// ----------------------------------------------------------------------
+
+
+
 
 export function ChatView() {
+  const { sendUserEmailToBackend } = useSendUserEmail();
+
+
   const router = useRouter();
-
-  const { user } = useMockedUser();
-
+  const { user } = sendUserEmailToBackend();
+  console.log(user);
+ 
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
