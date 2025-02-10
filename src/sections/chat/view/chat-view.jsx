@@ -12,6 +12,7 @@ import { useGetContacts, useGetConversation, useGetConversations } from 'src/act
 import { EmptyContent } from 'src/components/empty-content';
 
 import { useMockedUser } from 'src/auth/hooks';
+import { useAuthContext } from 'src/auth/hooks';
 
 import { ChatNav } from '../chat-nav';
 import { ChatLayout } from '../layout';
@@ -30,11 +31,10 @@ export function ChatView() {
   const { user } = useMockedUser();
 
   const { contacts } = useGetContacts();
-
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
 
-  const { conversations, conversationsLoading } = useGetConversations();
+  const { conversations, conversationsLoading } = useGetConversations(user?.id);
   const { conversation, conversationError, conversationLoading } =
     useGetConversation(selectedConversationId);
 
@@ -42,7 +42,6 @@ export function ChatView() {
   const conversationsNav = useCollapseNav();
 
   const [recipients, setRecipients] = useState([]);
-
   useEffect(() => {
     if (!selectedConversationId) {
       startTransition(() => {

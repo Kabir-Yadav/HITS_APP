@@ -5,6 +5,7 @@ import useSWR, { mutate } from 'swr';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
+const BASE_URL = 'http://127.0.0.1:8000/api/chat';
 
 const enableServer = false;
 
@@ -19,10 +20,9 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 
 export function useGetContacts() {
-  const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
+  // const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
 
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-
+  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher);
   const memoizedValue = useMemo(
     () => ({
       contacts: data?.contacts || [],
@@ -39,15 +39,17 @@ export function useGetContacts() {
 
 // ----------------------------------------------------------------------
 
-export function useGetConversations() {
-  const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-
+export function useGetConversations(userId) {
+  // const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
+  const { data, isLoading, error, isValidating } =useSWR(`${BASE_URL}/conversations/`, fetcher);
   const memoizedValue = useMemo(() => {
-    const byId = data?.conversations.length ? keyBy(data.conversations, (option) => option.id) : {};
-    const allIds = Object.keys(byId);
+    const userConversations = data?.conversations?.filter((conversation) =>
+      conversation.participants.some((participant) => participant.id === userId)
+    ) || [];
 
+    const byId = userConversations.length ? keyBy(userConversations, (conv) => conv.id) : {};
+    const allIds = Object.keys(byId);
+    console.log({ byId, allIds })
     return {
       conversations: { byId, allIds },
       conversationsLoading: isLoading,
@@ -55,7 +57,7 @@ export function useGetConversations() {
       conversationsValidating: isValidating,
       conversationsEmpty: !isLoading && !isValidating && !allIds.length,
     };
-  }, [data?.conversations, error, isLoading, isValidating]);
+  }, [data?.conversations, userId, error, isLoading, isValidating]);
 
   return memoizedValue;
 }
@@ -64,20 +66,18 @@ export function useGetConversations() {
 
 export function useGetConversation(conversationId) {
   const url = conversationId
-    ? [CHART_ENDPOINT, { params: { conversationId, endpoint: 'conversation' } }]
+    ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
     : '';
-
   const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-
   const memoizedValue = useMemo(
     () => ({
-      conversation: data?.conversation,
+      conversation: data?.conversations?.[0] || null, // Ensure a valid conversation object
       conversationLoading: isLoading,
       conversationError: error,
       conversationValidating: isValidating,
-      conversationEmpty: !isLoading && !isValidating && !data?.conversation,
+      conversationEmpty: !isLoading && !isValidating && (!data?.conversations || data.conversations.length === 0),
     }),
-    [data?.conversation, error, isLoading, isValidating]
+    [data?.conversations, error, isLoading, isValidating]
   );
 
   return memoizedValue;
@@ -173,24 +173,32 @@ export async function clickConversation(conversationId) {
    * Work on server
    */
   if (enableServer) {
-    await axios.get(CHART_ENDPOINT, { params: { conversationId, endpoint: 'mark-as-seen' } });
+    try {
+      await axios.get(`${BASE_URL}/markAsSeen/`, {
+        params: { conversationId },
+      });
+    } catch (error) {
+      console.error("Failed to mark conversation as seen:", error);
+    }
   }
 
   /**
    * Work in local
    */
-
   mutate(
     [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }],
     (currentData) => {
-      const currentConversations = currentData.conversations;
+      if (!currentData || !currentData.conversations) {
+        return currentData; // Ensure a consistent return value
+      }
 
-      const conversations = currentConversations.map((conversation) =>
+      const updatedConversations = currentData.conversations.map((conversation) =>
         conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation
       );
 
-      return { ...currentData, conversations };
+      return { ...currentData, conversations: updatedConversations };
     },
     false
   );
 }
+
