@@ -1,10 +1,6 @@
-import { useAuthContext } from 'src/auth/hooks';
-
-
 export function useSendUserEmail() {
-    const { userData } = useAuthContext();
-    console.log(userData);
-    async function sendUserEmailToBackend() {
+
+    async function sendUserEmailToBackend(userData) {
       try {
         if (!userData?.email) {
           console.error('No email found in auth context');

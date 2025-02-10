@@ -7,11 +7,12 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetContacts, useGetConversation, useGetConversations} from 'src/actions/chat';
+import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
-import { useMockedUser } from'src/auth/hooks';
+import { useMockedUser } from 'src/auth/hooks';
+import { useAuthContext } from 'src/auth/hooks';
 import { useSendUserEmail } from 'src/auth/hooks/useSendUserEmail';
 
 import { ChatNav } from '../chat-nav';
@@ -23,23 +24,30 @@ import { ChatHeaderDetail } from '../chat-header-detail';
 import { ChatHeaderCompose } from '../chat-header-compose';
 import { useCollapseNav } from '../hooks/use-collapse-nav';
 
-
-
-
+// ----------------------------------------------------------------------
 
 export function ChatView() {
-  const { sendUserEmailToBackend } = useSendUserEmail();
-
-
   const router = useRouter();
-  const { user } = sendUserEmailToBackend();
-  console.log(user);
- 
+
+  const { user } = useAuthContext();
+  const { sendUserEmailToBackend } = useSendUserEmail();
+  const [userData, setUserData] = useState(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      if (user) {
+        const data = await sendUserEmailToBackend(user); // Wait for the data
+        setUserData(data); // Store data in state
+      }
+    }
+    fetchUser();
+  }, [user]); // Runs when `user` changes
+
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
 
-  const { conversations, conversationsLoading } = useGetConversations(user?.id);
+  const { conversations, conversationsLoading } = useGetConversations(userData?.id);
   const { conversation, conversationError, conversationLoading } =
     useGetConversation(selectedConversationId);
 
@@ -60,7 +68,7 @@ export function ChatView() {
   }, []);
 
   const filteredParticipants = conversation
-    ? conversation.participants.filter((participant) => participant.id !== `${user?.id}`)
+    ? conversation.participants.filter((participant) => participant.id !== `${userData?.id}`)
     : [];
 
   const hasConversation = selectedConversationId && conversation;

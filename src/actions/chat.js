@@ -52,7 +52,6 @@ export function useGetConversations(userId) {
 
     const byId = userConversations.length ? keyBy(userConversations, (conv) => conv.id) : {};
     const allIds = Object.keys(byId);
-    console.log({ byId, allIds })
     return {
       conversations: { byId, allIds },
       conversationsLoading: isLoading,
