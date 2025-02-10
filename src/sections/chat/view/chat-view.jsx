@@ -12,8 +12,6 @@ import { useGetContacts, useGetConversation, useGetConversations } from 'src/act
 import { EmptyContent } from 'src/components/empty-content';
 
 import { useMockedUser } from 'src/auth/hooks';
-import { useAuthContext } from 'src/auth/hooks';
-import { useSendUserEmail } from 'src/auth/hooks/useSendUserEmail';
 
 import { ChatNav } from '../chat-nav';
 import { ChatLayout } from '../layout';
@@ -29,25 +27,13 @@ import { useCollapseNav } from '../hooks/use-collapse-nav';
 export function ChatView() {
   const router = useRouter();
 
-  const { user } = useAuthContext();
-  const { sendUserEmailToBackend } = useSendUserEmail();
-  const [userData, setUserData] = useState(null);
-
-  useEffect(() => {
-    async function fetchUser() {
-      if (user) {
-        const data = await sendUserEmailToBackend(user); // Wait for the data
-        setUserData(data); // Store data in state
-      }
-    }
-    fetchUser();
-  }, [user]); // Runs when `user` changes
+  const { user } = useMockedUser();
 
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
 
-  const { conversations, conversationsLoading } = useGetConversations(userData?.id);
+  const { conversations, conversationsLoading } = useGetConversations(user?.id);
   const { conversation, conversationError, conversationLoading } =
     useGetConversation(selectedConversationId);
 
@@ -68,7 +54,7 @@ export function ChatView() {
   }, []);
 
   const filteredParticipants = conversation
-    ? conversation.participants.filter((participant) => participant.id !== `${userData?.id}`)
+    ? conversation.participants.filter((participant) => participant.id !== `${user?.id}`)
     : [];
 
   const hasConversation = selectedConversationId && conversation;
@@ -94,13 +80,22 @@ export function ChatView() {
             <ChatHeaderCompose contacts={contacts} onAddRecipients={handleAddRecipients} />
           ),
           nav: (
-            <ChatNav
-              contacts={contacts}
-              conversations={conversations}
-              selectedConversationId={selectedConversationId}
-              collapseNav={conversationsNav}
-              loading={conversationsLoading}
-            />
+            <div
+              style={{
+                height: '100%',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <ChatNav
+                contacts={contacts}
+                conversations={conversations}
+                selectedConversationId={selectedConversationId}
+                collapseNav={conversationsNav}
+                loading={conversationsLoading}
+              />
+            </div>
           ),
           main: (
             <>
