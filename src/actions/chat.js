@@ -87,56 +87,32 @@ export function useGetConversation(conversationId) {
 
 // ----------------------------------------------------------------------
 
-export async function sendMessage(conversationId,userid ,messageData) {
-  const conversationsUrl = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-  console.log(conversationId,":",userid)
-  const conversationUrl = [
-    CHART_ENDPOINT,
-    { params: { conversationId, endpoint: 'conversation' } },
-  ];
+export async function sendMessage(conversationId, userId, messageData) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
 
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { conversationId, messageData };
-    await axios.put(CHART_ENDPOINT, data);
-  }
+    ws.onopen = () => {
+      const messagePayload = JSON.stringify({
+        conversation_id: conversationId,
+        sender_id: userId,
+        ...messageData,
+      });
 
-  /**
-   * Work in local
-   */
-  mutate(
-    conversationUrl,
-    (currentData) => {
-      const currentConversation = currentData.conversation;
+      ws.send(messagePayload);
+      resolve(messageData); // Ensuring same return structure as before
+    };
 
-      const conversation = {
-        ...currentConversation,
-        messages: [...currentConversation.messages, messageData],
-      };
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      reject(error);
+    };
 
-      return { ...currentData, conversation };
-    },
-    false
-  );
-
-  mutate(
-    conversationsUrl,
-    (currentData) => {
-      const currentConversations = currentData.conversations;
-
-      const conversations = currentConversations.map((conversation) =>
-        conversation.id === conversationId
-          ? { ...conversation, messages: [...conversation.messages, messageData] }
-          : conversation
-      );
-
-      return { ...currentData, conversations };
-    },
-    false
-  );
+    ws.onclose = () => {
+      console.log("WebSocket closed.");
+    };
+  });
 }
+
 
 // ----------------------------------------------------------------------
 
