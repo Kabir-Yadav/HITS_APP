@@ -22,11 +22,9 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
     participants,
     currentUserId: `${user?.id}`,
   });
-
   const { firstName, avatarUrl } = senderDetails;
 
   const { body, createdAt } = message;
-
   const renderInfo = () => (
     <Typography
       noWrap

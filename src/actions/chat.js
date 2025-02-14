@@ -87,9 +87,9 @@ export function useGetConversation(conversationId) {
 
 // ----------------------------------------------------------------------
 
-export async function sendMessage(conversationId, messageData) {
+export async function sendMessage(conversationId,userid ,messageData) {
   const conversationsUrl = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-
+  console.log(conversationId,":",userid)
   const conversationUrl = [
     CHART_ENDPOINT,
     { params: { conversationId, endpoint: 'conversation' } },

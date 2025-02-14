@@ -8,7 +8,6 @@ export function getMessage({ message, participants, currentUserId }) {
   const senderDetails = isCurrentUser
     ? { type: 'me' }
     : { avatarUrl: sender?.avatarUrl, firstName: sender?.name?.split(' ')[0] ?? 'Unknown' };
-
   const hasImage = message.contentType === 'image';
 
   return { hasImage, me: isCurrentUser, senderDetails };

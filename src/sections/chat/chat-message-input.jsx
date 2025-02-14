@@ -39,10 +39,10 @@ export function ChatMessageInput({
       role: `${user?.role}`,
       email: `${user?.email}`,
       address: `${user?.address}`,
-      name: `${user?.displayName}`,
+      name: `${user?.name}`,
       lastActivity: today(),
-      avatarUrl: `${user?.photoURL}`,
-      phoneNumber: `${user?.phoneNumber}`,
+      avatarUrl: `${user?.avatar_url}`,
+      phoneNumber: `${user?.phone_number}`,
       status: 'online',
     }),
     [user]
@@ -71,7 +71,7 @@ export function ChatMessageInput({
       try {
         if (selectedConversationId) {
           // If the conversation already exists
-          await sendMessage(selectedConversationId, messageData);
+          await sendMessage(selectedConversationId, user?.id, messageData);
         } else {
           // If the conversation does not exist
           const res = await createConversation(conversationData);

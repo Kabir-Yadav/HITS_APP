@@ -53,7 +53,7 @@ export function ChatNavAccount() {
           alignItems: 'center',
         }}
       >
-        <ListItemText primary={user?.displayName} secondary={user?.email} />
+        <ListItemText primary={user?.name} secondary={user?.email} />
 
         <Tooltip title="Log out">
           <IconButton color="error">
@@ -130,12 +130,12 @@ export function ChatNavAccount() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
         <Avatar
-          src={user?.photoURL}
-          alt={user?.displayName}
+          src={user?.avatar_url}
+          alt={user?.name}
           onClick={menuActions.onOpen}
           sx={{ cursor: 'pointer', width: 48, height: 48 }}
         >
-          {user?.displayName?.charAt(0).toUpperCase()}
+          {user?.name?.charAt(0).toUpperCase()}
         </Avatar>
       </Badge>
 

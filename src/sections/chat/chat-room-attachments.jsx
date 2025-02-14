@@ -15,7 +15,6 @@ import { CollapseButton } from './styles';
 
 export function ChatRoomAttachments({ attachments }) {
   const collapse = useBoolean(true);
-
   const totalAttachments = attachments.length;
 
   const renderList = () =>
