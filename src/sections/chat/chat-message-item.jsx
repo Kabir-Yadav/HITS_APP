@@ -3,6 +3,8 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import FolderIcon from '@mui/icons-material/Folder';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 import { fToNow } from 'src/utils/format-time';
 
@@ -17,14 +19,22 @@ import { getMessage } from './utils/get-message';
 export function ChatMessageItem({ message, participants, onOpenLightbox }) {
   const { user } = useMockedUser();
 
-  const { me, senderDetails, hasImage } = getMessage({
+  const { me, senderDetails } = getMessage({
     message,
     participants,
     currentUserId: `${user?.id}`,
   });
-  const { firstName, avatarUrl } = senderDetails;
 
+  const { firstName, avatarUrl } = senderDetails;
   const { body, createdAt } = message;
+
+  // ✅ Detect if message contains an image
+  const isImage = body.startsWith('data:image/');
+  // ✅ Detect if message contains a file (PDF, ZIP, DOC, etc.)
+  const isFile = body.startsWith('data:application/');
+  // ✅ Detect if it's a folder (Assuming folder messages include '[FOLDER]')
+  const isFolder = body.includes('[FOLDER]');
+
   const renderInfo = () => (
     <Typography
       noWrap
@@ -32,7 +42,6 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
       sx={{ mb: 1, color: 'text.disabled', ...(!me && { mr: 'auto' }) }}
     >
       {!me && `${firstName}, `}
-
       {fToNow(createdAt)}
     </Typography>
   );
@@ -47,10 +56,11 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
         typography: 'body2',
         bgcolor: 'background.neutral',
         ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
-        ...(hasImage && { p: 0, bgcolor: 'transparent' }),
+        ...(isImage && { p: 0, bgcolor: 'transparent' }),
       }}
     >
-      {hasImage ? (
+      {/* ✅ Show image preview */}
+      {isImage ? (
         <Box
           component="img"
           alt="Attachment"
@@ -66,7 +76,26 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
             '&:hover': { opacity: 0.9 },
           }}
         />
+      ) : isFile ? (
+        // ✅ Show file preview with download option
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <InsertDriveFileIcon sx={{ mr: 1 }} />
+          <a
+            href={body}
+            download={`file_${message.message_id}`}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
+            Download File
+          </a>
+        </Box>
+      ) : isFolder ? (
+        // ✅ Show folder icon if it’s a folder
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <FolderIcon sx={{ mr: 1, color: 'blue' }} />
+          <Typography>Folder</Typography>
+        </Box>
       ) : (
+        // ✅ Default Text Messages
         body
       )}
     </Stack>

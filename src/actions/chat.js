@@ -99,7 +99,14 @@ export async function sendMessage(conversationId, userId, messageData) {
       });
 
       ws.send(messagePayload);
-      resolve(messageData); // Ensuring same return structure as before
+
+      resolve(messageData);
+    };
+
+    ws.onmessage = (event) => {
+      console.log('Received message:', event.data);
+      // When a new message is received, update the conversation list
+      mutate(`http://127.0.0.1:8000/api/chat/conversationByID/${conversationId}`);
     };
 
     ws.onerror = (error) => {
@@ -108,10 +115,13 @@ export async function sendMessage(conversationId, userId, messageData) {
     };
 
     ws.onclose = () => {
-      console.log("WebSocket closed.");
+      console.warn("WebSocket disconnected, attempting reconnection...");
+      setTimeout(() => sendMessage(conversationId, userId, messageData), 1000);
     };
   });
 }
+
+
 
 
 // ----------------------------------------------------------------------

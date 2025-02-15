@@ -17,7 +17,7 @@ export function ChatMessageList({ messages = [], participants, loading }) {
     .map((message) => ({ src: message.body }));
 
   const lightbox = useLightBox(slides);
-
+  console.log(messages);
   if (loading) {
     return (
       <Stack sx={{ flex: '1 1 auto', position: 'relative' }}>

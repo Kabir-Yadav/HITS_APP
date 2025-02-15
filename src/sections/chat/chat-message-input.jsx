@@ -63,6 +63,37 @@ export function ChatMessageInput({
   const handleChangeMessage = useCallback((event) => {
     setMessage(event.target.value);
   }, []);
+  const handleFileChange = useCallback(
+    async (event) => {
+      const file = event.target.files[0]; // Get the selected file
+      if (!file) return;
+
+      try {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const fileData = e.target.result; // Base64 encoded file
+
+          if (selectedConversationId) {
+            // If the conversation already exists, send the file message
+            await sendMessage(selectedConversationId, user?.id, {
+              body: fileData, // Base64 file data
+              contentType: file.type, // File type (e.g., "image/png", "application/pdf")
+            });
+          } else {
+            // If the conversation does not exist, create a new one
+            const res = await createConversation(conversationData);
+            router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+            onAddRecipients([]);
+          }
+        };
+
+        reader.readAsDataURL(file); // Convert the file to Base64
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    [selectedConversationId, user?.id, conversationData, router, onAddRecipients]
+  );
 
   const handleSendMessage = useCallback(
     async (event) => {
@@ -126,7 +157,7 @@ export function ChatMessageInput({
         ]}
       />
 
-      <input type="file" ref={fileRef} style={{ display: 'none' }} />
+      <input type="file" ref={fileRef} style={{ display: 'none' }} onChange={handleFileChange} />
     </>
   );
 }
