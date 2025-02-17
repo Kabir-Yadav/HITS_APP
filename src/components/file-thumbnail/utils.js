@@ -87,6 +87,7 @@ export function fileThumb(fileUrl) {
       thumb = iconUrl('ic-video');
       break;
     case 'word':
+    case 'document':
       thumb = iconUrl('ic-word');
       break;
     case 'excel':
@@ -151,4 +152,13 @@ export function fileData(file) {
     lastModified: file.lastModified,
     lastModifiedDate: file.lastModifiedDate,
   };
+}
+
+// ----------------------------------------------------------------------
+
+export function formatFileSize(size) {
+  if (size < 1024) return `${size} B`; // ✅ Bytes
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KB`; // ✅ Kilobytes
+  if (size < 1024 * 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2)} MB`; // ✅ Megabytes
+  return `${(size / (1024 * 1024 * 1024)).toFixed(2)} GB`; // ✅ Gigabytes
 }

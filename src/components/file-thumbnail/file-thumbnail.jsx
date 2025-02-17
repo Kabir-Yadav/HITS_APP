@@ -21,7 +21,7 @@ export const FileThumbnail = forwardRef((props, ref) => {
   const previewUrl = typeof file === 'string' ? file : URL.createObjectURL(file);
 
   const format = fileFormat(path ?? previewUrl);
-
+  console.log(format, ":", previewUrl)
   const renderItem = () => (
     <ItemRoot
       ref={ref}

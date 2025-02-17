@@ -2,18 +2,22 @@ import { uuidv4 } from 'minimal-shared/utils';
 import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import { Stack } from '@mui/material';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import ListItemText from '@mui/material/ListItemText';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { today } from 'src/utils/format-time';
+import { fDateTime } from 'src/utils/format-time';
 
 import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
+import { FileThumbnail, formatFileSize } from 'src/components/file-thumbnail';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -143,57 +147,98 @@ export function ChatMessageInput({
       {attachments.length > 0 && (
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
             mb: 1,
             p: 1,
             borderRadius: 1,
-            flexWrap: 'wrap', // ✅ Ensures multiple previews fit
+            flexWrap: "wrap", // ✅ Ensures multiple previews fit
             gap: 1, // ✅ Adds spacing between previews
           }}
         >
-          {attachments.map((file) => (
-            <Box
-              key={file.id}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                p: 1,
-                borderRadius: 1,
-                backgroundColor: 'background.default',
-                boxShadow: 1,
-                maxWidth: 180, // ✅ Prevents taking full width
-              }}
-            >
-              {file.type.includes('image') ? (
-                <img
-                  src={file.preview}
-                  alt="Preview"
-                  style={{ width: 50, height: 50, borderRadius: 5, marginRight: 8 }}
-                />
-              ) : (
-                <Iconify
-                  icon="eva:file-text-outline"
-                  width={40}
-                  sx={{ color: 'text.secondary', mr: 1 }}
-                />
-              )}
-              <Typography
-                variant="body2"
-                sx={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}
-              >
-                {file.name}
-              </Typography>
-              <IconButton
-                onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== file.id))}
-                sx={{ ml: 1 }}
-              >
-                <Iconify icon="eva:close-circle-outline" width={20} />
-              </IconButton>
-            </Box>
-          ))}
+          {attachments.map((file) => {
+            const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(file.type);
+
+            return (
+              <Stack key={file.id} sx={{ position: "relative", alignItems: "center" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: 1,
+                    maxWidth: 180, // ✅ Prevents taking full width
+                    borderRadius: 5
+                  }}
+                >
+                  {/* ✅ Close Button Only for Images */}
+                  {isImage && (
+                    <IconButton
+                      onClick={() =>
+                        setAttachments((prev) => prev.filter((item) => item.id !== file.id))
+                      }
+                      sx={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        width: 30,
+                        height: 30,
+                        color: "white",
+                        backgroundColor: "rgba(0, 0, 0, 0.5)", // ✅ Semi-transparent background
+                        "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" }, // ✅ Darker on hover
+                      }}
+                    >
+                      <Iconify icon="mingcute:close-line" width={18} />
+                    </IconButton>
+                  )}
+
+                  {/* ✅ Image Preview */}
+                  {isImage ? (
+                    <img
+                      src={file.preview}
+                      alt="Preview"
+                      style={{ width: 110, height: 100, borderRadius: 5 }}
+                    />
+                  ) : (
+                    // ✅ File Icon for Non-Image Files
+                    <></>
+                  )}
+                </Box>
+
+                {/* ✅ File Display for Non-Image Files */}
+                {!isImage && (
+                  <Box sx={{ boxShadow: 1, p: .5, borderRadius: 2, maxWidth: 200, gap: 1.5, display: "flex", alignItems: "center" }}>
+                    <FileThumbnail
+                      imageView
+                      file={file.type}
+                      onRemove
+                      slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
+                      sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
+                    />
+
+                    <ListItemText
+                      primary={file.name}
+                      secondary={formatFileSize(file.size)}
+                      slotProps={{
+                        primary: { noWrap: true, sx: { typography: "body2" } },
+                        secondary: {
+                          noWrap: true,
+                          sx: {
+                            mt: 0.25,
+                            typography: "caption",
+                            color: "text.disabled",
+                          },
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+              </Stack>
+            );
+          })}
         </Box>
       )}
+
 
       <InputBase
         name="chat-message"
