@@ -62,6 +62,7 @@ export const navData = [
   {
     subheader: 'Services',
     items: [
+      { title: 'Kanban', path: paths.dashboard.kanban, icon: ICONS.kanban },
       {
         title:'Chat',
         path: paths.dashboard.chat, 

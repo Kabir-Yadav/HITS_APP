@@ -9,6 +9,7 @@ import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
+import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import { styled } from '@mui/material/styles';
 import Checkbox from '@mui/material/Checkbox';
@@ -16,6 +17,9 @@ import TextField from '@mui/material/TextField';
 import FormGroup from '@mui/material/FormGroup';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
@@ -28,19 +32,17 @@ import { KanbanDetailsToolbar } from './kanban-details-toolbar';
 import { KanbanInputName } from '../components/kanban-input-name';
 import { KanbanDetailsPriority } from './kanban-details-priority';
 import { KanbanDetailsAttachments } from './kanban-details-attachments';
-import { KanbanDetailsCommentList } from './kanban-details-comment-list';
-import { KanbanDetailsCommentInput } from './kanban-details-comment-input';
 import { KanbanContactsDialog } from '../components/kanban-contacts-dialog';
 
 // ----------------------------------------------------------------------
 
-const SUBTASKS = [
-  'Complete project proposal',
-  'Conduct market research',
-  'Design user interface mockups',
-  'Develop backend api',
-  'Implement authentication system',
-];
+// const SUBTASKS = [
+//   'Complete project proposal',
+//   'Conduct market research',
+//   'Design user interface mockups',
+//   'Develop backend api',
+//   'Implement authentication system',
+// ];
 
 const BlockLabel = styled('span')(({ theme }) => ({
   ...theme.typography.caption,
@@ -61,7 +63,11 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
   const [taskName, setTaskName] = useState(task.name);
   const [priority, setPriority] = useState(task.priority);
   const [taskDescription, setTaskDescription] = useState(task.description);
-  const [subtaskCompleted, setSubtaskCompleted] = useState(SUBTASKS.slice(0, 2));
+  const [subtaskCompleted, setSubtaskCompleted] = useState([]);
+  const [subtasks, setSubtasks] = useState([]);
+  const [newSubtaskDialog, setNewSubtaskDialog] = useState(false);
+  const [newSubtaskName, setNewSubtaskName] = useState('');
+  const [editingSubtask, setEditingSubtask] = useState(null);
 
   const rangePicker = useDateRangePicker(dayjs(task.due[0]), dayjs(task.due[1]));
 
@@ -90,7 +96,11 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
   const handleChangePriority = useCallback((newValue) => {
     setPriority(newValue);
-  }, []);
+    onUpdateTask({
+      ...task,
+      priority: newValue,
+    });
+  }, [onUpdateTask, task]);
 
   const handleClickSubtaskComplete = (taskId) => {
     const selected = subtaskCompleted.includes(taskId)
@@ -100,14 +110,61 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
     setSubtaskCompleted(selected);
   };
 
+  const handleAddSubtask = () => {
+    if (newSubtaskName.trim()) {
+      setSubtasks([...subtasks, newSubtaskName.trim()]);
+      setNewSubtaskName('');
+      setNewSubtaskDialog(false);
+    }
+  };
+
+  const handleDeleteSubtask = (taskToDelete) => {
+    setSubtasks(subtasks.filter((subtask) => subtask !== taskToDelete));
+    setSubtaskCompleted(subtaskCompleted.filter((subtask) => subtask !== taskToDelete));
+  };
+
+  const handleEditSubtask = (taskToEdit) => {
+    setEditingSubtask(taskToEdit);
+    setNewSubtaskName(taskToEdit);
+    setNewSubtaskDialog(true);
+  };
+
+  const handleUpdateSubtask = () => {
+    if (newSubtaskName.trim()) {
+      setSubtasks(
+        subtasks.map((subtask) => (subtask === editingSubtask ? newSubtaskName.trim() : subtask))
+      );
+      setNewSubtaskName('');
+      setEditingSubtask(null);
+      setNewSubtaskDialog(false);
+    }
+  };
+
+  const handleAssignee = useCallback((newAssignee) => {
+    // Update the task with new assignees
+    onUpdateTask({
+      ...task,
+      assignee: newAssignee,
+    });
+  }, [onUpdateTask, task]);
+
+  const handleUpdateStatus = useCallback((newStatus) => {
+    onUpdateTask({
+      ...task,
+      status: newStatus,
+    });
+  }, [onUpdateTask, task]);
+
   const renderToolbar = () => (
     <KanbanDetailsToolbar
+      task={task}
       taskName={task.name}
-      onDelete={onDeleteTask}
       taskStatus={task.status}
+      onDelete={onDeleteTask}
       liked={likeToggle.value}
       onCloseDetails={onClose}
       onLikeToggle={likeToggle.onToggle}
+      onUpdateStatus={handleUpdateStatus}
     />
   );
 
@@ -121,7 +178,6 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
       {[
         { value: 'overview', label: 'Overview' },
         { value: 'subTasks', label: 'Subtasks' },
-        { value: 'comments', label: `Comments (${task.comments.length})` },
       ].map((tab) => (
         <Tab key={tab.value} value={tab.value} label={tab.label} />
       ))}
@@ -141,17 +197,30 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
       {/* Reporter */}
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Reporter</BlockLabel>
-        <Avatar alt={task.reporter.name} src={task.reporter.avatarUrl} />
+        <BlockLabel>Assigned By:</BlockLabel>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2">{task.reporter.name}</Typography>
+        </Box>
       </Box>
 
       {/* Assignee */}
       <Box sx={{ display: 'flex' }}>
-        <BlockLabel sx={{ height: 40, lineHeight: '40px' }}>Assignee</BlockLabel>
+        <BlockLabel sx={{ height: 32, lineHeight: '32px' }}>Assigned to:</BlockLabel>
 
-        <Box sx={{ gap: 1, display: 'flex', flexWrap: 'wrap' }}>
-          {task.assignee.map((user) => (
-            <Avatar key={user.id} alt={user.name} src={user.avatarUrl} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+          {task.assignee.map((user, index) => (
+            <Box
+              key={user.id}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                typography: 'body2',
+                ...(index < task.assignee.length - 1 && { mr: 1 }),
+              }}
+            >
+              {user.name}
+              {index < task.assignee.length - 1 && ','}
+            </Box>
           ))}
 
           <Tooltip title="Add assignee">
@@ -159,12 +228,18 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
               onClick={contactsDialog.onTrue}
               sx={[
                 (theme) => ({
+                  width: 32,
+                  height: 32,
+                  padding: 0,
+                  minWidth: 32,
+                  borderRadius: 1,
+                  marginLeft: 0.5,
                   border: `dashed 1px ${theme.vars.palette.divider}`,
                   bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
                 }),
               ]}
             >
-              <Iconify icon="mingcute:add-line" />
+              <Iconify icon="mingcute:add-line" width={16} />
             </IconButton>
           </Tooltip>
 
@@ -172,21 +247,9 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
             assignee={task.assignee}
             open={contactsDialog.value}
             onClose={contactsDialog.onFalse}
+            onAssignee={handleAssignee}
           />
         </Box>
-      </Box>
-
-      {/* Label */}
-      <Box sx={{ display: 'flex' }}>
-        <BlockLabel sx={{ height: 24, lineHeight: '24px' }}>Labels</BlockLabel>
-
-        {!!task.labels.length && (
-          <Box sx={{ gap: 1, display: 'flex', flexWrap: 'wrap' }}>
-            {task.labels.map((label) => (
-              <Chip key={label} color="info" label={label} size="small" variant="soft" />
-            ))}
-          </Box>
-        )}
       </Box>
 
       {/* Due date */}
@@ -259,29 +322,37 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <div>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          {subtaskCompleted.length} of {SUBTASKS.length}
+          {subtaskCompleted.length} of {subtasks.length}
         </Typography>
 
         <LinearProgress
           variant="determinate"
-          value={(subtaskCompleted.length / SUBTASKS.length) * 100}
+          value={(subtaskCompleted.length / subtasks.length) * 100}
         />
       </div>
 
       <FormGroup>
-        {SUBTASKS.map((taskItem) => (
-          <FormControlLabel
-            key={taskItem}
-            control={
-              <Checkbox
-                disableRipple
-                name={taskItem}
-                checked={subtaskCompleted.includes(taskItem)}
-              />
-            }
-            label={taskItem}
-            onChange={() => handleClickSubtaskComplete(taskItem)}
-          />
+        {subtasks.map((taskItem) => (
+          <Box key={taskItem} sx={{ display: 'flex', alignItems: 'center' }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  disableRipple
+                  name={taskItem}
+                  checked={subtaskCompleted.includes(taskItem)}
+                />
+              }
+              label={taskItem}
+              onChange={() => handleClickSubtaskComplete(taskItem)}
+              sx={{ flexGrow: 1 }}
+            />
+            <IconButton size="small" onClick={() => handleEditSubtask(taskItem)}>
+              <Iconify icon="eva:edit-fill" />
+            </IconButton>
+            <IconButton size="small" onClick={() => handleDeleteSubtask(taskItem)}>
+              <Iconify icon="eva:trash-2-fill" />
+            </IconButton>
+          </Box>
         ))}
       </FormGroup>
 
@@ -289,14 +360,36 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
         variant="outlined"
         startIcon={<Iconify icon="mingcute:add-line" />}
         sx={{ alignSelf: 'flex-start' }}
+        onClick={() => {
+          setEditingSubtask(null);
+          setNewSubtaskName('');
+          setNewSubtaskDialog(true);
+        }}
       >
-        Subtask
+        Add Subtask
       </Button>
+
+      <Dialog open={newSubtaskDialog} onClose={() => setNewSubtaskDialog(false)}>
+        <DialogTitle>{editingSubtask ? 'Edit Subtask' : 'Add New Subtask'}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            value={newSubtaskName}
+            onChange={(e) => setNewSubtaskName(e.target.value)}
+            placeholder="Enter subtask name"
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNewSubtaskDialog(false)}>Cancel</Button>
+          <Button onClick={editingSubtask ? handleUpdateSubtask : handleAddSubtask}>
+            {editingSubtask ? 'Update' : 'Add'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
-
-  const renderTabComments = () =>
-    !!task.comments.length && <KanbanDetailsCommentList comments={task.comments} />;
 
   return (
     <Drawer
@@ -312,10 +405,7 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
       <Scrollbar fillContent sx={{ py: 3, px: 2.5 }}>
         {tabs.value === 'overview' && renderTabOverview()}
         {tabs.value === 'subTasks' && renderTabSubtasks()}
-        {tabs.value === 'comments' && renderTabComments()}
       </Scrollbar>
-
-      {tabs.value === 'comments' && <KanbanDetailsCommentInput />}
     </Drawer>
   );
 }

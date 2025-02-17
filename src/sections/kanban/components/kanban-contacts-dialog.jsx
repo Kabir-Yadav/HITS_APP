@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -12,6 +12,7 @@ import DialogContent from '@mui/material/DialogContent';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { _contacts } from 'src/_mock';
+import { supabase } from 'src/lib/supabase';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -21,14 +22,45 @@ import { SearchNotFound } from 'src/components/search-not-found';
 
 const ITEM_HEIGHT = 64;
 
-export function KanbanContactsDialog({ assignee = [], open, onClose }) {
+export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee }) {
   const [searchContact, setSearchContact] = useState('');
+  const [contacts, setContacts] = useState([]);
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, email, avatar_url')
+        .order('full_name');
+
+      if (!error) {
+        setContacts(data);
+      }
+    };
+
+    if (open) {
+      fetchContacts();
+    }
+  }, [open]);
 
   const handleSearchContacts = useCallback((event) => {
     setSearchContact(event.target.value);
   }, []);
 
-  const dataFiltered = applyFilter({ inputData: _contacts, query: searchContact });
+  const handleAssignContact = useCallback(
+    (contact) => {
+      const isAssigned = assignee.map((person) => person.id).includes(contact.id);
+
+      if (isAssigned) {
+        onAssignee(assignee.filter((person) => person.id !== contact.id));
+      } else {
+        onAssignee([...assignee, contact]);
+      }
+    },
+    [assignee, onAssignee]
+  );
+
+  const dataFiltered = applyFilter({ inputData: contacts, query: searchContact });
 
   const notFound = !dataFiltered.length && !!searchContact;
 
@@ -60,29 +92,37 @@ export function KanbanContactsDialog({ assignee = [], open, onClose }) {
         {notFound ? (
           <SearchNotFound query={searchContact} sx={{ mt: 3, mb: 10 }} />
         ) : (
-          <Scrollbar sx={{ height: ITEM_HEIGHT * 6, px: 2.5 }}>
-            <Box component="ul">
+          <Scrollbar sx={{ px: 2.5, height: 'auto', maxHeight: 400 }}>
+            <Box component="ul" sx={{ py: 1 }}>
               {dataFiltered.map((contact) => {
-                const checked = assignee.map((person) => person.name).includes(contact.name);
+                const checked = assignee.map((person) => person.id).includes(contact.id);
 
                 return (
                   <Box
                     component="li"
                     key={contact.id}
                     sx={{
-                      gap: 2,
+                      p: 1,
                       display: 'flex',
-                      height: ITEM_HEIGHT,
                       alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 1,
+                      '&:hover': {
+                        bgcolor: 'action.hover',
+                      },
                     }}
                   >
-                    <Avatar src={contact.avatarUrl} />
-
-                    <ListItemText primary={contact.name} secondary={contact.email} />
+                    <Box>
+                      <Typography variant="subtitle2">{contact.full_name}</Typography>
+                      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                        {contact.email}
+                      </Typography>
+                    </Box>
 
                     <Button
                       size="small"
                       color={checked ? 'primary' : 'inherit'}
+                      onClick={() => handleAssignContact(contact)}
                       startIcon={
                         <Iconify
                           width={16}
@@ -109,7 +149,9 @@ export function KanbanContactsDialog({ assignee = [], open, onClose }) {
 function applyFilter({ inputData, query }) {
   if (!query) return inputData;
 
-  return inputData.filter(({ name, email }) =>
-    [name, email].some((field) => field?.toLowerCase().includes(query.toLowerCase()))
+  return inputData.filter(
+    ({ full_name, email }) =>
+      full_name?.toLowerCase().includes(query.toLowerCase()) ||
+      email?.toLowerCase().includes(query.toLowerCase())
   );
 }
