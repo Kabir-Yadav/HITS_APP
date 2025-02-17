@@ -12,9 +12,17 @@ import { useMessagesScroll } from './hooks/use-messages-scroll';
 export function ChatMessageList({ messages = [], participants, loading }) {
   const { messagesEndRef } = useMessagesScroll(messages);
 
-  const slides = messages
-    .filter((message) => message.contentType === 'image')
-    .map((message) => ({ src: message.body }));
+  // ✅ Collect all image attachments from messages
+  const slides = messages.flatMap(
+    (message) =>
+      message.attachments
+        ?.filter(
+          (attachment) =>
+            attachment.type.startsWith('image') ||
+            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(attachment.type.toLowerCase())
+        )
+        .map((attachment) => ({ src: attachment.path })) || []
+  );
 
   const lightbox = useLightBox(slides);
 
@@ -52,7 +60,9 @@ export function ChatMessageList({ messages = [], participants, loading }) {
             key={message.id}
             message={message}
             participants={participants}
-            onOpenLightbox={() => lightbox.onOpen(message.body)}
+            onOpenLightbox={(imageUrl) => {
+              lightbox.onOpen(imageUrl);
+            }}
           />
         ))}
       </Scrollbar>

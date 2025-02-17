@@ -64,6 +64,11 @@ export const navData = [
     items: [
       { title: 'Kanban', path: paths.dashboard.kanban, icon: ICONS.kanban },
       {
+        title:'Chat',
+        path: paths.dashboard.chat, 
+        icon: ICONS.chat,
+      },
+      {
         title: 'Recruitment',
         path: paths.dashboard.recruitment.root,
         icon: ICONS.external,

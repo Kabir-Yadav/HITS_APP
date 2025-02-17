@@ -41,7 +41,6 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
       if (!mdUp) {
         onCloseMobile();
       }
-
       await clickConversation(conversation.id);
 
       const redirectPath = `${paths.dashboard.chat}?id=${conversation.id}`;

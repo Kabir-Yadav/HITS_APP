@@ -6,10 +6,17 @@ export function getMessage({ message, participants, currentUserId }) {
   const isCurrentUser = message.senderId === currentUserId;
 
   const senderDetails = isCurrentUser
-    ? { type: 'me' }
-    : { avatarUrl: sender?.avatarUrl, firstName: sender?.name?.split(' ')[0] ?? 'Unknown' };
+    ? { type: "me" }
+    : { avatarUrl: sender?.avatarUrl, firstName: sender?.name?.split(" ")[0] ?? "Unknown" };
+  // console.log(message)
+  // ✅ Detect Images
+  const hasImage = message.contentType?.startsWith("image");
 
-  const hasImage = message.contentType === 'image';
+  // ✅ Detect Files (PDFs, ZIPs, DOCs, etc.)
+  const hasFile = message.contentType?.startsWith("application");
 
-  return { hasImage, me: isCurrentUser, senderDetails };
+  // ✅ Detect Folders (Assuming folders are marked as `[FOLDER]` in body)
+  const hasFolder = message.body?.includes("[FOLDER]");
+
+  return { hasImage, hasFile, hasFolder, me: isCurrentUser, senderDetails };
 }

@@ -30,11 +30,10 @@ export function ChatView() {
   const { user } = useMockedUser();
 
   const { contacts } = useGetContacts();
-
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
 
-  const { conversations, conversationsLoading } = useGetConversations();
+  const { conversations, conversationsLoading } = useGetConversations(user?.id);
   const { conversation, conversationError, conversationLoading } =
     useGetConversation(selectedConversationId);
 
@@ -42,7 +41,6 @@ export function ChatView() {
   const conversationsNav = useCollapseNav();
 
   const [recipients, setRecipients] = useState([]);
-
   useEffect(() => {
     if (!selectedConversationId) {
       startTransition(() => {
@@ -82,13 +80,22 @@ export function ChatView() {
             <ChatHeaderCompose contacts={contacts} onAddRecipients={handleAddRecipients} />
           ),
           nav: (
-            <ChatNav
-              contacts={contacts}
-              conversations={conversations}
-              selectedConversationId={selectedConversationId}
-              collapseNav={conversationsNav}
-              loading={conversationsLoading}
-            />
+            <div
+              style={{
+                height: '100%',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <ChatNav
+                contacts={contacts}
+                conversations={conversations}
+                selectedConversationId={selectedConversationId}
+                collapseNav={conversationsNav}
+                loading={conversationsLoading}
+              />
+            </div>
           ),
           main: (
             <>

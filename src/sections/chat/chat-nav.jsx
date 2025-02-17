@@ -38,7 +38,6 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
   const router = useRouter();
 
   const { user } = useMockedUser();
-
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -59,10 +58,10 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
       role: `${user?.role}`,
       email: `${user?.email}`,
       address: `${user?.address}`,
-      name: `${user?.displayName}`,
+      name: `${user?.name}`,
       lastActivity: today(),
-      avatarUrl: `${user?.photoURL}`,
-      phoneNumber: `${user?.phoneNumber}`,
+      avatarUrl: `${user?.avatar_url}`,
+      phoneNumber: `${user?.phone_number}`,
       status: 'online',
     }),
     [user]
