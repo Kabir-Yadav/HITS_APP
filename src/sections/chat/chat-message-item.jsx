@@ -3,10 +3,13 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import ListItemText from '@mui/material/ListItemText';
 
 import { fToNow } from 'src/utils/format-time';
+import { fDateTime } from 'src/utils/format-time';
 
 import { Iconify } from 'src/components/iconify';
+import { FileThumbnail } from 'src/components/file-thumbnail';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -43,61 +46,57 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
 
     return (
       <Stack spacing={1} sx={{ mb: 1 }}>
-        {attachments.map((attachment) => {
-          // ✅ Normalize Type Handling
+        {attachments.map((attachment, index) => {
           const fileType = attachment.type.toLowerCase();
-          const isImage =
-            fileType.includes('image') ||
-            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
+          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
 
-          return (
+          return isImage ? (
+            // ✅ Display images properly and pass correct `path`
             <Box
-              key={attachment.id}
+              key={attachment.name + index}
+              component="img"
+              alt="Attachment"
+              src={attachment.path} // ✅ Use correct S3 URL
+              onClick={() => onOpenLightbox(attachment.path)} // ✅ Pass correct image URL
               sx={{
-                p: 1.5,
-                borderRadius: 1,
-                maxWidth: 320,
-                bgcolor: 'background.neutral',
-                display: 'flex',
-                alignItems: 'center',
-                ...(me && { bgcolor: 'primary.lighter' }),
+                width: 250,
+                height: 'auto',
+                borderRadius: 1.5,
+                cursor: 'pointer',
+                objectFit: 'cover',
+                aspectRatio: '16/11',
+                '&:hover': { opacity: 0.9 },
               }}
+            />
+          ) : (
+            // ✅ Display non-image files using `FileThumbnail`
+            <Box
+              key={attachment.name + index}
+              sx={{ gap: 1.5, display: 'flex', alignItems: 'center' }}
             >
-              {/* ✅ Render Image Preview Instead of Name */}
-              {isImage ? (
-                <Box
-                  component="img"
-                  alt="Attachment"
-                  src={attachment.path} // ✅ Use correct S3 URL
-                  onClick={() => onOpenLightbox(attachment.path)}
-                  sx={{
-                    width: 250,
-                    height: 'auto',
-                    borderRadius: 1.5,
-                    cursor: 'pointer',
-                    objectFit: 'cover',
-                    aspectRatio: '16/11',
-                    '&:hover': { opacity: 0.9 },
-                  }}
-                />
-              ) : (
-                <Stack direction="row" alignItems="center">
-                  <Iconify icon="eva:file-text-outline" width={24} sx={{ mr: 1 }} />
-                  <Typography
-                    variant="body2"
-                    sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  >
-                    <a
-                      href={attachment.path}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ textDecoration: 'none', color: 'inherit' }}
-                    >
-                      {attachment.name}
-                    </a>
-                  </Typography>
-                </Stack>
-              )}
+              <FileThumbnail
+                imageView
+                file={attachment.preview}
+                onDownload={() => window.open(attachment.path, '_blank')}
+                slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
+                sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
+              />
+
+              <ListItemText
+                primary={attachment.name}
+                secondary={fDateTime(attachment.createdAt)}
+                slotProps={{
+                  primary: { noWrap: true, sx: { typography: 'body2' } },
+                  secondary: {
+                    noWrap: true,
+                    sx: {
+                      mt: 0.25,
+                      typography: 'caption',
+                      color: 'text.disabled',
+                    },
+                  },
+                }}
+              />
             </Box>
           );
         })}
