@@ -41,11 +41,11 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
   );
 
   // ✅ Function to Render Attachments First
-  const renderAttachments = () => {
+  const renderAttachments = (isCurrentUser) => {
     if (!attachments || attachments.length === 0) return null;
 
     return (
-      <Stack spacing={1} sx={{ mb: 1 }}>
+      <Stack spacing={1} sx={{ mb: 1, alignItems: isCurrentUser ? 'end' : 'start' }}>
         {attachments.map((attachment, index) => {
           const fileType = attachment.type.toLowerCase();
           const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
@@ -112,7 +112,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
         sx={{
           p: 1.5,
           minWidth: 48,
-          maxWidth: 320,
+          maxWidth: 450,
           borderRadius: 1,
           typography: 'body2',
           bgcolor: 'background.neutral',
@@ -170,7 +170,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
           }}
         >
           <Stack spacing={1}>
-            {renderAttachments()} {/* ✅ Attachments are displayed first */}
+            {renderAttachments(me)} {/* ✅ Attachments are displayed first */}
             {renderBody()} {/* ✅ Message text appears below attachments */}
           </Stack>
           {renderActions()}

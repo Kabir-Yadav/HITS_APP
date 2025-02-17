@@ -16,9 +16,12 @@ import { CollapseButton } from './styles';
 export function ChatRoomAttachments({ attachments }) {
   const collapse = useBoolean(true);
   const totalAttachments = attachments.length;
-
+  // ✅ Sort attachments in descending order by `createdAt`
+  const sortedAttachments = [...attachments].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  );
   const renderList = () =>
-    attachments.map((attachment, index) => (
+    sortedAttachments.map((attachment, index) => (
       <Box key={attachment.name + index} sx={{ gap: 1.5, display: 'flex', alignItems: 'center' }}>
         <FileThumbnail
           imageView
