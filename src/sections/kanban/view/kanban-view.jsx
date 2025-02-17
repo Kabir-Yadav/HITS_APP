@@ -1,4 +1,5 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { compareDesc } from 'date-fns';
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   arrayMove,
   SortableContext,
@@ -53,6 +54,18 @@ const cssVars = {
 
 // ----------------------------------------------------------------------
 
+const priorityOrder = {
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+const sortTasks = (tasks) => [...tasks].sort((a, b) => {
+  const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+  if (priorityDiff !== 0) return priorityDiff;
+  return compareDesc(new Date(a.due[0]), new Date(b.due[0]));
+});
+
 export function KanbanView() {
   const { board, boardLoading, boardEmpty } = useGetBoard();
 
@@ -62,17 +75,29 @@ export function KanbanView() {
   const [columnFixed, setColumnFixed] = useState(true);
   const [activeId, setActiveId] = useState(null);
 
-  const columnIds = board.columns.map((column) => column.id);
+  const sortedBoard = useMemo(() => {
+    if (!board.tasks) return { tasks: {}, columns: [] };
+
+    const sortedTasks = {};
+    Object.keys(board.tasks).forEach((columnId) => {
+      sortedTasks[columnId] = sortTasks(board.tasks[columnId]);
+    });
+
+    return {
+      ...board,
+      tasks: sortedTasks,
+    };
+  }, [board]);
+
+  const columnIds = sortedBoard.columns.map((column) => column.id);
 
   const isSortingContainer = activeId != null ? columnIds.includes(activeId) : false;
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
-      // Require the mouse to move by 3px pixels before activating
       activationConstraint: { distance: 3 },
     }),
     useSensor(TouchSensor, {
-      // Press delay of 250ms, with tolerance of 5px of movement
       activationConstraint: { delay: 250, tolerance: 5 },
     }),
     useSensor(KeyboardSensor, { coordinateGetter })
@@ -80,25 +105,19 @@ export function KanbanView() {
 
   const collisionDetectionStrategy = useCallback(
     (args) => {
-      if (activeId && activeId in board.tasks) {
+      if (activeId && activeId in sortedBoard.tasks) {
         return closestCenter({
           ...args,
           droppableContainers: args.droppableContainers.filter(
-            (column) => column.id in board.tasks
+            (column) => column.id in sortedBoard.tasks
           ),
         });
       }
 
-      // Start by finding any intersecting droppable
       const pointerIntersections = pointerWithin(args);
       const cornersCollisions = closestCorners(args);
       const centerCollisions = closestCenter(args);
 
-      // OLD
-      // const intersections = pointerIntersections.length > 0 ? pointerIntersections : rectIntersection(args);
-
-      // NEW
-      // https://github.com/clauderic/dnd-kit/issues/900#issuecomment-2068314434
       const intersections =
         !!pointerIntersections.length && !!centerCollisions.length && !!cornersCollisions.length
           ? pointerIntersections
@@ -107,12 +126,10 @@ export function KanbanView() {
       let overId = getFirstCollision(intersections, 'id');
 
       if (overId != null) {
-        if (overId in board.tasks) {
-          const columnItems = board.tasks[overId].map((task) => task.id);
+        if (overId in sortedBoard.tasks) {
+          const columnItems = sortedBoard.tasks[overId].map((task) => task.id);
 
-          // If a column is matched and it contains items (columns 'A', 'B', 'C')
           if (columnItems.length > 0) {
-            // Return the closest droppable within that column
             overId = closestCenter({
               ...args,
               droppableContainers: args.droppableContainers.filter(
@@ -127,27 +144,22 @@ export function KanbanView() {
         return [{ id: overId }];
       }
 
-      // When a draggable item moves to a new column, the layout may shift
-      // and the `overId` may become `null`. We manually set the cached `lastOverId`
-      // to the id of the draggable item that was moved to the new column, otherwise
-      // the previous `overId` will be returned which can cause items to incorrectly shift positions
       if (recentlyMovedToNewContainer.current) {
         lastOverId.current = activeId;
       }
 
-      // If no droppable is matched, return the last match
       return lastOverId.current ? [{ id: lastOverId.current }] : [];
     },
-    [activeId, board?.tasks]
+    [activeId, sortedBoard.tasks]
   );
 
   const findColumn = (id) => {
-    if (id in board.tasks) {
+    if (id in sortedBoard.tasks) {
       return id;
     }
 
-    return Object.keys(board.tasks).find((key) =>
-      board.tasks[key].map((task) => task.id).includes(id)
+    return Object.keys(sortedBoard.tasks).find((key) =>
+      sortedBoard.tasks[key].map((task) => task.id).includes(id)
     );
   };
 
@@ -170,7 +182,7 @@ export function KanbanView() {
   const onDragOver = ({ active, over }) => {
     const overId = over?.id;
 
-    if (overId == null || active.id in board.tasks) {
+    if (overId == null || active.id in sortedBoard.tasks) {
       return;
     }
 
@@ -182,14 +194,14 @@ export function KanbanView() {
     }
 
     if (activeColumn !== overColumn) {
-      const activeItems = board.tasks[activeColumn].map((task) => task.id);
-      const overItems = board.tasks[overColumn].map((task) => task.id);
+      const activeItems = sortedBoard.tasks[activeColumn].map((task) => task.id);
+      const overItems = sortedBoard.tasks[overColumn].map((task) => task.id);
       const overIndex = overItems.indexOf(overId);
       const activeIndex = activeItems.indexOf(active.id);
 
       let newIndex;
 
-      if (overId in board.tasks) {
+      if (overId in sortedBoard.tasks) {
         newIndex = overItems.length + 1;
       } else {
         const isBelowOverItem =
@@ -204,17 +216,19 @@ export function KanbanView() {
 
       recentlyMovedToNewContainer.current = true;
 
-      const updateTasks = {
-        ...board.tasks,
-        [activeColumn]: board.tasks[activeColumn].filter((task) => task.id !== active.id),
+      const updatedTasks = {
+        ...sortedBoard.tasks,
+        [activeColumn]: sortedBoard.tasks[activeColumn].filter((task) => task.id !== active.id),
         [overColumn]: [
-          ...board.tasks[overColumn].slice(0, newIndex),
-          board.tasks[activeColumn][activeIndex],
-          ...board.tasks[overColumn].slice(newIndex, board.tasks[overColumn].length),
+          ...sortedBoard.tasks[overColumn].slice(0, newIndex),
+          sortedBoard.tasks[activeColumn][activeIndex],
+          ...sortedBoard.tasks[overColumn].slice(newIndex, sortedBoard.tasks[overColumn].length),
         ],
       };
 
-      moveTask(updateTasks);
+      updatedTasks[overColumn] = sortTasks(updatedTasks[overColumn]);
+
+      moveTask(updatedTasks);
     }
   };
 
@@ -222,10 +236,10 @@ export function KanbanView() {
    * onDragEnd
    */
   const onDragEnd = ({ active, over }) => {
-    if (active.id in board.tasks && over?.id) {
+    if (active.id in sortedBoard.tasks && over?.id) {
       const activeIndex = columnIds.indexOf(active.id);
       const overIndex = columnIds.indexOf(over.id);
-      const updateColumns = arrayMove(board.columns, activeIndex, overIndex);
+      const updateColumns = arrayMove(sortedBoard.columns, activeIndex, overIndex);
 
       moveColumn(updateColumns);
     }
@@ -247,17 +261,19 @@ export function KanbanView() {
     const overColumn = findColumn(overId);
 
     if (overColumn) {
-      const activeContainerTaskIds = board.tasks[activeColumn].map((task) => task.id);
-      const overContainerTaskIds = board.tasks[overColumn].map((task) => task.id);
+      const activeContainerTaskIds = sortedBoard.tasks[activeColumn].map((task) => task.id);
+      const overContainerTaskIds = sortedBoard.tasks[overColumn].map((task) => task.id);
 
       const activeIndex = activeContainerTaskIds.indexOf(active.id);
       const overIndex = overContainerTaskIds.indexOf(overId);
 
       if (activeIndex !== overIndex) {
         const updateTasks = {
-          ...board.tasks,
-          [overColumn]: arrayMove(board.tasks[overColumn], activeIndex, overIndex),
+          ...sortedBoard.tasks,
+          [overColumn]: arrayMove(sortedBoard.tasks[overColumn], activeIndex, overIndex),
         };
+
+        updateTasks[overColumn] = sortTasks(updateTasks[overColumn]);
 
         moveTask(updateTasks);
       }
@@ -312,13 +328,13 @@ export function KanbanView() {
               items={[...columnIds, PLACEHOLDER_ID]}
               strategy={horizontalListSortingStrategy}
             >
-              {board?.columns.map((column) => (
-                <KanbanColumn key={column.id} column={column} tasks={board.tasks[column.id]}>
+              {sortedBoard.columns.map((column) => (
+                <KanbanColumn key={column.id} column={column} tasks={sortedBoard.tasks[column.id]}>
                   <SortableContext
-                    items={board.tasks[column.id]}
+                    items={sortedBoard.tasks[column.id]}
                     strategy={verticalListSortingStrategy}
                   >
-                    {board.tasks[column.id].map((task) => (
+                    {sortedBoard.tasks[column.id].map((task) => (
                       <KanbanTaskItem
                         key={task.id}
                         task={task}
@@ -337,8 +353,8 @@ export function KanbanView() {
       </Stack>
 
       <KanbanDragOverlay
-        columns={board?.columns}
-        tasks={board?.tasks}
+        columns={sortedBoard.columns}
+        tasks={sortedBoard.tasks}
         activeId={activeId}
         sx={cssVars}
       />

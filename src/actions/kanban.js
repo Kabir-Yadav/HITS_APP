@@ -1,6 +1,7 @@
 import useSWR, { mutate } from 'swr';
 import { useMemo, startTransition } from 'react';
 
+import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
@@ -18,20 +19,54 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 
 export function useGetBoard() {
-  const { data, isLoading, error, isValidating } = useSWR(KANBAN_ENDPOINT, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(
+    'kanban-board',
+    async () => {
+      // Fetch columns
+      const { data: columns, error: columnsError } = await supabase
+        .from('kanban_columns')
+        .select('*')
+        .order('position');
 
-  const memoizedValue = useMemo(() => {
-    const tasks = data?.board.tasks ?? {};
-    const columns = data?.board.columns ?? [];
+      if (columnsError) throw columnsError;
 
-    return {
-      board: { tasks, columns },
+      // Fetch tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('kanban_task_details')
+        .select('*');
+
+      if (tasksError) throw tasksError;
+
+      // Organize tasks by column
+      const tasks = columns.reduce((acc, column) => {
+        acc[column.id] = tasksData
+          .filter(task => task.column_id === column.id)
+          .sort((a, b) => a.position - b.position);
+        return acc;
+      }, {});
+
+      return {
+        board: {
+          columns,
+          tasks
+        }
+      };
+    }
+  );
+
+  const memoizedValue = useMemo(
+    () => ({
+      board: {
+        tasks: data?.board.tasks ?? {},
+        columns: data?.board.columns ?? []
+      },
       boardLoading: isLoading,
       boardError: error,
       boardValidating: isValidating,
-      boardEmpty: !isLoading && !isValidating && !columns.length,
-    };
-  }, [data?.board.columns, data?.board.tasks, error, isLoading, isValidating]);
+      boardEmpty: !isLoading && !isValidating && !data?.board.columns.length,
+    }),
+    [data?.board.columns, data?.board.tasks, error, isLoading, isValidating]
+  );
 
   return memoizedValue;
 }
@@ -39,69 +74,37 @@ export function useGetBoard() {
 // ----------------------------------------------------------------------
 
 export async function createColumn(columnData) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnData };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'create-column' } });
-  }
+  const { data: columns } = await supabase
+    .from('kanban_columns')
+    .select('position')
+    .order('position', { ascending: false })
+    .limit(1);
 
-  /**
-   * Work in local
-   */
-  mutate(
-    KANBAN_ENDPOINT,
-    (currentData) => {
-      const { board } = currentData;
+  const position = (columns?.[0]?.position || 0) + 1;
 
-      // add new column in board.columns
-      const columns = [...board.columns, columnData];
+  const { data, error } = await supabase
+    .from('kanban_columns')
+    .insert([{ ...columnData, position }])
+    .select()
+    .single();
 
-      // add new task in board.tasks
-      const tasks = { ...board.tasks, [columnData.id]: [] };
+  if (error) throw error;
 
-      return { ...currentData, board: { ...board, columns, tasks } };
-    },
-    false
-  );
+  mutate('kanban-board');
+  return data;
 }
 
 // ----------------------------------------------------------------------
 
 export async function updateColumn(columnId, columnName) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnId, columnName };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'update-column' } });
-  }
+  const { error } = await supabase
+    .from('kanban_columns')
+    .update({ name: columnName })
+    .eq('id', columnId);
 
-  /**
-   * Work in local
-   */
-  startTransition(() => {
-    mutate(
-      KANBAN_ENDPOINT,
-      (currentData) => {
-        const { board } = currentData;
+  if (error) throw error;
 
-        const columns = board.columns.map((column) =>
-          column.id === columnId
-            ? {
-                // Update data when found
-                ...column,
-                name: columnName,
-              }
-            : column
-        );
-
-        return { ...currentData, board: { ...board, columns } };
-      },
-      false
-    );
-  });
+  mutate('kanban-board');
 }
 
 // ----------------------------------------------------------------------
@@ -164,110 +167,98 @@ export async function clearColumn(columnId) {
 // ----------------------------------------------------------------------
 
 export async function deleteColumn(columnId) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnId };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'delete-column' } });
-  }
+  const { error } = await supabase
+    .from('kanban_columns')
+    .delete()
+    .eq('id', columnId);
 
-  /**
-   * Work in local
-   */
-  mutate(
-    KANBAN_ENDPOINT,
-    (currentData) => {
-      const { board } = currentData;
+  if (error) throw error;
 
-      // delete column in board.columns
-      const columns = board.columns.filter((column) => column.id !== columnId);
-
-      // delete tasks by column deleted
-      const tasks = Object.keys(board.tasks)
-        .filter((key) => key !== columnId)
-        .reduce((obj, key) => {
-          obj[key] = board.tasks[key];
-          return obj;
-        }, {});
-
-      return { ...currentData, board: { ...board, columns, tasks } };
-    },
-    false
-  );
+  mutate('kanban-board');
 }
 
 // ----------------------------------------------------------------------
 
 export async function createTask(columnId, taskData) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnId, taskData };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'create-task' } });
+  const { data: tasks } = await supabase
+    .from('kanban_tasks')
+    .select('position')
+    .eq('column_id', columnId)
+    .order('position', { ascending: false })
+    .limit(1);
+
+  const position = (tasks?.[0]?.position || 0) + 1;
+
+  const { data, error } = await supabase
+    .from('kanban_tasks')
+    .insert([{ 
+      ...taskData,
+      column_id: columnId,
+      position,
+      created_by: supabase.auth.user()?.id
+    }])
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Handle assignees if any
+  if (taskData.assignee?.length) {
+    const assigneeData = taskData.assignee.map(user => ({
+      task_id: data.id,
+      user_id: user.id
+    }));
+
+    const { error: assigneeError } = await supabase
+      .from('kanban_task_assignees')
+      .insert(assigneeData);
+
+    if (assigneeError) throw assigneeError;
   }
 
-  /**
-   * Work in local
-   */
-  startTransition(() => {
-    mutate(
-      KANBAN_ENDPOINT,
-      (currentData) => {
-        const { board } = currentData;
-
-        // add task in board.tasks
-        const tasks = { ...board.tasks, [columnId]: [taskData, ...board.tasks[columnId]] };
-
-        return { ...currentData, board: { ...board, tasks } };
-      },
-      false
-    );
-  });
+  mutate('kanban-board');
+  return data;
 }
 
 // ----------------------------------------------------------------------
 
 export async function updateTask(columnId, taskData) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnId, taskData };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'update-task' } });
+  const { error } = await supabase
+    .from('kanban_tasks')
+    .update({
+      name: taskData.name,
+      description: taskData.description,
+      priority: taskData.priority,
+      due_date: taskData.due[0]
+    })
+    .eq('id', taskData.id);
+
+  if (error) throw error;
+
+  // Update assignees
+  if (taskData.assignee) {
+    // Remove existing assignees
+    await supabase
+      .from('kanban_task_assignees')
+      .delete()
+      .eq('task_id', taskData.id);
+
+    // Add new assignees
+    const assigneeData = taskData.assignee.map(user => ({
+      task_id: taskData.id,
+      user_id: user.id
+    }));
+
+    if (assigneeData.length) {
+      const { error: assigneeError } = await supabase
+        .from('kanban_task_assignees')
+        .insert(assigneeData);
+
+      if (assigneeError) throw assigneeError;
+    }
   }
 
-  /**
-   * Work in local
-   */
-  startTransition(() => {
-    mutate(
-      KANBAN_ENDPOINT,
-      (currentData) => {
-        const { board } = currentData;
-
-        // tasks in column
-        const tasksInColumn = board.tasks[columnId];
-
-        // find and update task
-        const updateTasks = tasksInColumn.map((task) =>
-          task.id === taskData.id
-            ? {
-                // Update data when found
-                ...task,
-                ...taskData,
-              }
-            : task
-        );
-
-        const tasks = { ...board.tasks, [columnId]: updateTasks };
-
-        return { ...currentData, board: { ...board, tasks } };
-      },
-      false
-    );
-  });
+  mutate('kanban-board');
 }
 
 // ----------------------------------------------------------------------
@@ -282,10 +273,21 @@ export async function moveTask(updateTasks) {
       (currentData) => {
         const { board } = currentData;
 
-        // update board.tasks
-        const tasks = updateTasks;
+        // Find the column containing the task and update its status
+        Object.keys(updateTasks).forEach((columnId) => {
+          updateTasks[columnId] = updateTasks[columnId].map(task => ({
+            ...task,
+            status: board.columns.find(col => col.id === columnId)?.name || task.status
+          }));
+        });
 
-        return { ...currentData, board: { ...board, tasks } };
+        return { 
+          ...currentData, 
+          board: { 
+            ...board, 
+            tasks: updateTasks 
+          } 
+        };
       },
       false
     );
@@ -303,30 +305,26 @@ export async function moveTask(updateTasks) {
 // ----------------------------------------------------------------------
 
 export async function deleteTask(columnId, taskId) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { columnId, taskId };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'delete-task' } });
-  }
+  const { error } = await supabase
+    .from('kanban_tasks')
+    .delete()
+    .eq('id', taskId);
 
-  /**
-   * Work in local
-   */
-  mutate(
-    KANBAN_ENDPOINT,
-    (currentData) => {
-      const { board } = currentData;
+  if (error) throw error;
 
-      // delete task in column
-      const tasks = {
-        ...board.tasks,
-        [columnId]: board.tasks[columnId].filter((task) => task.id !== taskId),
-      };
+  mutate('kanban-board');
+}
 
-      return { ...currentData, board: { ...board, tasks } };
-    },
-    false
-  );
+// ----------------------------------------------------------------------
+
+export async function moveTaskBetweenColumns(task, sourceColumnId, targetColumnId) {
+  const { error } = await supabase.rpc('move_task_between_columns', {
+    p_task_id: task.id,
+    p_source_column_id: sourceColumnId,
+    p_target_column_id: targetColumnId
+  });
+
+  if (error) throw error;
+
+  mutate('kanban-board');
 }

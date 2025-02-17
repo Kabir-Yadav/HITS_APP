@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -10,6 +10,8 @@ import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
+import { useGetBoard, moveTaskBetweenColumns } from 'src/actions/kanban';
+
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
@@ -18,28 +20,50 @@ import { CustomPopover } from 'src/components/custom-popover';
 
 export function KanbanDetailsToolbar({
   sx,
+  task,
   liked,
   taskName,
   onDelete,
   taskStatus,
   onLikeToggle,
   onCloseDetails,
+  onUpdateStatus,
   ...other
 }) {
   const theme = useTheme();
   const smUp = useMediaQuery(theme.breakpoints.up('sm'));
+  const { board } = useGetBoard();
 
   const menuActions = usePopover();
   const confirmDialog = useBoolean();
 
   const [status, setStatus] = useState(taskStatus);
 
+  useEffect(() => {
+    setStatus(taskStatus);
+  }, [taskStatus]);
+
   const handleChangeStatus = useCallback(
-    (newValue) => {
-      menuActions.onClose();
-      setStatus(newValue);
+    async (newValue, targetColumnId) => {
+      try {
+        // Find current column ID
+        const sourceColumnId = Object.keys(board.tasks).find(columnId =>
+          board.tasks[columnId].some(t => t.id === task.id)
+        );
+
+        if (sourceColumnId && sourceColumnId !== targetColumnId) {
+          // Move task to new column
+          await moveTaskBetweenColumns(task, sourceColumnId, targetColumnId);
+        }
+
+        menuActions.onClose();
+        setStatus(newValue);
+        onUpdateStatus?.(newValue);
+      } catch (error) {
+        console.error('Error moving task:', error);
+      }
     },
-    [menuActions]
+    [menuActions, onUpdateStatus, task, board.tasks]
   );
 
   const renderMenuActions = () => (
@@ -50,13 +74,13 @@ export function KanbanDetailsToolbar({
       slotProps={{ arrow: { placement: 'top-right' } }}
     >
       <MenuList>
-        {['To do', 'In progress', 'Ready to test', 'Done'].map((option) => (
+        {board.columns?.map((column) => (
           <MenuItem
-            key={option}
-            selected={status === option}
-            onClick={() => handleChangeStatus(option)}
+            key={column.id}
+            selected={status === column.name}
+            onClick={() => handleChangeStatus(column.name, column.id)}
           >
-            {option}
+            {column.name}
           </MenuItem>
         ))}
       </MenuList>
@@ -115,21 +139,11 @@ export function KanbanDetailsToolbar({
         <Box component="span" sx={{ flexGrow: 1 }} />
 
         <Box sx={{ display: 'flex' }}>
-          <Tooltip title="Like">
-            <IconButton color={liked ? 'default' : 'primary'} onClick={onLikeToggle}>
-              <Iconify icon="ic:round-thumb-up" />
-            </IconButton>
-          </Tooltip>
-
           <Tooltip title="Delete task">
             <IconButton onClick={confirmDialog.onTrue}>
               <Iconify icon="solar:trash-bin-trash-bold" />
             </IconButton>
           </Tooltip>
-
-          <IconButton>
-            <Iconify icon="eva:more-vertical-fill" />
-          </IconButton>
         </Box>
       </Box>
 

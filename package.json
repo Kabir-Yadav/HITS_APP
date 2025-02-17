@@ -46,6 +46,7 @@
     "@fullcalendar/timeline": "^6.1.15",
     "@google-cloud/local-auth": "^2.1.0",
     "@googleapis/calendar": "^9.7.9",
+    "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@iconify/react": "^5.1.0",
     "@mui/icons-material": "^6.4.0",
