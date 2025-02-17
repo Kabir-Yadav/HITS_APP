@@ -17,43 +17,45 @@ export function KanbanTaskAdd({ status, openAddTask, onAddTask, onCloseAddTask }
 
   const defaultTask = useMemo(
     () => ({
-      id: uuidv4(),
-      status,
       name: taskName.trim() ? taskName : 'Untitled',
       priority: 'medium',
       attachments: [],
       assignee: [],
       due: [today(), fAdd({ days: 1 })],
-      reporter: { id: _mock.id(16), name: _mock.fullName(16), avatarUrl: _mock.image.avatar(16) },
+      description: ''
     }),
-    [status, taskName]
+    [taskName]
   );
 
   const handleChangeName = useCallback((event) => {
     setTaskName(event.target.value);
   }, []);
 
+  const handleCreateTask = useCallback(async () => {
+    try {
+      await onAddTask(defaultTask);
+      setTaskName('');
+      onCloseAddTask();
+    } catch (error) {
+      console.error(error);
+    }
+  }, [defaultTask, onAddTask, onCloseAddTask]);
+
   const handleKeyUpAddTask = useCallback(
     (event) => {
       if (event.key === 'Enter') {
-        onAddTask(defaultTask);
-        setTaskName('');
+        handleCreateTask();
       }
     },
-    [defaultTask, onAddTask]
+    [handleCreateTask]
   );
-
-  const handleCancel = useCallback(() => {
-    setTaskName('');
-    onCloseAddTask();
-  }, [onCloseAddTask]);
 
   if (!openAddTask) {
     return null;
   }
 
   return (
-    <ClickAwayListener onClickAway={handleCancel}>
+    <ClickAwayListener onClickAway={onCloseAddTask}>
       <div>
         <Paper
           sx={[

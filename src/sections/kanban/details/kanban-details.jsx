@@ -1,11 +1,13 @@
 import dayjs from 'dayjs';
-import { useState, useCallback } from 'react';
+import { toast } from 'react-hot-toast';
 import { varAlpha } from 'minimal-shared/utils';
+import { useState, useCallback, useEffect } from 'react';
 import { useTabs, useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
 import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
@@ -17,6 +19,7 @@ import TextField from '@mui/material/TextField';
 import FormGroup from '@mui/material/FormGroup';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -54,44 +57,90 @@ const BlockLabel = styled('span')(({ theme }) => ({
 
 // ----------------------------------------------------------------------
 
-export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose }) {
+export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask, onDeleteTask }) {
+  const [name, setName] = useState(task?.name || '');
+  const [status, setStatus] = useState(task?.status || '');
+  const [priority, setPriority] = useState(task?.priority || 'medium');
+  const [description, setDescription] = useState(task?.description || '');
+  const [isDescriptionChanged, setIsDescriptionChanged] = useState(false);
+  const [assignee, setAssignee] = useState(task?.assignees?.map(a => a.user) || []);
+  const [due, setDue] = useState(task?.due_date ? [new Date(task?.due_date)] : []);
+  const [attachments, setAttachments] = useState(task?.attachments || []);
+  const [saving, setSaving] = useState(false);
+
+  const [liked, setLiked] = useState(false);
+  const [completed, setCompleted] = useState(false);
+
+  const [openDateRange, setOpenDateRange] = useState(false);
+  const [openContacts, setOpenContacts] = useState(false);
+  const [newSubtaskDialog, setNewSubtaskDialog] = useState(false);
+  const [newSubtaskName, setNewSubtaskName] = useState('');
+  const [editingSubtask, setEditingSubtask] = useState(null);
+  const [subtasks, setSubtasks] = useState([]);
+
+  const dateRange = useDateRangePicker(due);
   const tabs = useTabs('overview');
+
+  useEffect(() => {
+    if (task) {
+      setName(task.name || '');
+      setStatus(task.status || '');
+      setPriority(task.priority || 'medium');
+      setDescription(task.description || '');
+      setIsDescriptionChanged(false);
+      setAssignee(task.assignees?.map(a => a.user) || []);
+      setDue(task.due_date ? [new Date(task.due_date)] : []);
+      setAttachments(task.attachments || []);
+    }
+  }, [task]);
 
   const likeToggle = useBoolean();
   const contactsDialog = useBoolean();
 
-  const [taskName, setTaskName] = useState(task.name);
-  const [priority, setPriority] = useState(task.priority);
-  const [taskDescription, setTaskDescription] = useState(task.description);
-  const [subtaskCompleted, setSubtaskCompleted] = useState([]);
-  const [subtasks, setSubtasks] = useState([]);
-  const [newSubtaskDialog, setNewSubtaskDialog] = useState(false);
-  const [newSubtaskName, setNewSubtaskName] = useState('');
-  const [editingSubtask, setEditingSubtask] = useState(null);
-
-  const rangePicker = useDateRangePicker(dayjs(task.due[0]), dayjs(task.due[1]));
-
   const handleChangeTaskName = useCallback((event) => {
-    setTaskName(event.target.value);
+    setName(event.target.value);
   }, []);
 
   const handleUpdateTask = useCallback(
     (event) => {
       try {
         if (event.key === 'Enter') {
-          if (taskName) {
-            onUpdateTask({ ...task, name: taskName });
+          if (name) {
+            onUpdateTask({ ...task, name: name });
           }
         }
       } catch (error) {
         console.error(error);
       }
     },
-    [onUpdateTask, task, taskName]
+    [onUpdateTask, task, name]
   );
 
+  const handleDescriptionChange = (e) => {
+    const newDescription = e.target.value;
+    setDescription(newDescription);
+    setIsDescriptionChanged(newDescription !== task?.description);
+  };
+
+  const handleSaveDescription = async () => {
+    try {
+      setSaving(true);
+      await onUpdateTask({
+        ...task,
+        description,
+      });
+      setIsDescriptionChanged(false);
+      toast.success('Description updated successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update description');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleChangeTaskDescription = useCallback((event) => {
-    setTaskDescription(event.target.value);
+    setDescription(event.target.value);
   }, []);
 
   const handleChangePriority = useCallback((newValue) => {
@@ -103,11 +152,11 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
   }, [onUpdateTask, task]);
 
   const handleClickSubtaskComplete = (taskId) => {
-    const selected = subtaskCompleted.includes(taskId)
-      ? subtaskCompleted.filter((value) => value !== taskId)
-      : [...subtaskCompleted, taskId];
+    const selected = completed.includes(taskId)
+      ? completed.filter((value) => value !== taskId)
+      : [...completed, taskId];
 
-    setSubtaskCompleted(selected);
+    setCompleted(selected);
   };
 
   const handleAddSubtask = () => {
@@ -120,7 +169,7 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
   const handleDeleteSubtask = (taskToDelete) => {
     setSubtasks(subtasks.filter((subtask) => subtask !== taskToDelete));
-    setSubtaskCompleted(subtaskCompleted.filter((subtask) => subtask !== taskToDelete));
+    setCompleted(completed.filter((subtask) => subtask !== taskToDelete));
   };
 
   const handleEditSubtask = (taskToEdit) => {
@@ -155,14 +204,31 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
     });
   }, [onUpdateTask, task]);
 
+  const handleSaveDueDate = async (newDate) => {
+    try {
+      setSaving(true);
+      await onUpdateTask({
+        ...task,
+        due_date: newDate,
+      });
+      setDue([newDate]);
+      toast.success('Due date updated successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update due date');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const renderToolbar = () => (
     <KanbanDetailsToolbar
       task={task}
-      taskName={task.name}
-      taskStatus={task.status}
+      taskName={name}
+      taskStatus={status}
       onDelete={onDeleteTask}
       liked={likeToggle.value}
-      onCloseDetails={onClose}
+      onCloseDetails={onCloseDetails}
       onLikeToggle={likeToggle.onToggle}
       onUpdateStatus={handleUpdateStatus}
     />
@@ -185,149 +251,101 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
   );
 
   const renderTabOverview = () => (
-    <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
-      {/* Task name */}
-      <KanbanInputName
-        placeholder="Task name"
-        value={taskName}
-        onChange={handleChangeTaskName}
-        onKeyUp={handleUpdateTask}
-        inputProps={{ id: `${taskName}-task-input` }}
-      />
-
-      {/* Reporter */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Assigned By:</BlockLabel>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Typography variant="body2">{task.reporter.name}</Typography>
-        </Box>
-      </Box>
-
-      {/* Assignee */}
-      <Box sx={{ display: 'flex' }}>
-        <BlockLabel sx={{ height: 32, lineHeight: '32px' }}>Assigned to:</BlockLabel>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {task.assignee.map((user, index) => (
-            <Box
-              key={user.id}
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                typography: 'body2',
-                ...(index < task.assignee.length - 1 && { mr: 1 }),
-              }}
+    <Stack spacing={3}>
+      <Stack spacing={1.5}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="subtitle2">Description</Typography>
+          {isDescriptionChanged && (
+            <LoadingButton
+              size="small"
+              loading={saving}
+              variant="contained"
+              onClick={handleSaveDescription}
+              startIcon={<Iconify icon="eva:save-fill" />}
+              sx={{ px: 2, py: 0.5 }}
             >
-              {user.name}
-              {index < task.assignee.length - 1 && ','}
-            </Box>
-          ))}
+              Save
+            </LoadingButton>
+          )}
+        </Box>
+        <TextField
+          fullWidth
+          multiline
+          rows={3}
+          value={description}
+          onChange={handleDescriptionChange}
+          placeholder="Add a description..."
+          sx={{
+            '& .MuiInputBase-root': {
+              bgcolor: 'background.neutral',
+            },
+          }}
+        />
+      </Stack>
 
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">Due Date</Typography>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <CustomDateRangePicker
+            open={openDateRange}
+            startDate={due[0]}
+            onChangeStartDate={(newValue) => {
+              handleSaveDueDate(newValue);
+            }}
+            onClose={() => setOpenDateRange(false)}
+          />
+          <Button 
+            variant="outlined"
+            onClick={() => setOpenDateRange(true)}
+            startIcon={<Iconify icon="solar:calendar-bold-duotone" />}
+          >
+            {due[0] ? dayjs(due[0]).format('dd MMM yyyy') : 'Set Due Date'}
+          </Button>
+        </Box>
+      </Stack>
+
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">Priority</Typography>
+        <KanbanDetailsPriority priority={priority} onChangePriority={setPriority} />
+      </Stack>
+
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">Assignee</Typography>
+        <Stack direction="row" flexWrap="wrap" alignItems="center" spacing={1}>
+          {assignee.map((person) => (
+            <Avatar key={person.id} alt={person.name} src={person.avatar_url} />
+          ))}
           <Tooltip title="Add assignee">
             <IconButton
-              onClick={contactsDialog.onTrue}
-              sx={[
-                (theme) => ({
-                  width: 32,
-                  height: 32,
-                  padding: 0,
-                  minWidth: 32,
-                  borderRadius: 1,
-                  marginLeft: 0.5,
-                  border: `dashed 1px ${theme.vars.palette.divider}`,
-                  bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                }),
-              ]}
-            >
-              <Iconify icon="mingcute:add-line" width={16} />
-            </IconButton>
-          </Tooltip>
-
-          <KanbanContactsDialog
-            assignee={task.assignee}
-            open={contactsDialog.value}
-            onClose={contactsDialog.onFalse}
-            onAssignee={handleAssignee}
-          />
-        </Box>
-      </Box>
-
-      {/* Due date */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel> Due date </BlockLabel>
-
-        {rangePicker.selected ? (
-          <Button size="small" onClick={rangePicker.onOpen}>
-            {rangePicker.shortLabel}
-          </Button>
-        ) : (
-          <Tooltip title="Add due date">
-            <IconButton
-              onClick={rangePicker.onOpen}
-              sx={[
-                (theme) => ({
-                  border: `dashed 1px ${theme.vars.palette.divider}`,
-                  bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                }),
-              ]}
+              onClick={() => setOpenContacts(true)}
+              sx={{
+                bgcolor: (theme) => varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+                border: (theme) => `dashed 1px ${theme.vars.palette.grey['500Channel']}`,
+              }}
             >
               <Iconify icon="mingcute:add-line" />
             </IconButton>
           </Tooltip>
-        )}
+        </Stack>
+      </Stack>
 
-        <CustomDateRangePicker
-          variant="calendar"
-          title="Choose due date"
-          startDate={rangePicker.startDate}
-          endDate={rangePicker.endDate}
-          onChangeStartDate={rangePicker.onChangeStartDate}
-          onChangeEndDate={rangePicker.onChangeEndDate}
-          open={rangePicker.open}
-          onClose={rangePicker.onClose}
-          selected={rangePicker.selected}
-          error={rangePicker.error}
-        />
-      </Box>
-
-      {/* Priority */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Priority</BlockLabel>
-        <KanbanDetailsPriority priority={priority} onChangePriority={handleChangePriority} />
-      </Box>
-
-      {/* Description */}
-      <Box sx={{ display: 'flex' }}>
-        <BlockLabel> Description </BlockLabel>
-        <TextField
-          fullWidth
-          multiline
-          size="small"
-          minRows={4}
-          value={taskDescription}
-          onChange={handleChangeTaskDescription}
-          slotProps={{ input: { sx: { typography: 'body2' } } }}
-        />
-      </Box>
-
-      {/* Attachments */}
-      <Box sx={{ display: 'flex' }}>
-        <BlockLabel>Attachments</BlockLabel>
-        <KanbanDetailsAttachments attachments={task.attachments} />
-      </Box>
-    </Box>
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2">Attachments</Typography>
+        <KanbanDetailsAttachments taskId={task?.id} attachments={attachments} />
+      </Stack>
+    </Stack>
   );
 
   const renderTabSubtasks = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <div>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          {subtaskCompleted.length} of {subtasks.length}
+          {completed.length} of {subtasks.length}
         </Typography>
 
         <LinearProgress
           variant="determinate"
-          value={(subtaskCompleted.length / subtasks.length) * 100}
+          value={(completed.length / subtasks.length) * 100}
         />
       </div>
 
@@ -339,7 +357,7 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
                 <Checkbox
                   disableRipple
                   name={taskItem}
-                  checked={subtaskCompleted.includes(taskItem)}
+                  checked={completed.includes(taskItem)}
                 />
               }
               label={taskItem}
@@ -393,8 +411,8 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
   return (
     <Drawer
-      open={open}
-      onClose={onClose}
+      open={openDetails}
+      onClose={onCloseDetails}
       anchor="right"
       slotProps={{ backdrop: { invisible: true } }}
       PaperProps={{ sx: { width: { xs: 1, sm: 480 } } }}

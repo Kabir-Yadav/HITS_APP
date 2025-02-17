@@ -12,7 +12,7 @@ import { KanbanDetails } from '../details/kanban-details';
 // ----------------------------------------------------------------------
 
 export function KanbanTaskItem({ task, disabled, columnId, sx }) {
-  const taskDetailsDialog = useBoolean();
+  const [openDetails, setOpenDetails] = useState(false);
 
   const { setNodeRef, listeners, isDragging, isSorting, transform, transition } = useSortable({
     id: task?.id,
@@ -21,43 +21,62 @@ export function KanbanTaskItem({ task, disabled, columnId, sx }) {
   const mounted = useMountStatus();
   const mountedWhileDragging = isDragging && !mounted;
 
+  const handleOpenDetails = () => {
+    setOpenDetails(true);
+  };
+
+  const handleCloseDetails = () => {
+    setOpenDetails(false);
+  };
+
   const handleDeleteTask = useCallback(async () => {
     try {
-      deleteTask(columnId, task.id);
-      toast.success('Delete success!', { position: 'top-center' });
+      await deleteTask(columnId, task.id);
+      handleCloseDetails();
+      toast.success('Delete success!');
     } catch (error) {
       console.error(error);
+      toast.error('Delete failed!');
     }
   }, [columnId, task.id]);
 
   const handleUpdateTask = useCallback(
-    async (taskData) => {
+    async (updateData) => {
       try {
-        updateTask(columnId, taskData);
+        await updateTask(columnId, {
+          ...task,
+          ...updateData,
+        });
+        toast.success('Update success!');
       } catch (error) {
         console.error(error);
+        toast.error('Update failed!');
       }
     },
-    [columnId]
+    [columnId, task]
   );
 
-  const renderTaskDetailsDialog = () => (
-    <KanbanDetails
-      task={task}
-      open={taskDetailsDialog.value}
-      onClose={taskDetailsDialog.onFalse}
-      onUpdateTask={handleUpdateTask}
-      onDeleteTask={handleDeleteTask}
-    />
-  );
+  const renderTaskDetailsDialog = () => {
+    if (!task) return null;
+
+    return (
+      <KanbanDetails
+        task={task}
+        openDetails={openDetails}
+        onCloseDetails={handleCloseDetails}
+        onDeleteTask={handleDeleteTask}
+        onUpdateTask={handleUpdateTask}
+      />
+    );
+  };
 
   return (
     <>
       <ItemBase
         ref={disabled ? undefined : setNodeRef}
         task={task}
-        open={taskDetailsDialog.value}
-        onClick={taskDetailsDialog.onTrue}
+        open={openDetails}
+        onClick={handleOpenDetails}
         stateProps={{
           transform,
           listeners,
@@ -81,7 +100,6 @@ function useMountStatus() {
 
   useEffect(() => {
     const timeout = setTimeout(() => setIsMounted(true), 500);
-
     return () => clearTimeout(timeout);
   }, []);
 

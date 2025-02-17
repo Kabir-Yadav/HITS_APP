@@ -11,72 +11,86 @@ export function KanbanDetailsAttachments({ taskId, attachments = [] }) {
 
   const handleDrop = useCallback(
     async (acceptedFiles) => {
-      const newFiles = [];
-      
-      for (const file of acceptedFiles) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${taskId}/${fileName}`;
+      try {
+        const newAttachments = await Promise.all(
+          acceptedFiles.map(async (file) => {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `${taskId}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from('task-attachments')
-          .upload(filePath, file);
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+              .from('task-attachments')
+              .upload(filePath, file);
 
-        if (!uploadError) {
-          const { data: { publicUrl } } = supabase.storage
-            .from('task-attachments')
-            .getPublicUrl(filePath);
+            if (uploadError) throw uploadError;
 
-          const { data, error } = await supabase
-            .from('kanban_task_attachments')
-            .insert([{
-              task_id: taskId,
-              file_name: file.name,
-              file_path: filePath,
-              file_type: file.type,
-              file_size: file.size,
-              uploaded_by: supabase.auth.user()?.id
-            }])
-            .select()
-            .single();
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('task-attachments')
+              .getPublicUrl(filePath);
 
-          if (!error) {
-            newFiles.push({
-              ...data,
-              preview: publicUrl
-            });
-          }
-        }
+            // Save attachment record
+            const { data, error } = await supabase
+              .from('task_attachments')
+              .insert({
+                task_id: taskId,
+                file_name: file.name,
+                file_url: publicUrl,
+                file_type: file.type,
+                file_size: file.size
+              })
+              .select()
+              .single();
+
+            if (error) throw error;
+
+            return data;
+          })
+        );
+
+        setFiles([...files, ...newAttachments]);
+      } catch (error) {
+        console.error('Error uploading files:', error);
       }
-
-      setFiles([...files, ...newFiles]);
     },
     [files, taskId]
   );
 
   const handleRemoveFile = useCallback(
     async (fileToRemove) => {
-      const { error: deleteError } = await supabase.storage
-        .from('task-attachments')
-        .remove([fileToRemove.file_path]);
+      try {
+        // Delete from storage
+        const { error: storageError } = await supabase.storage
+          .from('task-attachments')
+          .remove([`${taskId}/${fileToRemove.file_name}`]);
 
-      if (!deleteError) {
-        await supabase
-          .from('kanban_task_attachments')
+        if (storageError) throw storageError;
+
+        // Delete record
+        const { error: dbError } = await supabase
+          .from('task_attachments')
           .delete()
           .eq('id', fileToRemove.id);
 
+        if (dbError) throw dbError;
+
         const filtered = files.filter((file) => file.id !== fileToRemove.id);
         setFiles(filtered);
+      } catch (error) {
+        console.error('Error removing file:', error);
       }
     },
-    [files]
+    [files, taskId]
   );
 
   return (
     <MultiFilePreview
       thumbnail
-      files={files}
+      files={files.map(file => ({
+        ...file,
+        preview: file.file_url
+      }))}
       onRemove={handleRemoveFile}
       slotProps={{ thumbnail: { sx: { width: 64, height: 64 } } }}
       lastNode={<UploadBox onDrop={handleDrop} />}

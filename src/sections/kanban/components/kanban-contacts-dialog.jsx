@@ -27,19 +27,18 @@ export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee 
   const [contacts, setContacts] = useState([]);
 
   useEffect(() => {
-    const fetchContacts = async () => {
+    async function loadContacts() {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, full_name, email, avatar_url')
-        .order('full_name');
-
-      if (!error) {
+        .select('*');
+      
+      if (!error && data) {
         setContacts(data);
       }
-    };
+    }
 
     if (open) {
-      fetchContacts();
+      loadContacts();
     }
   }, [open]);
 
@@ -47,18 +46,17 @@ export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee 
     setSearchContact(event.target.value);
   }, []);
 
-  const handleAssignContact = useCallback(
-    (contact) => {
-      const isAssigned = assignee.map((person) => person.id).includes(contact.id);
-
-      if (isAssigned) {
-        onAssignee(assignee.filter((person) => person.id !== contact.id));
-      } else {
-        onAssignee([...assignee, contact]);
-      }
-    },
-    [assignee, onAssignee]
-  );
+  const handleAssignContact = useCallback((contact) => {
+    const isAssigned = assignee.map((person) => person.id).includes(contact.id);
+    
+    if (isAssigned) {
+      // Remove assignee
+      onAssignee(assignee.filter((person) => person.id !== contact.id));
+    } else {
+      // Add assignee
+      onAssignee([...assignee, contact]);
+    }
+  }, [assignee, onAssignee]);
 
   const dataFiltered = applyFilter({ inputData: contacts, query: searchContact });
 
@@ -113,7 +111,7 @@ export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee 
                     }}
                   >
                     <Box>
-                      <Typography variant="subtitle2">{contact.full_name}</Typography>
+                      <Typography variant="subtitle2">{contact.name}</Typography>
                       <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                         {contact.email}
                       </Typography>
@@ -149,9 +147,7 @@ export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee 
 function applyFilter({ inputData, query }) {
   if (!query) return inputData;
 
-  return inputData.filter(
-    ({ full_name, email }) =>
-      full_name?.toLowerCase().includes(query.toLowerCase()) ||
-      email?.toLowerCase().includes(query.toLowerCase())
+  return inputData.filter(({ name, email }) =>
+    [name, email].some((field) => field?.toLowerCase().includes(query.toLowerCase()))
   );
 }
