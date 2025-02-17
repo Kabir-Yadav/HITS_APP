@@ -97,7 +97,7 @@ export async function sendMessage(conversationId, userId, messageData) {
         sender_id: userId,
         ...messageData,
       });
-
+      console.log(messagePayload)
       ws.send(messagePayload);
 
       resolve(messageData);
@@ -116,7 +116,7 @@ export async function sendMessage(conversationId, userId, messageData) {
 
     ws.onclose = () => {
       console.warn("WebSocket disconnected, attempting reconnection...");
-      setTimeout(() => sendMessage(conversationId, userId, messageData), 1000);
+      // setTimeout(() => sendMessage(conversationId, userId, messageData), 1000);
     };
   });
 }

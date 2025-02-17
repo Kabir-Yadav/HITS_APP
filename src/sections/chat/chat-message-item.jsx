@@ -3,8 +3,6 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import FolderIcon from '@mui/icons-material/Folder';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
 import { fToNow } from 'src/utils/format-time';
 
@@ -19,21 +17,14 @@ import { getMessage } from './utils/get-message';
 export function ChatMessageItem({ message, participants, onOpenLightbox }) {
   const { user } = useMockedUser();
 
-  const { me, senderDetails } = getMessage({
+  const { me, senderDetails, hasImage, hasFile } = getMessage({
     message,
     participants,
     currentUserId: `${user?.id}`,
   });
-
   const { firstName, avatarUrl } = senderDetails;
-  const { body, createdAt } = message;
 
-  // ✅ Detect if message contains an image
-  const isImage = body.startsWith('data:image/');
-  // ✅ Detect if message contains a file (PDF, ZIP, DOC, etc.)
-  const isFile = body.startsWith('data:application/');
-  // ✅ Detect if it's a folder (Assuming folder messages include '[FOLDER]')
-  const isFolder = body.includes('[FOLDER]');
+  const { body, createdAt, attachments } = message;
 
   const renderInfo = () => (
     <Typography
@@ -46,61 +37,95 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
     </Typography>
   );
 
-  const renderBody = () => (
-    <Stack
-      sx={{
-        p: 1.5,
-        minWidth: 48,
-        maxWidth: 320,
-        borderRadius: 1,
-        typography: 'body2',
-        bgcolor: 'background.neutral',
-        ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
-        ...(isImage && { p: 0, bgcolor: 'transparent' }),
-      }}
-    >
-      {/* ✅ Show image preview */}
-      {isImage ? (
-        <Box
-          component="img"
-          alt="Attachment"
-          src={body}
-          onClick={() => onOpenLightbox(body)}
-          sx={{
-            width: 400,
-            height: 'auto',
-            borderRadius: 1.5,
-            cursor: 'pointer',
-            objectFit: 'cover',
-            aspectRatio: '16/11',
-            '&:hover': { opacity: 0.9 },
-          }}
-        />
-      ) : isFile ? (
-        // ✅ Show file preview with download option
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <InsertDriveFileIcon sx={{ mr: 1 }} />
-          <a
-            href={body}
-            download={`file_${message.message_id}`}
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            Download File
-          </a>
-        </Box>
-      ) : isFolder ? (
-        // ✅ Show folder icon if it’s a folder
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <FolderIcon sx={{ mr: 1, color: 'blue' }} />
-          <Typography>Folder</Typography>
-        </Box>
-      ) : (
-        // ✅ Default Text Messages
-        body
-      )}
-    </Stack>
-  );
+  // ✅ Function to Render Attachments First
+  const renderAttachments = () => {
+    if (!attachments || attachments.length === 0) return null;
 
+    return (
+      <Stack spacing={1} sx={{ mb: 1 }}>
+        {attachments.map((attachment) => {
+          // ✅ Normalize Type Handling
+          const fileType = attachment.type.toLowerCase();
+          const isImage =
+            fileType.includes('image') ||
+            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
+
+          return (
+            <Box
+              key={attachment.id}
+              sx={{
+                p: 1.5,
+                borderRadius: 1,
+                maxWidth: 320,
+                bgcolor: 'background.neutral',
+                display: 'flex',
+                alignItems: 'center',
+                ...(me && { bgcolor: 'primary.lighter' }),
+              }}
+            >
+              {/* ✅ Render Image Preview Instead of Name */}
+              {isImage ? (
+                <Box
+                  component="img"
+                  alt="Attachment"
+                  src={attachment.path} // ✅ Use correct S3 URL
+                  onClick={() => onOpenLightbox(attachment.path)}
+                  sx={{
+                    width: 250,
+                    height: 'auto',
+                    borderRadius: 1.5,
+                    cursor: 'pointer',
+                    objectFit: 'cover',
+                    aspectRatio: '16/11',
+                    '&:hover': { opacity: 0.9 },
+                  }}
+                />
+              ) : (
+                <Stack direction="row" alignItems="center">
+                  <Iconify icon="eva:file-text-outline" width={24} sx={{ mr: 1 }} />
+                  <Typography
+                    variant="body2"
+                    sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  >
+                    <a
+                      href={attachment.path}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: 'none', color: 'inherit' }}
+                    >
+                      {attachment.name}
+                    </a>
+                  </Typography>
+                </Stack>
+              )}
+            </Box>
+          );
+        })}
+      </Stack>
+    );
+  };
+
+  // ✅ Render Message Text (After Attachments)
+  const renderBody = () => {
+    if (!body) return null; // ✅ Don't render empty messages
+    return (
+      <Stack
+        sx={{
+          p: 1.5,
+          minWidth: 48,
+          maxWidth: 320,
+          borderRadius: 1,
+          typography: 'body2',
+          bgcolor: 'background.neutral',
+          ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
+        }}
+      >
+        {body}
+      </Stack>
+    );
+  };
+
+  // ✅ Render Actions (Reply, Delete)
   const renderActions = () => (
     <Box
       className="message-actions"
@@ -131,17 +156,12 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
     </Box>
   );
 
-  if (!message.body) {
-    return null;
-  }
-
   return (
     <Box sx={{ mb: 5, display: 'flex', justifyContent: me ? 'flex-end' : 'unset' }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>
         {renderInfo()}
-
         <Box
           sx={{
             display: 'flex',
@@ -150,7 +170,10 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
             '&:hover': { '& .message-actions': { opacity: 1 } },
           }}
         >
-          {renderBody()}
+          <Stack spacing={1}>
+            {renderAttachments()} {/* ✅ Attachments are displayed first */}
+            {renderBody()} {/* ✅ Message text appears below attachments */}
+          </Stack>
           {renderActions()}
         </Box>
       </Stack>
