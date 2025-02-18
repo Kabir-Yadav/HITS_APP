@@ -26,6 +26,8 @@ import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
+import { addSubtask, updateSubtaskStatus, deleteSubtask, updateSubtaskName } from 'src/actions/kanban';
+
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
@@ -76,7 +78,7 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
   const [newSubtaskDialog, setNewSubtaskDialog] = useState(false);
   const [newSubtaskName, setNewSubtaskName] = useState('');
   const [editingSubtask, setEditingSubtask] = useState(null);
-  const [subtasks, setSubtasks] = useState([]);
+  const [subtasks, setSubtasks] = useState(task?.subtasks || []);
 
   const dateRange = useDateRangePicker(due);
   const tabs = useTabs('overview');
@@ -91,6 +93,7 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
       setAssignee(task.assignees?.map(a => a.user) || []);
       setDue(task.due_date ? [new Date(task.due_date)] : []);
       setAttachments(task.attachments || []);
+      setSubtasks(task.subtasks || []);
     }
   }, [task]);
 
@@ -143,12 +146,19 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
     setDescription(event.target.value);
   }, []);
 
-  const handleChangePriority = useCallback((newValue) => {
-    setPriority(newValue);
-    onUpdateTask({
-      ...task,
-      priority: newValue,
-    });
+  const handleChangePriority = useCallback(async (newValue) => {
+    try {
+      setPriority(newValue);
+      await onUpdateTask({
+        ...task,
+        priority: newValue,
+      });
+      toast.success('Priority updated successfully');
+    } catch (error) {
+      console.error(error);
+      setPriority(task?.priority || 'medium');
+      toast.error('Failed to update priority');
+    }
   }, [onUpdateTask, task]);
 
   const handleClickSubtaskComplete = (taskId) => {
@@ -159,33 +169,66 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
     setCompleted(selected);
   };
 
-  const handleAddSubtask = () => {
-    if (newSubtaskName.trim()) {
-      setSubtasks([...subtasks, newSubtaskName.trim()]);
-      setNewSubtaskName('');
-      setNewSubtaskDialog(false);
+  const handleAddSubtask = async () => {
+    try {
+      if (newSubtaskName.trim()) {
+        const newSubtask = await addSubtask(task.id, newSubtaskName.trim());
+        setSubtasks(prev => [...prev, newSubtask]);
+        setNewSubtaskName('');
+        setNewSubtaskDialog(false);
+        toast.success('Subtask added successfully');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to add subtask');
     }
   };
 
-  const handleDeleteSubtask = (taskToDelete) => {
-    setSubtasks(subtasks.filter((subtask) => subtask !== taskToDelete));
-    setCompleted(completed.filter((subtask) => subtask !== taskToDelete));
+  const handleSubtaskComplete = async (subtaskId, isCompleted) => {
+    try {
+      const updatedSubtask = await updateSubtaskStatus(subtaskId, !isCompleted);
+      setSubtasks(prev => 
+        prev.map(st => st.id === subtaskId ? updatedSubtask : st)
+      );
+      toast.success('Subtask status updated');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update subtask status');
+    }
   };
 
-  const handleEditSubtask = (taskToEdit) => {
-    setEditingSubtask(taskToEdit);
-    setNewSubtaskName(taskToEdit);
+  const handleDeleteSubtask = async (subtaskId) => {
+    try {
+      await deleteSubtask(subtaskId);
+      setSubtasks(prev => prev.filter(st => st.id !== subtaskId));
+      toast.success('Subtask deleted successfully');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to delete subtask');
+    }
+  };
+
+  const handleEditSubtask = (subtask) => {
+    setEditingSubtask(subtask);
+    setNewSubtaskName(subtask.name);
     setNewSubtaskDialog(true);
   };
 
-  const handleUpdateSubtask = () => {
-    if (newSubtaskName.trim()) {
-      setSubtasks(
-        subtasks.map((subtask) => (subtask === editingSubtask ? newSubtaskName.trim() : subtask))
-      );
-      setNewSubtaskName('');
-      setEditingSubtask(null);
-      setNewSubtaskDialog(false);
+  const handleUpdateSubtask = async () => {
+    try {
+      if (newSubtaskName.trim() && editingSubtask) {
+        const updatedSubtask = await updateSubtaskName(editingSubtask.id, newSubtaskName.trim());
+        setSubtasks(prev => 
+          prev.map(st => st.id === editingSubtask.id ? updatedSubtask : st)
+        );
+        setNewSubtaskName('');
+        setEditingSubtask(null);
+        setNewSubtaskDialog(false);
+        toast.success('Subtask updated successfully');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update subtask');
     }
   };
 
@@ -306,7 +349,10 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
 
       <Stack spacing={1.5}>
         <Typography variant="subtitle2">Priority</Typography>
-        <KanbanDetailsPriority priority={priority} onChangePriority={setPriority} />
+        <KanbanDetailsPriority 
+          priority={priority} 
+          onChangePriority={handleChangePriority}
+        />
       </Stack>
 
       <Stack spacing={1.5}>
@@ -340,44 +386,85 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <div>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          {completed.length} of {subtasks.length}
+          {subtasks.filter(st => st.is_completed).length} of {subtasks.length}
         </Typography>
 
         <LinearProgress
           variant="determinate"
-          value={(completed.length / subtasks.length) * 100}
+          value={(subtasks.filter(st => st.is_completed).length / subtasks.length) * 100}
         />
       </div>
 
       <FormGroup>
-        {subtasks.map((taskItem) => (
-          <Box key={taskItem} sx={{ display: 'flex', alignItems: 'center' }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  disableRipple
-                  name={taskItem}
-                  checked={completed.includes(taskItem)}
-                />
+        {subtasks.map((subtask) => (
+          <FormControlLabel
+            key={subtask.id}
+            control={
+              <Checkbox
+                checked={subtask.is_completed}
+                onChange={() => handleSubtaskComplete(subtask.id, subtask.is_completed)}
+              />
+            }
+            label={
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                width: '100%',
+                pr: 1
+              }}>
+                <Typography
+                  variant="body2"
+                  noWrap
+                  sx={{
+                    flexGrow: 1,
+                    mr: 1,
+                    textDecoration: subtask.is_completed ? 'line-through' : 'none',
+                    color: subtask.is_completed ? 'text.disabled' : 'text.primary',
+                  }}
+                >
+                  {subtask.name}
+                </Typography>
+                <Box sx={{ 
+                  display: 'flex', 
+                  gap: 0.5,
+                  flexShrink: 0
+                }}>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditSubtask(subtask);
+                    }}
+                    sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
+                  >
+                    <Iconify icon="solar:pen-bold" />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSubtask(subtask.id);
+                    }}
+                    sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
+                  >
+                    <Iconify icon="solar:trash-bin-trash-bold" />
+                  </IconButton>
+                </Box>
+              </Box>
+            }
+            sx={{ 
+              mx: 0,
+              width: '100%',
+              '& .MuiFormControlLabel-label': { 
+                width: '100%'
               }
-              label={taskItem}
-              onChange={() => handleClickSubtaskComplete(taskItem)}
-              sx={{ flexGrow: 1 }}
-            />
-            <IconButton size="small" onClick={() => handleEditSubtask(taskItem)}>
-              <Iconify icon="eva:edit-fill" />
-            </IconButton>
-            <IconButton size="small" onClick={() => handleDeleteSubtask(taskItem)}>
-              <Iconify icon="eva:trash-2-fill" />
-            </IconButton>
-          </Box>
+            }}
+          />
         ))}
       </FormGroup>
 
       <Button
-        variant="outlined"
         startIcon={<Iconify icon="mingcute:add-line" />}
-        sx={{ alignSelf: 'flex-start' }}
         onClick={() => {
           setEditingSubtask(null);
           setNewSubtaskName('');
@@ -387,7 +474,11 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
         Add Subtask
       </Button>
 
-      <Dialog open={newSubtaskDialog} onClose={() => setNewSubtaskDialog(false)}>
+      <Dialog open={newSubtaskDialog} onClose={() => {
+        setNewSubtaskDialog(false);
+        setEditingSubtask(null);
+        setNewSubtaskName('');
+      }}>
         <DialogTitle>{editingSubtask ? 'Edit Subtask' : 'Add New Subtask'}</DialogTitle>
         <DialogContent>
           <TextField
@@ -400,7 +491,13 @@ export function KanbanDetails({ task, openDetails, onCloseDetails, onUpdateTask,
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setNewSubtaskDialog(false)}>Cancel</Button>
+          <Button onClick={() => {
+            setNewSubtaskDialog(false);
+            setEditingSubtask(null);
+            setNewSubtaskName('');
+          }}>
+            Cancel
+          </Button>
           <Button onClick={editingSubtask ? handleUpdateSubtask : handleAddSubtask}>
             {editingSubtask ? 'Update' : 'Add'}
           </Button>

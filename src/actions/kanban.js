@@ -24,7 +24,7 @@ export async function fetchBoardData() {
 
   if (columnsError) throw columnsError;
 
-  // Get tasks with assignees and attachments
+  // Get tasks with assignees, attachments, and subtasks
   const { data: tasks, error: tasksError } = await supabase
     .from('kanban_tasks')
     .select(`
@@ -32,7 +32,8 @@ export async function fetchBoardData() {
       assignees:task_assignees(
         user:user_profiles(*)
       ),
-      attachments:task_attachments(*)
+      attachments:task_attachments(*),
+      subtasks:kanban_subtasks(*)
     `);
 
   if (tasksError) throw tasksError;
@@ -196,47 +197,53 @@ export async function createTask(columnId, taskData) {
 
 // Update task
 export async function updateTask(columnId, taskData) {
-  const { data, error } = await supabase
-    .from('kanban_tasks')
-    .update({
-      name: taskData.name,
-      description: taskData.description,
-      priority: taskData.priority,
-      due_date: taskData.due_date,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', taskData.id)
-    .select()
-    .single();
+  try {
+    // First update the task basic info
+    const { data, error } = await supabase
+      .from('kanban_tasks')
+      .update({
+        name: taskData.name,
+        description: taskData.description,
+        priority: taskData.priority,
+        due_date: taskData.due_date,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskData.id)
+      .select()
+      .single();
 
-  if (error) throw error;
+    if (error) throw error;
 
-  // Handle assignees if changed
-  if (taskData.assignee?.length) {
-    // First remove existing assignees
-    const { error: deleteError } = await supabase
-      .from('task_assignees')
-      .delete()
-      .eq('task_id', taskData.id);
+    // Handle assignees if changed
+    if (taskData.assignee?.length) {
+      // First remove existing assignees
+      const { error: deleteError } = await supabase
+        .from('task_assignees')
+        .delete()
+        .eq('task_id', taskData.id);
 
-    if (deleteError) throw deleteError;
+      if (deleteError) throw deleteError;
 
-    // Then add new assignees
-    const assigneeData = taskData.assignee.map(user => ({
-      task_id: taskData.id,
-      user_id: user.id,
-      assigned_at: new Date().toISOString()
-    }));
+      // Then add new assignees
+      const assigneeData = taskData.assignee.map(user => ({
+        task_id: taskData.id,
+        user_id: user.id,
+        assigned_at: new Date().toISOString()
+      }));
 
-    const { error: assigneeError } = await supabase
-      .from('task_assignees')
-      .insert(assigneeData);
+      const { error: assigneeError } = await supabase
+        .from('task_assignees')
+        .insert(assigneeData);
 
-    if (assigneeError) throw assigneeError;
+      if (assigneeError) throw assigneeError;
+    }
+
+    mutate(CACHE_KEY); // Refresh the board data
+    return data;
+  } catch (error) {
+    console.error('Error updating task:', error);
+    throw error; // Re-throw to handle in the component
   }
-
-  mutate(CACHE_KEY);
-  return data;
 }
 
 // ----------------------------------------------------------------------
@@ -328,3 +335,133 @@ export async function clearColumn(columnId) {
 }
 
 export const moveTask = moveTaskBetweenColumns;
+
+// ----------------------------------------------------------------------
+
+// Add subtask
+export async function addSubtask(taskId, subtaskName) {
+  try {
+    const { data, error } = await supabase
+      .from('kanban_subtasks')
+      .insert({
+        task_id: taskId,
+        name: subtaskName,
+        is_completed: false,
+        created_at: new Date().toISOString()
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+
+    mutate(CACHE_KEY, async (currentData) => {
+      if (!currentData) return currentData;
+      
+      const newData = JSON.parse(JSON.stringify(currentData));
+      
+      // Add the new subtask to the corresponding task
+      Object.values(newData.board.tasks).forEach(tasks => {
+        tasks.forEach(task => {
+          if (task.id === taskId) {
+            task.subtasks = [...(task.subtasks || []), data];
+          }
+        });
+      });
+      
+      return newData;
+    }, false);
+
+    return data;
+  } catch (error) {
+    console.error('Error adding subtask:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+// Update subtask completion status
+export async function updateSubtaskStatus(subtaskId, isCompleted) {
+  try {
+    const { data, error } = await supabase
+      .from('kanban_subtasks')
+      .update({
+        is_completed: isCompleted,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subtaskId)
+      .select('*') // Make sure to select all fields
+      .single();
+
+    if (error) throw error;
+
+    mutate(CACHE_KEY, async (currentData) => {
+      if (!currentData) return currentData;
+      
+      // Deep clone the current data
+      const newData = JSON.parse(JSON.stringify(currentData));
+      
+      // Update the subtask in all tasks
+      Object.values(newData.board.tasks).forEach(tasks => {
+        tasks.forEach(task => {
+          if (task.subtasks) {
+            task.subtasks = task.subtasks.map(st => 
+              st.id === subtaskId ? data : st
+            );
+          }
+        });
+      });
+      
+      return newData;
+    }, false);
+
+    return data;
+  } catch (error) {
+    console.error('Error updating subtask status:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+// Delete subtask
+export async function deleteSubtask(subtaskId) {
+  try {
+    const { error } = await supabase
+      .from('kanban_subtasks')
+      .delete()
+      .eq('id', subtaskId);
+
+    if (error) throw error;
+
+    mutate(CACHE_KEY);
+  } catch (error) {
+    console.error('Error deleting subtask:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+// Add this new function to update subtask name
+export async function updateSubtaskName(subtaskId, newName) {
+  try {
+    const { data, error } = await supabase
+      .from('kanban_subtasks')
+      .update({
+        name: newName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subtaskId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    mutate(CACHE_KEY);
+    return data;
+  } catch (error) {
+    console.error('Error updating subtask name:', error);
+    throw error;
+  }
+}
