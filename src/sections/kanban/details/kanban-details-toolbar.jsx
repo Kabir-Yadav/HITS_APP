@@ -37,23 +37,25 @@ export function KanbanDetailsToolbar({
   const menuActions = usePopover();
   const confirmDialog = useBoolean();
 
-  const [status, setStatus] = useState(taskStatus);
+  // Get the current column name based on task's column_id
+  const getCurrentColumnName = useCallback(() => {
+    const column = board.columns?.find(col => col.id === task?.column_id);
+    return column?.name || 'No Status';
+  }, [board.columns, task?.column_id]);
 
+  const [status, setStatus] = useState(getCurrentColumnName());
+
+  // Update status when task or columns change
   useEffect(() => {
-    setStatus(taskStatus);
-  }, [taskStatus]);
+    setStatus(getCurrentColumnName());
+  }, [getCurrentColumnName, task]);
 
   const handleChangeStatus = useCallback(
     async (newValue, targetColumnId) => {
       try {
-        // Find current column ID
-        const sourceColumnId = Object.keys(board.tasks).find(columnId =>
-          board.tasks[columnId].some(t => t.id === task.id)
-        );
-
-        if (sourceColumnId && sourceColumnId !== targetColumnId) {
+        if (task.column_id !== targetColumnId) {
           // Move task to new column
-          await moveTaskBetweenColumns(task, sourceColumnId, targetColumnId);
+          await moveTaskBetweenColumns(task, task.column_id, targetColumnId);
         }
 
         menuActions.onClose();
@@ -63,7 +65,7 @@ export function KanbanDetailsToolbar({
         console.error('Error moving task:', error);
       }
     },
-    [menuActions, onUpdateStatus, task, board.tasks]
+    [menuActions, onUpdateStatus, task]
   );
 
   const renderMenuActions = () => (
@@ -130,8 +132,18 @@ export function KanbanDetailsToolbar({
         <Button
           size="small"
           variant="soft"
-          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={16} sx={{ ml: -0.5 }} />}
+          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={16} sx={{ ml: 0.5 }} />}
           onClick={menuActions.onOpen}
+          sx={{ 
+            minWidth: 120,
+            justifyContent: 'space-between',
+            typography: 'body2',
+            textTransform: 'capitalize',
+            px: 1.5,
+            '& .MuiButton-endIcon': {
+              ml: 0.5,
+            }
+          }}
         >
           {status}
         </Button>

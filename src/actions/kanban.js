@@ -86,16 +86,38 @@ export function useGetBoard() {
 
 // Create new column
 export async function createColumn(columnData) {
-  const { data, error } = await supabase
-    .from('kanban_columns')
-    .insert([columnData])
-    .select()
-    .single();
+  try {
+    // Get the current highest order_position
+    const { data: columns, error: fetchError } = await supabase
+      .from('kanban_columns')
+      .select('order_position')
+      .order('order_position', { ascending: false })
+      .limit(1);
 
-  if (error) throw error;
+    if (fetchError) throw fetchError;
 
-  mutate(CACHE_KEY);
-  return data;
+    const nextPosition = columns.length ? (columns[0].order_position + 1) : 0;
+
+    // Create new column with the next order position
+    const { data, error } = await supabase
+      .from('kanban_columns')
+      .insert([{
+        ...columnData,
+        order_position: nextPosition,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    mutate(CACHE_KEY);
+    return data;
+  } catch (error) {
+    console.error('Error creating column:', error);
+    throw error;
+  }
 }
 
 // ----------------------------------------------------------------------
@@ -264,43 +286,105 @@ export async function deleteTask(columnId, taskId) {
 
 // Move task between columns
 export async function moveTaskBetweenColumns(task, sourceColumnId, targetColumnId) {
-  const { error } = await supabase
-    .from('kanban_tasks')
-    .update({ 
-      column_id: targetColumnId,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', task.id);
+  try {
+    // Update the task's column_id in the database
+    const { data, error } = await supabase
+      .from('kanban_tasks')
+      .update({ 
+        column_id: targetColumnId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', task.id)
+      .select(`
+        *,
+        assignees:task_assignees(
+          user:user_profiles(*)
+        ),
+        attachments:task_attachments(*),
+        subtasks:kanban_subtasks(*)
+      `)
+      .single();
 
-  if (error) throw error;
+    if (error) throw error;
 
-  mutate(CACHE_KEY);
+    // Update the SWR cache optimistically
+    mutate(CACHE_KEY, async (currentData) => {
+      if (!currentData) return currentData;
+      
+      const newData = JSON.parse(JSON.stringify(currentData));
+      
+      // Remove task from source column
+      newData.board.tasks[sourceColumnId] = newData.board.tasks[sourceColumnId]
+        .filter(t => t.id !== task.id);
+      
+      // Add task to target column
+      if (!newData.board.tasks[targetColumnId]) {
+        newData.board.tasks[targetColumnId] = [];
+      }
+      
+      // Replace the task with updated data from the database
+      newData.board.tasks[targetColumnId] = [
+        ...newData.board.tasks[targetColumnId],
+        data
+      ];
+
+      // Sort tasks in the target column by priority and due date
+      newData.board.tasks[targetColumnId].sort((a, b) => {
+        const priorityOrder = { high: 1, medium: 2, low: 3 };
+        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityDiff !== 0) return priorityDiff;
+        return new Date(b.due_date) - new Date(a.due_date);
+      });
+      
+      return newData;
+    }, false);
+
+    return data;
+  } catch (error) {
+    console.error('Error moving task between columns:', error);
+    throw error;
+  }
 }
 
 // ----------------------------------------------------------------------
 
+// Update column positions
 export async function moveColumn(updateColumns) {
-  /**
-   * Work in local
-   */
-  startTransition(() => {
-    mutate(
-      KANBAN_ENDPOINT,
-      (currentData) => {
-        const { board } = currentData;
+  try {
+    // Update each column's order position in the database
+    await Promise.all(
+      updateColumns.map(async (column, index) => {
+        const { error } = await supabase
+          .from('kanban_columns')
+          .update({ 
+            order_position: index,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', column.id);
 
-        return { ...currentData, board: { ...board, columns: updateColumns } };
-      },
-      false
+        if (error) throw error;
+      })
     );
-  });
 
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    const data = { updateColumns };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'move-column' } });
+    // Update the cache optimistically
+    mutate(CACHE_KEY, async (currentData) => {
+      if (!currentData) return currentData;
+      
+      return {
+        ...currentData,
+        board: {
+          ...currentData.board,
+          columns: updateColumns.map((column, index) => ({
+            ...column,
+            order_position: index
+          }))
+        }
+      };
+    }, false);
+
+  } catch (error) {
+    console.error('Error updating column positions:', error);
+    throw error;
   }
 }
 
@@ -334,7 +418,45 @@ export async function clearColumn(columnId) {
   });
 }
 
-export const moveTask = moveTaskBetweenColumns;
+export async function moveTask(updatedTasks) {
+  try {
+    // For each column's tasks, update their positions in the database
+    await Promise.all(
+      Object.entries(updatedTasks).map(async ([columnId, tasks]) => {
+        // Update each task's column_id if it has changed
+        await Promise.all(
+          tasks.map(async (task, index) => {
+            if (task.column_id !== columnId) {
+              await supabase
+                .from('kanban_tasks')
+                .update({
+                  column_id: columnId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', task.id);
+            }
+          })
+        );
+      })
+    );
+
+    // Update the cache
+    mutate(CACHE_KEY, async (currentData) => {
+      if (!currentData) return currentData;
+      
+      return {
+        ...currentData,
+        board: {
+          ...currentData.board,
+          tasks: updatedTasks,
+        },
+      };
+    }, false);
+  } catch (error) {
+    console.error('Error updating task positions:', error);
+    throw error;
+  }
+}
 
 // ----------------------------------------------------------------------
 
