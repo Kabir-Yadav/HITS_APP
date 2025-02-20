@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -12,7 +12,6 @@ import DialogContent from '@mui/material/DialogContent';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { _contacts } from 'src/_mock';
-import { supabase } from 'src/lib/supabase';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -24,23 +23,6 @@ const ITEM_HEIGHT = 64;
 
 export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee }) {
   const [searchContact, setSearchContact] = useState('');
-  const [contacts, setContacts] = useState([]);
-
-  useEffect(() => {
-    async function loadContacts() {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*');
-      
-      if (!error && data) {
-        setContacts(data);
-      }
-    }
-
-    if (open) {
-      loadContacts();
-    }
-  }, [open]);
 
   const handleSearchContacts = useCallback((event) => {
     setSearchContact(event.target.value);
@@ -58,7 +40,7 @@ export function KanbanContactsDialog({ assignee = [], open, onClose, onAssignee 
     }
   }, [assignee, onAssignee]);
 
-  const dataFiltered = applyFilter({ inputData: contacts, query: searchContact });
+  const dataFiltered = applyFilter({ inputData: _contacts, query: searchContact });
 
   const notFound = !dataFiltered.length && !!searchContact;
 

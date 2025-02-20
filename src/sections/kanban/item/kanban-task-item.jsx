@@ -1,8 +1,9 @@
+import dayjs from 'dayjs';
 import { useSortable } from '@dnd-kit/sortable';
 import { useBoolean } from 'minimal-shared/hooks';
 import { useState, useEffect, useCallback } from 'react';
 
-import { deleteTask, updateTask } from 'src/actions/kanban';
+import { deleteTask, updateTask, updateTaskPriority } from 'src/actions/kanban';
 
 import { toast } from 'src/components/snackbar';
 
@@ -12,7 +13,7 @@ import { KanbanDetails } from '../details/kanban-details';
 // ----------------------------------------------------------------------
 
 export function KanbanTaskItem({ task, disabled, columnId, sx }) {
-  const [openDetails, setOpenDetails] = useState(false);
+  const taskDetailsDialog = useBoolean();
 
   const { setNodeRef, listeners, isDragging, isSorting, transform, transition } = useSortable({
     id: task?.id,
@@ -21,62 +22,48 @@ export function KanbanTaskItem({ task, disabled, columnId, sx }) {
   const mounted = useMountStatus();
   const mountedWhileDragging = isDragging && !mounted;
 
-  const handleOpenDetails = () => {
-    setOpenDetails(true);
-  };
-
-  const handleCloseDetails = () => {
-    setOpenDetails(false);
-  };
+  const isTaskOverdue = task.due?.[1] && dayjs(task.due[1]).isBefore(dayjs(), 'day');
 
   const handleDeleteTask = useCallback(async () => {
     try {
-      await deleteTask(columnId, task.id);
-      handleCloseDetails();
-      toast.success('Delete success!');
+      deleteTask(columnId, task.id);
+      toast.success('Delete success!', { position: 'top-center' });
     } catch (error) {
       console.error(error);
-      toast.error('Delete failed!');
     }
   }, [columnId, task.id]);
 
   const handleUpdateTask = useCallback(
-    async (updateData) => {
+    async (updatedTask) => {
       try {
-        await updateTask(columnId, {
-          ...task,
-          ...updateData,
-        });
-        toast.success('Update success!');
+        if (updatedTask.priority !== task.priority) {
+          await updateTaskPriority(task.id, updatedTask.priority);
+        }
+        // Handle other updates...
       } catch (error) {
-        console.error(error);
-        toast.error('Update failed!');
+        console.error('Error updating task:', error);
       }
     },
-    [columnId, task]
+    [task]
   );
 
-  const renderTaskDetailsDialog = () => {
-    if (!task) return null;
-
-    return (
-      <KanbanDetails
-        task={task}
-        openDetails={openDetails}
-        onCloseDetails={handleCloseDetails}
-        onDeleteTask={handleDeleteTask}
-        onUpdateTask={handleUpdateTask}
-      />
-    );
-  };
+  const renderTaskDetailsDialog = () => (
+    <KanbanDetails
+      task={task}
+      open={taskDetailsDialog.value}
+      onClose={taskDetailsDialog.onFalse}
+      onUpdateTask={handleUpdateTask}
+      onDeleteTask={handleDeleteTask}
+    />
+  );
 
   return (
     <>
       <ItemBase
         ref={disabled ? undefined : setNodeRef}
         task={task}
-        open={openDetails}
-        onClick={handleOpenDetails}
+        open={taskDetailsDialog.value}
+        onClick={taskDetailsDialog.onTrue}
         stateProps={{
           transform,
           listeners,
@@ -85,7 +72,14 @@ export function KanbanTaskItem({ task, disabled, columnId, sx }) {
           dragging: isDragging,
           fadeIn: mountedWhileDragging,
         }}
-        sx={sx}
+        sx={{
+          ...(isTaskOverdue && {
+            '& .MuiTypography-root': {
+              color: 'error.main',
+            },
+          }),
+          ...sx,
+        }}
       />
 
       {renderTaskDetailsDialog()}
@@ -100,6 +94,7 @@ function useMountStatus() {
 
   useEffect(() => {
     const timeout = setTimeout(() => setIsMounted(true), 500);
+
     return () => clearTimeout(timeout);
   }, []);
 

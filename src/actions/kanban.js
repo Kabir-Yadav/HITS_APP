@@ -1,7 +1,7 @@
 import useSWR, { mutate } from 'swr';
 import { useMemo, startTransition } from 'react';
 
-import { supabase } from 'src/lib/supabase'; 
+import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
@@ -10,73 +10,91 @@ const enableServer = false;
 
 const KANBAN_ENDPOINT = endpoints.kanban;
 
-const CACHE_KEY = 'KANBAN_BOARD';
+const KANBAN_CACHE_KEY = 'kanban_board';
+
+const swrOptions = {
+  revalidateIfStale: enableServer,
+  revalidateOnFocus: enableServer,
+  revalidateOnReconnect: enableServer,
+};
 
 // ----------------------------------------------------------------------
 
-// Fetch board data
-export async function fetchBoardData() {
-  // Get columns
-  const { data: columns, error: columnsError } = await supabase
-    .from('kanban_columns')
-    .select('*')
-    .order('order_position');
-
-  if (columnsError) throw columnsError;
-
-  // Get tasks with assignees, attachments, and subtasks
-  const { data: tasks, error: tasksError } = await supabase
-    .from('kanban_tasks')
-    .select(`
-      *,
-      assignees:task_assignees(
-        user:user_profiles(*)
-      ),
-      attachments:task_attachments(*),
-      subtasks:kanban_subtasks(*)
-    `);
-
-  if (tasksError) throw tasksError;
-
-  // Organize tasks by column
-  const tasksByColumn = {};
-  columns.forEach(column => {
-    tasksByColumn[column.id] = tasks.filter(task => task.column_id === column.id);
-  });
-
-  return {
-    board: {
-      columns,
-      tasks: tasksByColumn
-    }
-  };
-}
-
-// ----------------------------------------------------------------------
-
-// Get board data hook
 export function useGetBoard() {
   const { data, isLoading, error, isValidating } = useSWR(
-    CACHE_KEY,
-    fetchBoardData,
-    {
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true
+    KANBAN_CACHE_KEY,
+    async () => {
+      // Fetch columns ordered by position
+      const { data: columns, error: columnsError } = await supabase
+        .from('kanban_columns')
+        .select('*')
+        .order('position');
+
+      if (columnsError) throw columnsError;
+
+      // Fetch tasks with assignees and attachments
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('kanban_tasks')
+        .select(`
+          *,
+          assignees:kanban_task_assignees(
+            user:user_profiles(*)
+          ),
+          attachments:kanban_task_attachments(*),
+          reporter:user_profiles!kanban_tasks_reporter_id_fkey(*)
+        `)
+        .order('created_at');
+
+      if (tasksError) throw tasksError;
+
+      // Organize tasks by column
+      const tasks = columns.reduce((acc, column) => {
+        acc[column.id] = tasksData
+          .filter(task => task.column_id === column.id)
+          .map(task => ({
+            id: task.id,
+            name: task.name,
+            description: task.description,
+            priority: task.priority,
+            status: column.name,
+            column_id: task.column_id,
+            due: [task.due_start, task.due_end],
+            assignee: task.assignees?.map(({ user }) => ({
+              id: user.id,
+              name: user.name || user.email,
+              avatarUrl: user.avatar_url,
+            })) || [],
+            attachments: task.attachments?.map(att => att.file_url) || [],
+            reporter: task.reporter ? {
+              id: task.reporter.id,
+              name: task.reporter.name || task.reporter.email,
+              avatarUrl: task.reporter.avatar_url,
+            } : null,
+          }));
+        return acc;
+      }, {});
+
+      return {
+        board: {
+          columns,
+          tasks,
+        },
+      };
     }
   );
 
   const memoizedValue = useMemo(
     () => ({
       board: {
-        columns: data?.board.columns || [],
-        tasks: data?.board.tasks || {}
+        tasks: data?.board.tasks ?? {},
+        columns: data?.board.columns ?? [],
       },
       boardLoading: isLoading,
       boardError: error,
       boardValidating: isValidating,
-      boardEmpty: !isLoading && !data?.board.columns.length,
+      boardEmpty: !isLoading && !isValidating && !data?.board.columns.length,
     }),
-    [data, error, isLoading, isValidating]
+    [data?.board.columns, data?.board.tasks, error, isLoading, isValidating]
   );
 
   return memoizedValue;
@@ -84,306 +102,131 @@ export function useGetBoard() {
 
 // ----------------------------------------------------------------------
 
-// Create new column
 export async function createColumn(columnData) {
-  try {
-    // Get the current highest order_position
-    const { data: columns, error: fetchError } = await supabase
-      .from('kanban_columns')
-      .select('order_position')
-      .order('order_position', { ascending: false })
-      .limit(1);
-
-    if (fetchError) throw fetchError;
-
-    const nextPosition = columns.length ? (columns[0].order_position + 1) : 0;
-
-    // Create new column with the next order position
-    const { data, error } = await supabase
-      .from('kanban_columns')
-      .insert([{
-        ...columnData,
-        order_position: nextPosition,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    mutate(CACHE_KEY);
-    return data;
-  } catch (error) {
-    console.error('Error creating column:', error);
-    throw error;
-  }
-}
-
-// ----------------------------------------------------------------------
-
-// Update column
-export async function updateColumn(columnId, columnName) {
-  const { error } = await supabase
+  // Get current max position
+  const { data: existingColumns } = await supabase
     .from('kanban_columns')
-    .update({ name: columnName })
-    .eq('id', columnId);
+    .select('position')
+    .order('position', { ascending: false })
+    .limit(1);
 
-  if (error) throw error;
-  
-  mutate(CACHE_KEY);
-}
+  const nextPosition = existingColumns?.[0]?.position + 1 || 0;
 
-// ----------------------------------------------------------------------
-
-// Delete column
-export async function deleteColumn(columnId) {
-  const { error } = await supabase
+  // Create new column with position
+  const { data: newColumn, error } = await supabase
     .from('kanban_columns')
-    .delete()
-    .eq('id', columnId);
-
-  if (error) throw error;
-
-  mutate(CACHE_KEY);
-}
-
-// ----------------------------------------------------------------------
-
-// Create task
-export async function createTask(columnId, taskData) {
-  // First get the column to get its name for the status
-  const { data: column, error: columnError } = await supabase
-    .from('kanban_columns')
-    .select('name')
-    .eq('id', columnId)
-    .single();
-
-  if (columnError) throw columnError;
-
-  // Prepare task data
-  const newTask = {
-    name: taskData.name,
-    description: taskData.description || '',
-    column_id: columnId,
-    priority: taskData.priority || 'medium',
-    due_date: taskData.due?.[0] || null, // Use first date from due array if exists
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-
-  // Insert the task
-  const { data: task, error: taskError } = await supabase
-    .from('kanban_tasks')
-    .insert([newTask])
+    .insert([{ 
+      name: columnData.name,
+      position: nextPosition 
+    }])
     .select()
     .single();
 
-  if (taskError) throw taskError;
-
-  // Handle assignees if any
-  if (taskData.assignee?.length) {
-    const assigneeData = taskData.assignee.map(user => ({
-      task_id: task.id,
-      user_id: user.id,
-      assigned_at: new Date().toISOString()
-    }));
-
-    const { error: assigneeError } = await supabase
-      .from('task_assignees')
-      .insert(assigneeData);
-
-    if (assigneeError) throw assigneeError;
-  }
-
-  // Fetch the complete task with its relationships
-  const { data: completeTask, error: fetchError } = await supabase
-    .from('kanban_tasks')
-    .select(`
-      *,
-      assignees:task_assignees(
-        user:user_profiles(*)
-      ),
-      attachments:task_attachments(*)
-    `)
-    .eq('id', task.id)
-    .single();
-
-  if (fetchError) throw fetchError;
-
-  mutate(CACHE_KEY);
-  return completeTask;
-}
-
-// ----------------------------------------------------------------------
-
-// Update task
-export async function updateTask(columnId, taskData) {
-  try {
-    // First update the task basic info
-    const { data, error } = await supabase
-      .from('kanban_tasks')
-      .update({
-        name: taskData.name,
-        description: taskData.description,
-        priority: taskData.priority,
-        due_date: taskData.due_date,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskData.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Handle assignees if changed
-    if (taskData.assignee?.length) {
-      // First remove existing assignees
-      const { error: deleteError } = await supabase
-        .from('task_assignees')
-        .delete()
-        .eq('task_id', taskData.id);
-
-      if (deleteError) throw deleteError;
-
-      // Then add new assignees
-      const assigneeData = taskData.assignee.map(user => ({
-        task_id: taskData.id,
-        user_id: user.id,
-        assigned_at: new Date().toISOString()
-      }));
-
-      const { error: assigneeError } = await supabase
-        .from('task_assignees')
-        .insert(assigneeData);
-
-      if (assigneeError) throw assigneeError;
-    }
-
-    mutate(CACHE_KEY); // Refresh the board data
-    return data;
-  } catch (error) {
-    console.error('Error updating task:', error);
-    throw error; // Re-throw to handle in the component
-  }
-}
-
-// ----------------------------------------------------------------------
-
-// Delete task
-export async function deleteTask(columnId, taskId) {
-  const { error } = await supabase
-    .from('kanban_tasks')
-    .delete()
-    .eq('id', taskId);
-
   if (error) throw error;
 
-  mutate(CACHE_KEY);
+  mutate(
+    KANBAN_CACHE_KEY,
+    (currentData) => {
+      const { board } = currentData;
+      const updatedColumns = [...board.columns, newColumn];
+      const tasks = { ...board.tasks, [newColumn.id]: [] };
+
+      return { 
+        ...currentData, 
+        board: { 
+          ...board, 
+          columns: updatedColumns, 
+          tasks 
+        } 
+      };
+    },
+    false
+  );
 }
 
 // ----------------------------------------------------------------------
 
-// Move task between columns
-export async function moveTaskBetweenColumns(task, sourceColumnId, targetColumnId) {
+export async function updateColumn(columnId, columnName) {
+  startTransition(() => {
+    mutate(
+      KANBAN_CACHE_KEY,
+      async (currentData) => {
+        // Update column in database
+        const { error } = await supabase
+          .from('kanban_columns')
+          .update({ name: columnName })
+          .eq('id', columnId);
+
+        if (error) throw error;
+
+        const { board } = currentData;
+
+        // Update column in local state
+        const columns = board.columns.map((column) =>
+          column.id === columnId ? { ...column, name: columnName } : column
+        );
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            columns,
+          },
+        };
+      },
+      false
+    );
+  });
+}
+
+// ----------------------------------------------------------------------
+
+export async function moveColumn(updateColumns) {
   try {
-    // Update the task's column_id in the database
-    const { data, error } = await supabase
-      .from('kanban_tasks')
-      .update({ 
-        column_id: targetColumnId,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', task.id)
-      .select(`
-        *,
-        assignees:task_assignees(
-          user:user_profiles(*)
-        ),
-        attachments:task_attachments(*),
-        subtasks:kanban_subtasks(*)
-      `)
-      .single();
+    // First update positions to temporary values to avoid conflicts
+    const tempUpdates = updateColumns.map((column, index) => ({
+      id: column.id,
+      name: column.name,
+      position: -1 * (index + 1)
+    }));
+
+    await supabase
+      .from('kanban_columns')
+      .upsert(tempUpdates, { onConflict: 'id' });
+
+    // Then update to final positions
+    const finalUpdates = updateColumns.map((column, index) => ({
+      id: column.id,
+      name: column.name,
+      position: index
+    }));
+
+    const { error } = await supabase
+      .from('kanban_columns')
+      .upsert(finalUpdates, { onConflict: 'id' });
 
     if (error) throw error;
 
-    // Update the SWR cache optimistically
-    mutate(CACHE_KEY, async (currentData) => {
-      if (!currentData) return currentData;
-      
-      const newData = JSON.parse(JSON.stringify(currentData));
-      
-      // Remove task from source column
-      newData.board.tasks[sourceColumnId] = newData.board.tasks[sourceColumnId]
-        .filter(t => t.id !== task.id);
-      
-      // Add task to target column
-      if (!newData.board.tasks[targetColumnId]) {
-        newData.board.tasks[targetColumnId] = [];
-      }
-      
-      // Replace the task with updated data from the database
-      newData.board.tasks[targetColumnId] = [
-        ...newData.board.tasks[targetColumnId],
-        data
-      ];
-
-      // Sort tasks in the target column by priority and due date
-      newData.board.tasks[targetColumnId].sort((a, b) => {
-        const priorityOrder = { high: 1, medium: 2, low: 3 };
-        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (priorityDiff !== 0) return priorityDiff;
-        return new Date(b.due_date) - new Date(a.due_date);
-      });
-      
-      return newData;
-    }, false);
-
-    return data;
-  } catch (error) {
-    console.error('Error moving task between columns:', error);
-    throw error;
-  }
-}
-
-// ----------------------------------------------------------------------
-
-// Update column positions
-export async function moveColumn(updateColumns) {
-  try {
-    // Update each column's order position in the database
-    await Promise.all(
-      updateColumns.map(async (column, index) => {
-        const { error } = await supabase
-          .from('kanban_columns')
-          .update({ 
-            order_position: index,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', column.id);
-
-        if (error) throw error;
-      })
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            columns: updateColumns.map((column, index) => ({
+              ...column,
+              position: index
+            }))
+          }
+        };
+      },
+      false
     );
-
-    // Update the cache optimistically
-    mutate(CACHE_KEY, async (currentData) => {
-      if (!currentData) return currentData;
-      
-      return {
-        ...currentData,
-        board: {
-          ...currentData.board,
-          columns: updateColumns.map((column, index) => ({
-            ...column,
-            order_position: index
-          }))
-        }
-      };
-    }, false);
-
   } catch (error) {
-    console.error('Error updating column positions:', error);
+    console.error('Error moving columns:', error);
     throw error;
   }
 }
@@ -391,12 +234,150 @@ export async function moveColumn(updateColumns) {
 // ----------------------------------------------------------------------
 
 export async function clearColumn(columnId) {
+  try {
+    // Delete all tasks in the column from database
+    const { error } = await supabase
+      .from('kanban_tasks')
+      .delete()
+      .eq('column_id', columnId);
+
+    if (error) throw error;
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        return { 
+          ...currentData, 
+          board: { 
+            ...board, 
+            tasks: { 
+              ...board.tasks, 
+              [columnId]: [] 
+            } 
+          } 
+        };
+      },
+      false
+    );
+  } catch (error) {
+    console.error('Error clearing column:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function deleteColumn(columnId) {
+  try {
+    // Delete the column from database
+    // (This will automatically delete associated tasks due to ON DELETE CASCADE)
+    const { error } = await supabase
+      .from('kanban_columns')
+      .delete()
+      .eq('id', columnId);
+
+    if (error) throw error;
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+
+        // Remove column from columns array
+        const columns = board.columns.filter((column) => column.id !== columnId);
+
+        // Remove tasks for the deleted column
+        const { [columnId]: deletedTasks, ...remainingTasks } = board.tasks;
+
+        return { 
+          ...currentData, 
+          board: { 
+            ...board, 
+            columns,
+            tasks: remainingTasks 
+          } 
+        };
+      },
+      false
+    );
+  } catch (error) {
+    console.error('Error deleting column:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function createTask(columnId, taskData) {
+  try {
+    // Create the task in the database
+    const { data: task, error: taskError } = await supabase
+      .from('kanban_tasks')
+      .insert([{
+        name: taskData.name,
+        description: taskData.description || '',
+        column_id: columnId,
+        priority: taskData.priority,
+        due_start: taskData.due[0],
+        due_end: taskData.due[1],
+        reporter_id: taskData.reporter.id,
+      }])
+      .select()
+      .single();
+
+    if (taskError) throw taskError;
+
+    // Update the local state optimistically
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        const columnTasks = board.tasks[columnId] || [];
+
+        const newTask = {
+          id: task.id,
+          name: task.name,
+          description: task.description,
+          priority: task.priority,
+          due: [task.due_start, task.due_end],
+          assignee: [],
+          attachments: [],
+          reporter: taskData.reporter,
+        };
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: {
+              ...board.tasks,
+              [columnId]: [newTask, ...columnTasks],
+            },
+          },
+        };
+      },
+      false
+    );
+
+    return task;
+  } catch (error) {
+    console.error('Error creating task:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function updateTask(columnId, taskData) {
   /**
    * Work on server
    */
   if (enableServer) {
-    const data = { columnId };
-    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'clear-column' } });
+    const data = { columnId, taskData };
+    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'update-task' } });
   }
 
   /**
@@ -404,12 +385,25 @@ export async function clearColumn(columnId) {
    */
   startTransition(() => {
     mutate(
-      KANBAN_ENDPOINT,
+      KANBAN_CACHE_KEY,
       (currentData) => {
         const { board } = currentData;
 
-        // remove all tasks in column
-        const tasks = { ...board.tasks, [columnId]: [] };
+        // tasks in column
+        const tasksInColumn = board.tasks[columnId];
+
+        // find and update task
+        const updateTasks = tasksInColumn.map((task) =>
+          task.id === taskData.id
+            ? {
+                // Update data when found
+                ...task,
+                ...taskData,
+              }
+            : task
+        );
+
+        const tasks = { ...board.tasks, [columnId]: updateTasks };
 
         return { ...currentData, board: { ...board, tasks } };
       },
@@ -418,172 +412,286 @@ export async function clearColumn(columnId) {
   });
 }
 
-export async function moveTask(updatedTasks) {
+// ----------------------------------------------------------------------
+
+export async function moveTask(updateTasks) {
   try {
-    // For each column's tasks, update their positions in the database
-    await Promise.all(
-      Object.entries(updatedTasks).map(async ([columnId, tasks]) => {
-        // Update each task's column_id if it has changed
-        await Promise.all(
-          tasks.map(async (task, index) => {
-            if (task.column_id !== columnId) {
-              await supabase
-                .from('kanban_tasks')
-                .update({
-                  column_id: columnId,
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', task.id);
-            }
-          })
-        );
-      })
+    // Find which tasks have changed columns and update them in the database
+    const updates = [];
+    
+    Object.entries(updateTasks).forEach(([columnId, tasks]) => {
+      tasks.forEach(task => {
+        // Always update the column_id and include all required fields when task is moved
+        updates.push({
+          id: task.id,
+          name: task.name,
+          column_id: columnId,
+          priority: task.priority,
+          description: task.description || '',
+          reporter_id: task.reporter?.id, // Include reporter_id
+          due_start: task.due?.[0] || null,
+          due_end: task.due?.[1] || null
+        });
+      });
+    });
+
+    // Batch update all moved tasks
+    if (updates.length > 0) {
+      const { error } = await supabase
+        .from('kanban_tasks')
+        .upsert(updates, { onConflict: 'id' });
+
+      if (error) throw error;
+    }
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+
+        // Update tasks with new column info and status
+        const updatedTasks = {};
+        Object.entries(updateTasks).forEach(([columnId, tasks]) => {
+          updatedTasks[columnId] = tasks.map(task => ({
+            ...task,
+            column_id: columnId,
+            status: board.columns.find(col => col.id === columnId)?.name || task.status
+          }));
+        });
+
+        return { 
+          ...currentData, 
+          board: { 
+            ...board, 
+            tasks: updatedTasks 
+          } 
+        };
+      },
+      false
     );
+  } catch (error) {
+    console.error('Error moving tasks:', error);
+    throw error;
+  }
+}
 
-    // Update the cache
-    mutate(CACHE_KEY, async (currentData) => {
-      if (!currentData) return currentData;
-      
-      return {
-        ...currentData,
-        board: {
-          ...currentData.board,
-          tasks: updatedTasks,
-        },
+// ----------------------------------------------------------------------
+
+export async function deleteTask(columnId, taskId) {
+  /**
+   * Work on server
+   */
+  if (enableServer) {
+    const data = { columnId, taskId };
+    await axios.post(KANBAN_ENDPOINT, data, { params: { endpoint: 'delete-task' } });
+  }
+
+  /**
+   * Work in local
+   */
+  mutate(
+    KANBAN_CACHE_KEY,
+    (currentData) => {
+      const { board } = currentData;
+
+      // delete task in column
+      const tasks = {
+        ...board.tasks,
+        [columnId]: board.tasks[columnId].filter((task) => task.id !== taskId),
       };
-    }, false);
-  } catch (error) {
-    console.error('Error updating task positions:', error);
-    throw error;
-  }
+
+      return { ...currentData, board: { ...board, tasks } };
+    },
+    false
+  );
 }
 
 // ----------------------------------------------------------------------
 
-// Add subtask
-export async function addSubtask(taskId, subtaskName) {
+export async function moveTaskBetweenColumns(task, sourceColumnId, targetColumnId) {
   try {
-    const { data, error } = await supabase
-      .from('kanban_subtasks')
-      .insert({
-        task_id: taskId,
-        name: subtaskName,
-        is_completed: false,
-        created_at: new Date().toISOString()
-      })
-      .select('*')
-      .single();
-
-    if (error) throw error;
-
-    mutate(CACHE_KEY, async (currentData) => {
-      if (!currentData) return currentData;
-      
-      const newData = JSON.parse(JSON.stringify(currentData));
-      
-      // Add the new subtask to the corresponding task
-      Object.values(newData.board.tasks).forEach(tasks => {
-        tasks.forEach(task => {
-          if (task.id === taskId) {
-            task.subtasks = [...(task.subtasks || []), data];
-          }
-        });
-      });
-      
-      return newData;
-    }, false);
-
-    return data;
-  } catch (error) {
-    console.error('Error adding subtask:', error);
-    throw error;
-  }
-}
-
-// ----------------------------------------------------------------------
-
-// Update subtask completion status
-export async function updateSubtaskStatus(subtaskId, isCompleted) {
-  try {
-    const { data, error } = await supabase
-      .from('kanban_subtasks')
-      .update({
-        is_completed: isCompleted,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', subtaskId)
-      .select('*') // Make sure to select all fields
-      .single();
-
-    if (error) throw error;
-
-    mutate(CACHE_KEY, async (currentData) => {
-      if (!currentData) return currentData;
-      
-      // Deep clone the current data
-      const newData = JSON.parse(JSON.stringify(currentData));
-      
-      // Update the subtask in all tasks
-      Object.values(newData.board.tasks).forEach(tasks => {
-        tasks.forEach(task => {
-          if (task.subtasks) {
-            task.subtasks = task.subtasks.map(st => 
-              st.id === subtaskId ? data : st
-            );
-          }
-        });
-      });
-      
-      return newData;
-    }, false);
-
-    return data;
-  } catch (error) {
-    console.error('Error updating subtask status:', error);
-    throw error;
-  }
-}
-
-// ----------------------------------------------------------------------
-
-// Delete subtask
-export async function deleteSubtask(subtaskId) {
-  try {
+    // Update task column in database first
     const { error } = await supabase
-      .from('kanban_subtasks')
-      .delete()
-      .eq('id', subtaskId);
+      .from('kanban_tasks')
+      .update({ column_id: targetColumnId })
+      .eq('id', task.id);
 
     if (error) throw error;
 
-    mutate(CACHE_KEY);
+    // Then update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        
+        // Remove task from source column
+        const sourceColumnTasks = board.tasks[sourceColumnId].filter(t => t.id !== task.id);
+        
+        // Add task to target column with updated status
+        const updatedTask = {
+          ...task,
+          status: board.columns.find(col => col.id === targetColumnId)?.name || task.status
+        };
+        
+        const targetColumnTasks = [updatedTask, ...(board.tasks[targetColumnId] || [])];
+
+        // Update both columns
+        const updatedTasks = {
+          ...board.tasks,
+          [sourceColumnId]: sourceColumnTasks,
+          [targetColumnId]: targetColumnTasks,
+        };
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: updatedTasks,
+          },
+        };
+      },
+      false // Don't revalidate immediately
+    );
   } catch (error) {
-    console.error('Error deleting subtask:', error);
+    console.error('Error moving task between columns:', error);
     throw error;
   }
 }
 
 // ----------------------------------------------------------------------
 
-// Add this new function to update subtask name
-export async function updateSubtaskName(subtaskId, newName) {
+export async function updateTaskPriority(taskId, priority) {
   try {
-    const { data, error } = await supabase
-      .from('kanban_subtasks')
-      .update({
-        name: newName,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', subtaskId)
-      .select()
-      .single();
+    // Update priority in database
+    const { error } = await supabase
+      .from('kanban_tasks')
+      .update({ priority })
+      .eq('id', taskId);
 
     if (error) throw error;
 
-    mutate(CACHE_KEY);
-    return data;
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        const updatedTasks = {};
+
+        // Update the task priority in all columns
+        Object.keys(board.tasks).forEach((columnId) => {
+          updatedTasks[columnId] = board.tasks[columnId].map((task) =>
+            task.id === taskId ? { ...task, priority } : task
+          );
+        });
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: updatedTasks,
+          },
+        };
+      },
+      false
+    );
   } catch (error) {
-    console.error('Error updating subtask name:', error);
+    console.error('Error updating task priority:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function updateTaskDescription(taskId, description) {
+  try {
+    // Update description in database
+    const { error } = await supabase
+      .from('kanban_tasks')
+      .update({ description })
+      .eq('id', taskId);
+
+    if (error) throw error;
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        const updatedTasks = {};
+
+        // Update the task description in all columns
+        Object.keys(board.tasks).forEach((columnId) => {
+          updatedTasks[columnId] = board.tasks[columnId].map((task) =>
+            task.id === taskId ? { ...task, description } : task
+          );
+        });
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: updatedTasks,
+          },
+        };
+      },
+      false
+    );
+  } catch (error) {
+    console.error('Error updating task description:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function updateTaskDueDate(taskId, dueStart, dueEnd) {
+  try {
+    // Update due dates in database
+    const { error } = await supabase
+      .from('kanban_tasks')
+      .update({
+        due_start: dueStart?.toISOString() || null,
+        due_end: dueEnd?.toISOString() || null
+      })
+      .eq('id', taskId);
+
+    if (error) throw error;
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        const updatedTasks = {};
+
+        // Update the task due dates in all columns
+        Object.keys(board.tasks).forEach((columnId) => {
+          updatedTasks[columnId] = board.tasks[columnId].map((task) =>
+            task.id === taskId 
+              ? { 
+                  ...task, 
+                  due: [
+                    dueStart?.toISOString() || null,
+                    dueEnd?.toISOString() || null
+                  ] 
+                } 
+              : task
+          );
+        });
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: updatedTasks,
+          },
+        };
+      },
+      false
+    );
+  } catch (error) {
+    console.error('Error updating task due dates:', error);
     throw error;
   }
 }
