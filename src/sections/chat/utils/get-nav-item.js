@@ -20,9 +20,15 @@ export function getNavItem({ currentUserId, conversation }) {
   let displayText = '';
 
   if (lastMessage) {
+    const lastAttachment = lastMessage.attachments && lastMessage.attachments.length > 0
+    ? lastMessage.attachments[lastMessage.attachments.length - 1]
+    : null; 
+    if (lastAttachment) {
+      console.log(lastAttachment.type); 
+    } 
     const sender = lastMessage.senderId === currentUserId ? 'You: ' : '';
 
-    const message = lastMessage.contentType === 'image' ? 'Sent a photo' : lastMessage.body;
+    const message = lastMessage.body===''?lastAttachment?`Sent a ${lastAttachment.type}`:'Sent a file':lastMessage.body;
 
     displayText = `${sender}${message}`;
   }

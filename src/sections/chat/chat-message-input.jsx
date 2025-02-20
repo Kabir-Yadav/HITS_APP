@@ -123,13 +123,14 @@ export function ChatMessageInput({
         }
 
         // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
-
-        if (selectedConversationId) {
-          await sendMessage(selectedConversationId, user?.id, finalMessageData);
-        } else {
-          const res = await createConversation(conversationData);
-          router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
-          onAddRecipients([]);
+        if (message !== '' || attachments.length > 0) {
+          if (selectedConversationId) {
+            await sendMessage(selectedConversationId, user?.id, finalMessageData);
+          } else {
+            const res = await createConversation(conversationData);
+            router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+            onAddRecipients([]);
+          }
         }
 
         setMessage('');
@@ -148,7 +149,6 @@ export function ChatMessageInput({
       onAddRecipients,
     ]
   );
-  console.log(attachments.length);
   return (
     <>
       {/* ✅ Small preview inside input like WhatsApp */}

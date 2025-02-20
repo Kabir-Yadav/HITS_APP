@@ -28,7 +28,6 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
   const { firstName, avatarUrl } = senderDetails;
 
   const { body, createdAt, attachments } = message;
-  console.log(createdAt)
   const renderInfo = () => (
     <Typography
       noWrap
@@ -90,7 +89,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
                   secondary: {
                     noWrap: true,
                     sx: {
-                      mt: 1,
+                      mt: 1.5,
                       typography: 'caption',
                       color: 'text.disabled',
                     },

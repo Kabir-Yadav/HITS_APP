@@ -35,7 +35,6 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
     getNavItem({ conversation, currentUserId: `${user?.id}` });
 
   const singleParticipant = participants[0];
-
   const handleClickConversation = useCallback(async () => {
     try {
       if (!mdUp) {
