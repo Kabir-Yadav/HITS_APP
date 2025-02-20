@@ -75,9 +75,11 @@ export function fileThumb(fileUrl) {
       thumb = iconUrl('ic-folder');
       break;
     case 'txt':
+    case 'plain':
       thumb = iconUrl('ic-txt');
       break;
     case 'zip':
+    case 'x-zip-compressed':
       thumb = iconUrl('ic-zip');
       break;
     case 'audio':
@@ -91,6 +93,8 @@ export function fileThumb(fileUrl) {
       thumb = iconUrl('ic-word');
       break;
     case 'excel':
+    case 'ms-excel':
+    case 'sheet':
       thumb = iconUrl('ic-excel');
       break;
     case 'powerpoint':

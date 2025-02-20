@@ -25,7 +25,7 @@ const swrOptions = {
 export function useGetContacts() {
   // const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
 
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher);
+  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher,swrOptions);
   const memoizedValue = useMemo(
     () => ({
       contacts: data?.contacts || [],
@@ -44,7 +44,7 @@ export function useGetContacts() {
 
 export function useGetConversations(userId) {
   // const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-  const { data, isLoading, error, isValidating } =useSWR(`${BASE_URL}/conversations/`, fetcher);
+  const { data, isLoading, error, isValidating } =useSWR(`${BASE_URL}/conversations/`, fetcher,swrOptions);
   const memoizedValue = useMemo(() => {
     const userConversations = data?.conversations?.filter((conversation) =>
       conversation.participants.some((participant) => participant.id === userId)
@@ -104,9 +104,16 @@ export async function sendMessage(conversationId, userId, messageData) {
     };
 
     ws.onmessage = (event) => {
-      console.log('Received message:', event.data);
+      const url =  [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }];
       // When a new message is received, update the conversation list
-      mutate(`http://127.0.0.1:8000/api/chat/conversationByID/${conversationId}`);
+      mutate(
+        url,
+      );
+    
+      mutate(
+        `${BASE_URL}/conversations/`,
+        
+      );
     };
 
     ws.onerror = (error) => {

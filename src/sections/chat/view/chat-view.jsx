@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useCallback, startTransition } from 'react';
 
 import Typography from '@mui/material/Typography';

@@ -1,7 +1,10 @@
 import dayjs from 'dayjs';
+import utc from "dayjs/plugin/utc";
 import duration from 'dayjs/plugin/duration';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
+dayjs.extend(utc);
+dayjs.extend(relativeTime);
 // ----------------------------------------------------------------------
 
 /**
@@ -130,7 +133,7 @@ export function fToNow(date) {
     return 'Invalid date';
   }
 
-  return dayjs(date).toNow(true);
+  return dayjs.utc(date).local().toNow(true);
 }
 
 // ----------------------------------------------------------------------

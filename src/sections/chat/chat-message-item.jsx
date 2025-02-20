@@ -28,7 +28,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
   const { firstName, avatarUrl } = senderDetails;
 
   const { body, createdAt, attachments } = message;
-
+  console.log(createdAt)
   const renderInfo = () => (
     <Typography
       noWrap
@@ -59,7 +59,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
               src={attachment.path} // ✅ Use correct S3 URL
               onClick={() => onOpenLightbox(attachment.path)} // ✅ Pass correct image URL
               sx={{
-                width: 250,
+                width: 220,
                 height: 'auto',
                 borderRadius: 1.5,
                 cursor: 'pointer',
@@ -111,8 +111,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
       <Stack
         sx={{
           p: 1.5,
-          minWidth: 48,
-          maxWidth: 450,
+          maxWidth: 400,
+          width: 'fit-content',
           borderRadius: 1,
           typography: 'body2',
           bgcolor: 'background.neutral',
@@ -163,13 +163,14 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
         {renderInfo()}
         <Box
           sx={{
+            maxWidth: 'fit-content',
             display: 'flex',
             alignItems: 'center',
             position: 'relative',
             '&:hover': { '& .message-actions': { opacity: 1 } },
           }}
         >
-          <Stack spacing={1}>
+          <Stack spacing={1} alignItems={me ? 'flex-end' : 'flex-start'}>
             {renderAttachments(me)} {/* ✅ Attachments are displayed first */}
             {renderBody()} {/* ✅ Message text appears below attachments */}
           </Stack>

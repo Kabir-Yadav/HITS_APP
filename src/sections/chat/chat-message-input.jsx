@@ -17,6 +17,7 @@ import { fDateTime } from 'src/utils/format-time';
 import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
+import { Scrollbar } from 'src/components/scrollbar';
 import { FileThumbnail, formatFileSize } from 'src/components/file-thumbnail';
 
 import { useMockedUser } from 'src/auth/hooks';
@@ -35,7 +36,8 @@ export function ChatMessageInput({
 
   const { user } = useMockedUser();
 
-  const fileRef = useRef(null);
+  const fileImageRef = useRef(null); // ✅ Reference for images
+  const fileDocRef = useRef(null);   // ✅ Reference for non-image files
 
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
@@ -62,11 +64,17 @@ export function ChatMessageInput({
     attachments,
   });
 
-  const handleAttach = useCallback(() => {
-    if (fileRef.current) {
-      fileRef.current.click();
+  const handleAttachImages = () => {
+    if (fileImageRef.current) {
+      fileImageRef.current.click();
     }
-  }, []);
+  };
+
+  const handleAttachFiles = () => {
+    if (fileDocRef.current) {
+      fileDocRef.current.click();
+    }
+  };
 
   const handleChangeMessage = useCallback((event) => {
     setMessage(event.target.value);
@@ -114,7 +122,7 @@ export function ChatMessageInput({
           };
         }
 
-        console.log('Sending message:', finalMessageData); // ✅ Debug before sending
+        // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
 
         if (selectedConversationId) {
           await sendMessage(selectedConversationId, user?.id, finalMessageData);
@@ -140,105 +148,102 @@ export function ChatMessageInput({
       onAddRecipients,
     ]
   );
-
+  console.log(attachments.length);
   return (
     <>
       {/* ✅ Small preview inside input like WhatsApp */}
       {attachments.length > 0 && (
-        <Box
+        <Scrollbar
           sx={{
-            display: "flex",
-            alignItems: "center",
-            mb: 1,
-            p: 1,
-            borderRadius: 1,
-            flexWrap: "wrap", // ✅ Ensures multiple previews fit
-            gap: 1, // ✅ Adds spacing between previews
+            maxHeight: 200,
+            minHeight: attachments.some((file) =>
+              ["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(file.type)
+            ) ? 120 : 70,
+            overflowY: "auto",
+            transition: "min-height .3s ease-in-out", // ✅ Smooth transition on shrink
           }}
         >
-          {attachments.map((file) => {
-            const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(file.type);
 
-            return (
-              <Stack key={file.id} sx={{ position: "relative", alignItems: "center" }}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: 1,
-                    maxWidth: 180, // ✅ Prevents taking full width
-                    borderRadius: 5
-                  }}
-                >
-                  {/* ✅ Close Button Only for Images */}
-                  {isImage && (
-                    <IconButton
-                      onClick={() =>
-                        setAttachments((prev) => prev.filter((item) => item.id !== file.id))
-                      }
-                      sx={{
-                        position: "absolute",
-                        top: 0,
-                        right: 0,
-                        width: 30,
-                        height: 30,
-                        color: "white",
-                        backgroundColor: "rgba(0, 0, 0, 0.5)", // ✅ Semi-transparent background
-                        "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" }, // ✅ Darker on hover
-                      }}
-                    >
-                      <Iconify icon="mingcute:close-line" width={18} />
-                    </IconButton>
-                  )}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 1,
+              p: 1,
+              borderRadius: 1,
+              maxHeight: "100%",
+              overflowY: "auto",
+            }}
+          >
+            {attachments.map((file) => {
+              const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(file.type);
 
-                  {/* ✅ Image Preview */}
-                  {isImage ? (
-                    <img
-                      src={file.preview}
-                      alt="Preview"
-                      style={{ width: 110, height: 100, borderRadius: 5 }}
-                    />
-                  ) : (
-                    // ✅ File Icon for Non-Image Files
-                    <></>
-                  )}
-                </Box>
-
-                {/* ✅ File Display for Non-Image Files */}
-                {!isImage && (
-                  <Box sx={{ boxShadow: 1, p: .5, borderRadius: 2, maxWidth: 200, gap: 1.5, display: "flex", alignItems: "center" }}>
-                    <FileThumbnail
-                      imageView
-                      file={file.type}
-                      onRemove
-                      slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
-                      sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
-                    />
-
-                    <ListItemText
-                      primary={file.name}
-                      secondary={formatFileSize(file.size)}
-                      slotProps={{
-                        primary: { noWrap: true, sx: { typography: "body2" } },
-                        secondary: {
-                          noWrap: true,
-                          sx: {
-                            mt: 0.25,
-                            typography: "caption",
-                            color: "text.disabled",
-                          },
-                        },
-                      }}
-                    />
+              return (
+                <Stack key={file.id} sx={{ position: "relative", alignItems: "center" }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: 1,
+                      maxWidth: 180,
+                      borderRadius: 2,
+                    }}
+                  >
+                    {isImage && (
+                      <IconButton
+                        onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== file.id))}
+                        sx={{
+                          position: "absolute",
+                          top: 0,
+                          right: 0,
+                          width: 30,
+                          height: 30,
+                          color: "white",
+                          backgroundColor: "rgba(0, 0, 0, 0.5)",
+                          "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" },
+                        }}
+                      >
+                        <Iconify icon="mingcute:close-line" width={18} />
+                      </IconButton>
+                    )}
+                    {isImage ? (
+                      <img src={file.preview} alt="Preview" style={{ width: 110, height: 100, borderRadius: 5 }} />
+                    ) : null}
                   </Box>
-                )}
-              </Stack>
-            );
-          })}
-        </Box>
+                  {!isImage && (
+                    <Box sx={{ boxShadow: 1, p: 0.5, borderRadius: 2, maxWidth: 200, gap: 1.5, display: "flex", alignItems: "center" }}>
+                      <FileThumbnail
+                        imageView
+                        file={file.type}
+                        onRemove={() => setAttachments((prev) => prev.filter((item) => item.id !== file.id))}
+                        slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
+                        sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
+                      />
+                      <ListItemText
+                        primary={file.name}
+                        secondary={formatFileSize(file.size)}
+                        slotProps={{
+                          primary: { noWrap: true, sx: { typography: "body2" } },
+                          secondary: {
+                            noWrap: true,
+                            sx: {
+                              mt: 0.25,
+                              typography: "caption",
+                              color: "text.disabled",
+                            },
+                          },
+                        }}
+                      />
+                    </Box>
+                  )}
+                </Stack>
+              );
+            })}
+          </Box>
+        </Scrollbar>
       )}
-
 
       <InputBase
         name="chat-message"
@@ -255,10 +260,10 @@ export function ChatMessageInput({
         }
         endAdornment={
           <Box sx={{ flexShrink: 0, display: 'flex' }}>
-            <IconButton onClick={handleAttach}>
+            <IconButton onClick={handleAttachImages}>
               <Iconify icon="solar:gallery-add-bold" />
             </IconButton>
-            <IconButton onClick={handleAttach}>
+            <IconButton onClick={handleAttachFiles}>
               <Iconify icon="eva:attach-2-fill" />
             </IconButton>
             <IconButton>
@@ -276,7 +281,22 @@ export function ChatMessageInput({
         ]}
       />
 
-      <input type="file" ref={fileRef} style={{ display: 'none' }} onChange={handleFileChange} />
+      <input
+        type="file"
+        ref={fileImageRef}
+        style={{ display: "none" }}
+        accept="image/*" // ✅ Only allows images
+        onChange={handleFileChange}
+      />
+
+      {/* ✅ Hidden Input for Documents (Non-Images) */}
+      <input
+        type="file"
+        ref={fileDocRef}
+        style={{ display: "none" }}
+        accept=".pdf,.docx,.xlsx,.zip,.txt" // ✅ Only allows documents
+        onChange={handleFileChange}
+      />
     </>
   );
 }
