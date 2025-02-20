@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+import { varAlpha } from 'minimal-shared/utils';
+import { useCallback, useEffect, useState } from 'react';
 import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -34,53 +35,55 @@ export function KanbanDetailsToolbar({
   const smUp = useMediaQuery(theme.breakpoints.up('sm'));
   const { board } = useGetBoard();
 
+  const [status, setStatus] = useState(taskStatus);
+
   const menuActions = usePopover();
   const confirmDialog = useBoolean();
 
-  // Get the current column name based on task's column_id
-  const getCurrentColumnName = useCallback(() => {
-    const column = board.columns?.find(col => col.id === task?.column_id);
-    return column?.name || 'No Status';
-  }, [board.columns, task?.column_id]);
-
-  const [status, setStatus] = useState(getCurrentColumnName());
-
-  // Update status when task or columns change
   useEffect(() => {
-    setStatus(getCurrentColumnName());
-  }, [getCurrentColumnName, task]);
+    setStatus(taskStatus);
+  }, [taskStatus]);
 
-  const handleChangeStatus = useCallback(
-    async (newValue, targetColumnId) => {
+  const handleUpdateStatus = useCallback(
+    async (newStatus) => {
       try {
-        if (task.column_id !== targetColumnId) {
-          // Move task to new column
-          await moveTaskBetweenColumns(task, task.column_id, targetColumnId);
-        }
+        const targetColumn = board.columns.find((column) => column.name === newStatus);
+        const sourceColumn = board.columns.find((column) => column.name === status);
 
+        if (targetColumn && sourceColumn) {
+          await moveTaskBetweenColumns(task, sourceColumn.id, targetColumn.id);
+          setStatus(newStatus);
+          if (onUpdateStatus) {
+            onUpdateStatus(newStatus);
+          }
+        }
         menuActions.onClose();
-        setStatus(newValue);
-        onUpdateStatus?.(newValue);
       } catch (error) {
-        console.error('Error moving task:', error);
+        console.error('Error updating task status:', error);
       }
     },
-    [menuActions, onUpdateStatus, task]
+    [board.columns, status, task, onUpdateStatus, menuActions]
   );
 
   const renderMenuActions = () => (
     <CustomPopover
       open={menuActions.open}
-      anchorEl={menuActions.anchorEl}
       onClose={menuActions.onClose}
-      slotProps={{ arrow: { placement: 'top-right' } }}
+      anchorEl={menuActions.anchorEl}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+      slotProps={{
+        paper: {
+          sx: { width: 180, mt: 0.5 },
+        },
+      }}
     >
       <MenuList>
-        {board.columns?.map((column) => (
+        {board.columns.map((column) => (
           <MenuItem
             key={column.id}
-            selected={status === column.name}
-            onClick={() => handleChangeStatus(column.name, column.id)}
+            selected={column.name === status}
+            onClick={() => handleUpdateStatus(column.name)}
           >
             {column.name}
           </MenuItem>
@@ -93,12 +96,8 @@ export function KanbanDetailsToolbar({
     <ConfirmDialog
       open={confirmDialog.value}
       onClose={confirmDialog.onFalse}
-      title="Delete"
-      content={
-        <>
-          Are you sure want to delete <strong> {taskName} </strong>?
-        </>
-      }
+      title="Delete Task"
+      content="Are you sure want to delete this task?"
       action={
         <Button variant="contained" color="error" onClick={onDelete}>
           Delete
@@ -111,12 +110,13 @@ export function KanbanDetailsToolbar({
     <>
       <Box
         sx={[
-          {
+          () => ({
+            p: 1.5,
             display: 'flex',
             alignItems: 'center',
-            p: theme.spacing(2.5, 1, 2.5, 2.5),
-            borderBottom: `solid 1px ${theme.vars.palette.divider}`,
-          },
+            gap: 1,
+            borderBottom: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
+          }),
           ...(Array.isArray(sx) ? sx : [sx]),
         ]}
         {...other}
@@ -132,18 +132,8 @@ export function KanbanDetailsToolbar({
         <Button
           size="small"
           variant="soft"
-          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={16} sx={{ ml: 0.5 }} />}
+          endIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={16} sx={{ ml: -0.5 }} />}
           onClick={menuActions.onOpen}
-          sx={{ 
-            minWidth: 120,
-            justifyContent: 'space-between',
-            typography: 'body2',
-            textTransform: 'capitalize',
-            px: 1.5,
-            '& .MuiButton-endIcon': {
-              ml: 0.5,
-            }
-          }}
         >
           {status}
         </Button>

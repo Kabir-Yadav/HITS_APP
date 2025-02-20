@@ -8,23 +8,29 @@ import InputBase, { inputBaseClasses } from '@mui/material/InputBase';
 
 import { fAdd, today } from 'src/utils/format-time';
 
-import { _mock } from 'src/_mock';
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
 export function KanbanTaskAdd({ status, openAddTask, onAddTask, onCloseAddTask }) {
   const [taskName, setTaskName] = useState('');
+  const { user } = useAuthContext();
 
   const defaultTask = useMemo(
     () => ({
+      id: uuidv4(),
       name: taskName.trim() ? taskName : 'Untitled',
       priority: 'medium',
       attachments: [],
       assignee: [],
       due: [today(), fAdd({ days: 1 })],
-      description: ''
+      reporter: {
+        id: user?.id,
+        name: user?.displayName || user?.email,
+        avatarUrl: user?.photoURL,
+      },
     }),
-    [taskName]
+    [taskName, user]
   );
 
   const handleChangeName = useCallback((event) => {
@@ -33,11 +39,13 @@ export function KanbanTaskAdd({ status, openAddTask, onAddTask, onCloseAddTask }
 
   const handleCreateTask = useCallback(async () => {
     try {
-      await onAddTask(defaultTask);
+      if (onAddTask) {
+        await onAddTask(defaultTask);
+      }
       setTaskName('');
       onCloseAddTask();
     } catch (error) {
-      console.error(error);
+      console.error('Error creating task:', error);
     }
   }, [defaultTask, onAddTask, onCloseAddTask]);
 
