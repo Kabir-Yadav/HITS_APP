@@ -89,7 +89,7 @@ export function useGetConversation(conversationId) {
 
 export async function sendMessage(conversationId, userId, messageData) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
+    const ws = new WebSocket(`ws://13.61.143.129:8000/ws/chat/${userId}`);
 
     ws.onopen = () => {
       const messagePayload = JSON.stringify({

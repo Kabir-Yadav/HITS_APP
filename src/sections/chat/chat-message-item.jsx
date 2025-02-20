@@ -90,7 +90,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }) {
                   secondary: {
                     noWrap: true,
                     sx: {
-                      mt: 0.25,
+                      mt: 1,
                       typography: 'caption',
                       color: 'text.disabled',
                     },

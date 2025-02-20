@@ -201,8 +201,8 @@ export function ChatMessageInput({
                           width: 30,
                           height: 30,
                           color: "white",
-                          backgroundColor: "rgba(0, 0, 0, 0.5)",
-                          "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" },
+                          backgroundColor: "rgba(0, 0, 0, 0.2)",
+                          "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.5)" },
                         }}
                       >
                         <Iconify icon="mingcute:close-line" width={18} />
