@@ -26,5 +26,12 @@ jobs:
       - name: Delete existing container
         run: docker rm -f employeeos
       - name: Run new container
-        run: docker run -d -p 5173:80 --name employeeos shreyasladhe23/employeeos_f13technologies
+        run: |
+          docker run -d -p 5173:80 \
+            --name employeeos \
+            -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
+            -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+            -e GOOGLE_CALENDAR_API_KEY=${{ secrets.GOOGLE_CALENDAR_API_KEY }} \
+            shreyasladhe23/employeeos_f13technologies
+
 
