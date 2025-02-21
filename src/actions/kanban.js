@@ -66,13 +66,20 @@ export function useGetBoard() {
               email: user.email,
               avatarUrl: user.avatar_url,
             })) || [],
-            attachments: task.attachments?.map(att => att.file_url) || [],
+            attachments: task.attachments?.map(att => ({
+              id: att.id,
+              file_name: att.file_name,
+              file_url: att.file_url,
+              file_type: att.file_type,
+              file_size: att.file_size,
+            })) || [],
             reporter: task.reporter ? {
               id: task.reporter.id,
               name: task.reporter.name || task.reporter.email,
+              email: task.reporter.email,
               avatarUrl: task.reporter.avatar_url,
             } : null,
-            subtasks: task.subtasks || [], // Add subtasks to the task object
+            subtasks: task.subtasks || [],
           }));
         return acc;
       }, {});
@@ -483,12 +490,17 @@ export async function moveTask(updateTasks) {
 
 export async function deleteTask(columnId, taskId) {
   try {
+    // First get the task's attachments before deletion
+    const { data: attachments } = await supabase
+      .from('kanban_task_attachments')
+      .select('file_url')
+      .eq('task_id', taskId);
+
     // Delete task from database
     // This will automatically cascade delete:
     // - kanban_task_assignees
     // - kanban_task_attachments 
     // - kanban_task_subtasks
-    // due to ON DELETE CASCADE constraints
     const { error } = await supabase
       .from('kanban_tasks')
       .delete()
@@ -496,23 +508,18 @@ export async function deleteTask(columnId, taskId) {
 
     if (error) throw error;
 
-    // Delete any uploaded files from storage
-    const { data: attachments } = await supabase
-      .from('kanban_task_attachments')
-      .select('file_url')
-      .eq('task_id', taskId);
-
+    // Delete attachment files from storage
     if (attachments?.length) {
-      // Extract file paths from URLs
-      const filePaths = attachments.map(att => {
-        const url = new URL(att.file_url);
-        return url.pathname.split('/').pop(); // Get filename from URL
+      const filesToDelete = attachments.map(att => {
+        // Extract filename from the URL
+        // Example URL: https://.../storage/v1/object/public/kanban-attachments/taskId/filename.jpg
+        const urlParts = att.file_url.split('/');
+        return `${taskId}/${urlParts[urlParts.length - 1]}`;
       });
 
-      // Delete files from storage
       const { error: storageError } = await supabase.storage
         .from('kanban-attachments')
-        .remove(filePaths);
+        .remove(filesToDelete);
 
       if (storageError) {
         console.error('Error deleting attachment files:', storageError);
@@ -931,6 +938,52 @@ export async function updateTaskAssignees(taskId, assignees) {
     );
   } catch (error) {
     console.error('Error updating task assignees:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function updateTaskName(taskId, newName) {
+  try {
+    const { error } = await supabase
+      .from('kanban_tasks')
+      .update({ name: newName })
+      .eq('id', taskId);
+
+    if (error) throw error;
+
+    // Update local state
+    mutate(
+      KANBAN_CACHE_KEY,
+      (currentData) => {
+        const { board } = currentData;
+        const updatedTasks = {};
+
+        // Update task name in all columns
+        Object.keys(board.tasks).forEach((columnId) => {
+          updatedTasks[columnId] = board.tasks[columnId].map((task) =>
+            task.id === taskId
+              ? {
+                  ...task,
+                  name: newName,
+                }
+              : task
+          );
+        });
+
+        return {
+          ...currentData,
+          board: {
+            ...board,
+            tasks: updatedTasks,
+          },
+        };
+      },
+      false
+    );
+  } catch (error) {
+    console.error('Error updating task name:', error);
     throw error;
   }
 }

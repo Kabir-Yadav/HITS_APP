@@ -24,7 +24,7 @@ import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { updateTaskPriority, updateTaskDescription, updateTaskDueDate, createSubtask, updateSubtask, deleteSubtask, updateTaskAssignees } from 'src/actions/kanban';
+import { updateTaskPriority, updateTaskDescription, updateTaskDueDate, createSubtask, updateSubtask, deleteSubtask, updateTaskAssignees, updateTaskName } from 'src/actions/kanban';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -81,6 +81,7 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
   const contactsDialog = useBoolean();
 
   const [taskName, setTaskName] = useState(task.name);
+  const [isNameChanged, setIsNameChanged] = useState(false);
   const [priority, setPriority] = useState(task.priority);
   const [description, setDescription] = useState(task.description);
   const [isDescriptionChanged, setIsDescriptionChanged] = useState(false);
@@ -97,36 +98,30 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
   const handleChangeTaskName = useCallback((event) => {
     setTaskName(event.target.value);
+    setIsNameChanged(true);
   }, []);
-
-  const handleUpdateTask = useCallback(
-    (event) => {
-      try {
-        if (event.key === 'Enter') {
-          if (taskName) {
-            onUpdateTask({ ...task, name: taskName });
-          }
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    },
-    [onUpdateTask, task, taskName]
-  );
 
   const handleChangeTaskDescription = useCallback((event) => {
     setDescription(event.target.value);
     setIsDescriptionChanged(true);
   }, []);
 
-  const handleSaveDescription = useCallback(async () => {
+  const handleSaveChanges = useCallback(async () => {
     try {
-      await updateTaskDescription(task.id, description);
-      setIsDescriptionChanged(false);
+      if (isNameChanged) {
+        await updateTaskName(task.id, taskName);
+        setIsNameChanged(false);
+        onUpdateTask({ ...task, name: taskName });
+      }
+      
+      if (isDescriptionChanged) {
+        await updateTaskDescription(task.id, description);
+        setIsDescriptionChanged(false);
+      }
     } catch (error) {
-      console.error('Error saving description:', error);
+      console.error('Error saving changes:', error);
     }
-  }, [task.id, description]);
+  }, [task, taskName, description, isNameChanged, isDescriptionChanged, onUpdateTask]);
 
   const handleChangePriority = useCallback(
     async (newPriority) => {
@@ -266,134 +261,145 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
 
   const renderTabOverview = () => (
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
-      {/* Task name */}
-      <KanbanInputName
-        placeholder="Task name"
-        value={taskName}
-        onChange={handleChangeTaskName}
-        onKeyUp={handleUpdateTask}
-        inputProps={{ id: `${taskName}-task-input` }}
-      />
+      <Stack spacing={3}>
+        <KanbanInputName
+          placeholder="Task name"
+          value={taskName}
+          onChange={handleChangeTaskName}
+        />
 
-      {/* Reporter */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Assigned By:</BlockLabel>
+        {/* Reporter (Assigned By) */}
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Typography variant="body2">{task.reporter.name}</Typography>
-        </Box>
-      </Box>
-
-      {/* Assignee */}
-      <Box sx={{ display: 'flex' }}>
-        <BlockLabel sx={{ height: 32, lineHeight: '32px' }}>Assigned to:</BlockLabel>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {task.assignee.map((user, index) => {
-            const formattedName = formatNameFromEmail(user.email);
-            
-            return (
-              <Box
-                key={user.id}
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  typography: 'body2',
-                }}
-              >
-                <Avatar
-                  alt={formattedName}
-                  src={user.avatarUrl}
-                  sx={{ width: 24, height: 24 }}
-                >
-                  {formattedName.charAt(0)}
-                </Avatar>
-                <Typography variant="body2">
-                  {formattedName}
-                  {index < task.assignee.length - 1 && ','}
-                </Typography>
-              </Box>
-            );
-          })}
-
-          <Tooltip title="Add assignee">
-            <IconButton
-              onClick={contactsDialog.onTrue}
-              sx={[
-                (theme) => ({
-                  width: 32,
-                  height: 32,
-                  padding: 0,
-                  minWidth: 32,
-                  borderRadius: 1,
-                  marginLeft: 0.5,
-                  border: `dashed 1px ${theme.vars.palette.divider}`,
-                  bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                }),
-              ]}
+          <BlockLabel>Assigned By:</BlockLabel>
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <Avatar
+              alt={formatNameFromEmail(task.reporter.email)}
+              src={task.reporter.avatarUrl}
+              sx={{ width: 24, height: 24 }}
             >
-              <Iconify icon="mingcute:add-line" width={16} />
-            </IconButton>
-          </Tooltip>
+              {formatNameFromEmail(task.reporter.email).charAt(0)}
+            </Avatar>
+            <Typography variant="body2">
+              {formatNameFromEmail(task.reporter.email)}
+            </Typography>
+          </Box>
+        </Box>
 
-          <KanbanContactsDialog
-            assignee={task.assignee}
-            open={contactsDialog.value}
-            onClose={contactsDialog.onFalse}
-            onAssignee={handleAssignee}
+        {/* Assignee */}
+        <Box sx={{ display: 'flex' }}>
+          <BlockLabel sx={{ height: 32, lineHeight: '32px' }}>Assigned to:</BlockLabel>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            {task.assignee.map((user, index) => {
+              const formattedName = formatNameFromEmail(user.email);
+              
+              return (
+                <Box
+                  key={user.id}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    typography: 'body2',
+                  }}
+                >
+                  <Avatar
+                    alt={formattedName}
+                    src={user.avatarUrl}
+                    sx={{ width: 24, height: 24 }}
+                  >
+                    {formattedName.charAt(0)}
+                  </Avatar>
+                  <Typography variant="body2">
+                    {formattedName}
+                    {index < task.assignee.length - 1 && ','}
+                  </Typography>
+                </Box>
+              );
+            })}
+
+            <Tooltip title="Add assignee">
+              <IconButton
+                onClick={contactsDialog.onTrue}
+                sx={[
+                  (theme) => ({
+                    width: 32,
+                    height: 32,
+                    padding: 0,
+                    minWidth: 32,
+                    borderRadius: 1,
+                    marginLeft: 0.5,
+                    border: `dashed 1px ${theme.vars.palette.divider}`,
+                    bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+                  }),
+                ]}
+              >
+                <Iconify icon="mingcute:add-line" width={16} />
+              </IconButton>
+            </Tooltip>
+
+            <KanbanContactsDialog
+              assignee={task.assignee}
+              open={contactsDialog.value}
+              onClose={contactsDialog.onFalse}
+              onAssignee={handleAssignee}
+            />
+          </Box>
+        </Box>
+
+        {/* Due date */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <BlockLabel>Due date</BlockLabel>
+
+          {rangePicker.selected ? (
+            <Button size="small" onClick={rangePicker.onOpen}>
+              {rangePicker.shortLabel}
+            </Button>
+          ) : (
+            <Tooltip title="Add due date">
+              <IconButton
+                onClick={rangePicker.onOpen}
+                sx={[
+                  (theme) => ({
+                    border: `dashed 1px ${theme.vars.palette.divider}`,
+                    bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
+                  }),
+                ]}
+              >
+                <Iconify icon="mingcute:add-line" />
+              </IconButton>
+            </Tooltip>
+          )}
+
+          <CustomDateRangePicker
+            variant="calendar"
+            title="Choose due date"
+            startDate={rangePicker.startDate}
+            endDate={rangePicker.endDate}
+            onChangeStartDate={rangePicker.onChangeStartDate}
+            onChangeEndDate={rangePicker.onChangeEndDate}
+            open={rangePicker.open}
+            onClose={rangePicker.onClose}
+            selected={rangePicker.selected}
+            error={rangePicker.error}
           />
         </Box>
-      </Box>
 
-      {/* Due date */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Due date</BlockLabel>
+        {/* Priority */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <BlockLabel>Priority</BlockLabel>
+          <KanbanDetailsPriority priority={priority} onChangePriority={handleChangePriority} />
+        </Box>
 
-        {rangePicker.selected ? (
-          <Button size="small" onClick={rangePicker.onOpen}>
-            {rangePicker.shortLabel}
-          </Button>
-        ) : (
-          <Tooltip title="Add due date">
-            <IconButton
-              onClick={rangePicker.onOpen}
-              sx={[
-                (theme) => ({
-                  border: `dashed 1px ${theme.vars.palette.divider}`,
-                  bgcolor: varAlpha(theme.vars.palette.grey['500Channel'], 0.08),
-                }),
-              ]}
-            >
-              <Iconify icon="mingcute:add-line" />
-            </IconButton>
-          </Tooltip>
-        )}
-
-        <CustomDateRangePicker
-          variant="calendar"
-          title="Choose due date"
-          startDate={rangePicker.startDate}
-          endDate={rangePicker.endDate}
-          onChangeStartDate={rangePicker.onChangeStartDate}
-          onChangeEndDate={rangePicker.onChangeEndDate}
-          open={rangePicker.open}
-          onClose={rangePicker.onClose}
-          selected={rangePicker.selected}
-          error={rangePicker.error}
-        />
-      </Box>
-
-      {/* Priority */}
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <BlockLabel>Priority</BlockLabel>
-        <KanbanDetailsPriority priority={priority} onChangePriority={handleChangePriority} />
-      </Box>
-
-      {/* Description */}
-      <Stack spacing={3} sx={{ pt: 3 }}>
+        {/* Description */}
         <Stack spacing={1}>
           <BlockLabel>Description</BlockLabel>
-
           <TextField
             fullWidth
             multiline
@@ -402,24 +408,28 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
             onChange={handleChangeTaskDescription}
             placeholder="Add description..."
           />
-
-          {isDescriptionChanged && (
-            <Box sx={{ textAlign: 'right', mt: 1 }}>
-              <Button
-                size="small"
-                variant="contained"
-                onClick={handleSaveDescription}
-              >
-                Save Changes
-              </Button>
-            </Box>
-          )}
         </Stack>
+
+        {(isNameChanged || isDescriptionChanged) && (
+          <Box sx={{ textAlign: 'right' }}>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={handleSaveChanges}
+              startIcon={<Iconify icon="eva:save-fill" />}
+            >
+              Save Changes
+            </Button>
+          </Box>
+        )}
 
         {/* Attachments */}
         <Box sx={{ display: 'flex' }}>
           <BlockLabel>Attachments</BlockLabel>
-          <KanbanDetailsAttachments attachments={task.attachments} />
+          <KanbanDetailsAttachments 
+            taskId={task.id}
+            attachments={task.attachments}
+          />
         </Box>
       </Stack>
     </Box>

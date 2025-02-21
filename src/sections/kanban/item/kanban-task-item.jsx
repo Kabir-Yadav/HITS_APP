@@ -78,6 +78,12 @@ export function KanbanTaskItem({ task, disabled, columnId, sx }) {
               color: 'error.main',
             },
           }),
+          '& .MuiBox-root img': {
+            transition: 'transform 0.2s ease-in-out',
+            '&:hover': {
+              transform: 'scale(1.02)',
+            },
+          },
           ...sx,
         }}
       />
