@@ -24,7 +24,7 @@ import DialogContent from '@mui/material/DialogContent';
 import LinearProgress from '@mui/material/LinearProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { updateTaskPriority, updateTaskDescription, updateTaskDueDate } from 'src/actions/kanban';
+import { updateTaskPriority, updateTaskDescription, updateTaskDueDate, createSubtask, updateSubtask, deleteSubtask, updateTaskAssignees } from 'src/actions/kanban';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -57,6 +57,23 @@ const BlockLabel = styled('span')(({ theme }) => ({
 
 // ----------------------------------------------------------------------
 
+const formatNameFromEmail = (email) => {
+  if (!email) return '';
+  
+  try {
+    // Extract the name part before @f13.tech
+    const namePart = email.split('@')[0];
+    // Split by dot and capitalize each part
+    return namePart
+      .split('.')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+  } catch (error) {
+    console.error('Error formatting email:', error);
+    return email || '';
+  }
+};
+
 export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose }) {
   const tabs = useTabs('overview');
 
@@ -68,7 +85,7 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
   const [description, setDescription] = useState(task.description);
   const [isDescriptionChanged, setIsDescriptionChanged] = useState(false);
   const [subtaskCompleted, setSubtaskCompleted] = useState([]);
-  const [subtasks, setSubtasks] = useState([]);
+  const [subtasks, setSubtasks] = useState(task.subtasks || []);
   const [newSubtaskDialog, setNewSubtaskDialog] = useState(false);
   const [newSubtaskName, setNewSubtaskName] = useState('');
   const [editingSubtask, setEditingSubtask] = useState(null);
@@ -122,50 +139,69 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
     [task.id]
   );
 
-  const handleClickSubtaskComplete = (taskId) => {
-    const selected = subtaskCompleted.includes(taskId)
-      ? subtaskCompleted.filter((value) => value !== taskId)
-      : [...subtaskCompleted, taskId];
-
-    setSubtaskCompleted(selected);
-  };
-
-  const handleAddSubtask = () => {
-    if (newSubtaskName.trim()) {
-      setSubtasks([...subtasks, newSubtaskName.trim()]);
-      setNewSubtaskName('');
-      setNewSubtaskDialog(false);
+  const handleClickSubtaskComplete = async (subtask) => {
+    try {
+      await updateSubtask(subtask.id, {
+        completed: !subtask.completed
+      });
+    } catch (error) {
+      console.error('Error updating subtask completion:', error);
     }
   };
 
-  const handleDeleteSubtask = (taskToDelete) => {
-    setSubtasks(subtasks.filter((subtask) => subtask !== taskToDelete));
-    setSubtaskCompleted(subtaskCompleted.filter((subtask) => subtask !== taskToDelete));
+  const handleAddSubtask = async () => {
+    if (newSubtaskName.trim()) {
+      try {
+        await createSubtask(task.id, newSubtaskName.trim());
+        setNewSubtaskName('');
+        setNewSubtaskDialog(false);
+      } catch (error) {
+        console.error('Error adding subtask:', error);
+      }
+    }
   };
 
-  const handleEditSubtask = (taskToEdit) => {
-    setEditingSubtask(taskToEdit);
-    setNewSubtaskName(taskToEdit);
+  const handleDeleteSubtask = async (subtaskId) => {
+    try {
+      await deleteSubtask(subtaskId);
+    } catch (error) {
+      console.error('Error deleting subtask:', error);
+    }
+  };
+
+  const handleEditSubtask = (subtask) => {
+    setEditingSubtask(subtask);
+    setNewSubtaskName(subtask.name);
     setNewSubtaskDialog(true);
   };
 
-  const handleUpdateSubtask = () => {
+  const handleUpdateSubtask = async () => {
     if (newSubtaskName.trim()) {
-      setSubtasks(
-        subtasks.map((subtask) => (subtask === editingSubtask ? newSubtaskName.trim() : subtask))
-      );
-      setNewSubtaskName('');
-      setEditingSubtask(null);
-      setNewSubtaskDialog(false);
+      try {
+        await updateSubtask(editingSubtask.id, {
+          name: newSubtaskName.trim()
+        });
+        setNewSubtaskName('');
+        setEditingSubtask(null);
+        setNewSubtaskDialog(false);
+      } catch (error) {
+        console.error('Error updating subtask:', error);
+      }
     }
   };
 
-  const handleAssignee = useCallback((newAssignee) => {
-    // Update the task with new assignees
-    onUpdateTask({
-      ...task,
-      assignee: newAssignee,
-    });
+  const handleAssignee = useCallback(async (newAssignee) => {
+    try {
+      await updateTaskAssignees(task.id, newAssignee);
+      
+      // Update the task with new assignees
+      onUpdateTask({
+        ...task,
+        assignee: newAssignee,
+      });
+    } catch (error) {
+      console.error('Error updating assignees:', error);
+    }
   }, [onUpdateTask, task]);
 
   const handleUpdateStatus = useCallback((newStatus) => {
@@ -193,6 +229,11 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
       handleUpdateDueDate();
     }
   }, [rangePicker.open, rangePicker.selected, handleUpdateDueDate]);
+
+  // Update useEffect to sync subtasks when task changes
+  useEffect(() => {
+    setSubtasks(task.subtasks || []);
+  }, [task.subtasks]);
 
   const renderToolbar = () => (
     <KanbanDetailsToolbar
@@ -247,20 +288,33 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
         <BlockLabel sx={{ height: 32, lineHeight: '32px' }}>Assigned to:</BlockLabel>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-          {task.assignee.map((user, index) => (
-            <Box
-              key={user.id}
-              sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                typography: 'body2',
-                ...(index < task.assignee.length - 1 && { mr: 1 }),
-              }}
-            >
-              {user.name}
-              {index < task.assignee.length - 1 && ','}
-            </Box>
-          ))}
+          {task.assignee.map((user, index) => {
+            const formattedName = formatNameFromEmail(user.email);
+            
+            return (
+              <Box
+                key={user.id}
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  typography: 'body2',
+                }}
+              >
+                <Avatar
+                  alt={formattedName}
+                  src={user.avatarUrl}
+                  sx={{ width: 24, height: 24 }}
+                >
+                  {formattedName.charAt(0)}
+                </Avatar>
+                <Typography variant="body2">
+                  {formattedName}
+                  {index < task.assignee.length - 1 && ','}
+                </Typography>
+              </Box>
+            );
+          })}
 
           <Tooltip title="Add assignee">
             <IconButton
@@ -375,34 +429,33 @@ export function KanbanDetails({ task, open, onUpdateTask, onDeleteTask, onClose 
     <Box sx={{ gap: 3, display: 'flex', flexDirection: 'column' }}>
       <div>
         <Typography variant="body2" sx={{ mb: 1 }}>
-          {subtaskCompleted.length} of {subtasks.length}
+          {subtasks.filter(subtask => subtask.completed).length} of {subtasks.length}
         </Typography>
 
         <LinearProgress
           variant="determinate"
-          value={(subtaskCompleted.length / subtasks.length) * 100}
+          value={(subtasks.filter(subtask => subtask.completed).length / subtasks.length) * 100}
         />
       </div>
 
       <FormGroup>
-        {subtasks.map((taskItem) => (
-          <Box key={taskItem} sx={{ display: 'flex', alignItems: 'center' }}>
+        {subtasks.map((subtask) => (
+          <Box key={subtask.id} sx={{ display: 'flex', alignItems: 'center' }}>
             <FormControlLabel
               control={
                 <Checkbox
                   disableRipple
-                  name={taskItem}
-                  checked={subtaskCompleted.includes(taskItem)}
+                  checked={subtask.completed}
                 />
               }
-              label={taskItem}
-              onChange={() => handleClickSubtaskComplete(taskItem)}
+              label={subtask.name}
+              onChange={() => handleClickSubtaskComplete(subtask)}
               sx={{ flexGrow: 1 }}
             />
-            <IconButton size="small" onClick={() => handleEditSubtask(taskItem)}>
+            <IconButton size="small" onClick={() => handleEditSubtask(subtask)}>
               <Iconify icon="eva:edit-fill" />
             </IconButton>
-            <IconButton size="small" onClick={() => handleDeleteSubtask(taskItem)}>
+            <IconButton size="small" onClick={() => handleDeleteSubtask(subtask.id)}>
               <Iconify icon="eva:trash-2-fill" />
             </IconButton>
           </Box>
