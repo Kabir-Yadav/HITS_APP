@@ -6,6 +6,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { useState } from 'react';
 
 import { paths } from 'src/routes/paths';
 
@@ -20,6 +21,70 @@ import { Markdown } from 'src/components/markdown';
 export function JobDetailsContent({ job, sx, ...other }) {
   const domain = 'ec2-15-206-185-224.ap-south-1.compute.amazonaws.com:5173';
   const applicationLink = `${domain}${paths.public.jobApplication(job.id)}`;
+
+  // Add state to track if Google Calendar event was successfully created
+  const [calendarEventCreated, setCalendarEventCreated] = useState(false);
+
+  // Function to handle Google Calendar window events
+  const handleCalendarWindow = (calendarWindow) => {
+    // Listen for window close event
+    calendarWindow.addEventListener('beforeunload', () => {
+      if (!calendarEventCreated) {
+        // If calendar event wasn't created successfully, prevent status change
+        setInterviewStatus('pending'); // Or whatever the previous status was
+      }
+    });
+  };
+
+  // Function to handle successful calendar event creation
+  const handleCalendarSuccess = () => {
+    setCalendarEventCreated(true);
+    // Now it's safe to update the interview status
+    updateInterviewStatus('scheduled');
+  };
+
+  // Function to open Google Calendar
+  const openGoogleCalendar = async () => {
+    setCalendarEventCreated(false); // Reset flag when opening calendar
+    
+    try {
+      const calendarWindow = window.open(googleCalendarURL, '_blank');
+      handleCalendarWindow(calendarWindow);
+      
+      // Listen for message from Google Calendar integration
+      window.addEventListener('message', (event) => {
+        if (event.data.type === 'CALENDAR_EVENT_CREATED') {
+          handleCalendarSuccess();
+        }
+      });
+
+    } catch (error) {
+      console.error('Error opening calendar:', error);
+      setInterviewStatus('pending'); // Keep previous status on error
+    }
+  };
+
+  // Function to handle manual scheduling
+  const handleManualScheduling = async (scheduleData) => {
+    try {
+      // First create Google Calendar event
+      const calendarResponse = await createGoogleCalendarEvent(scheduleData);
+      
+      if (calendarResponse.success) {
+        setCalendarEventCreated(true);
+        // Only update status after calendar event is created
+        await updateInterviewStatus('scheduled');
+      } else {
+        throw new Error('Failed to create calendar event');
+      }
+
+    } catch (error) {
+      console.error('Error in manual scheduling:', error);
+      setInterviewStatus('pending');
+      // Show error message to user
+      enqueueSnackbar('Failed to schedule interview. Please try again.', { variant: 'error' });
+    }
+  };
 
   const renderContent = () => (
     <Card
