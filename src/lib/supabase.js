@@ -20,10 +20,10 @@ export const signInWithGoogle = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://prhsilyjzxbkufchywxt.supabase.co/auth/v1/callback',
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
+          scope: 'openid email profile',
         },
       },
     });
@@ -31,6 +31,7 @@ export const signInWithGoogle = async () => {
     if (error) throw error;
     return { data, error: null };
   } catch (error) {
+    console.error('Google Sign In Error:', error);
     return { data: null, error };
   }
 };
