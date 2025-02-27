@@ -20,12 +20,10 @@ export const signInWithGoogle = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth`,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',
           scope: 'openid email profile',
-          hd: 'f13.tech' // Add your domain restriction if needed
         },
       },
     });
