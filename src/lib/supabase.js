@@ -20,7 +20,11 @@ export const signInWithGoogle = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: 'https://prhsilyjzxbkufchywxt.supabase.co/auth/v1/callback',
+        redirectTo: 'http://ec2-15-206-185-224.ap-south-1.compute.amazonaws.com:5173/auth',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
 
