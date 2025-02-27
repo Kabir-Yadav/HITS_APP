@@ -1,8 +1,9 @@
+import EmojiPicker from 'emoji-picker-react'; // ✅ New Emoji Picker
 import { uuidv4 } from 'minimal-shared/utils';
 import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import { Stack } from '@mui/material';
+import { Stack, useTheme } from '@mui/material';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -44,6 +45,14 @@ export function ChatMessageInput({
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
 
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false); // ✅ Track emoji picker visibility
+  const handleEmojiSelect = (emojiObject) => {
+    setMessage((prevMessage) => prevMessage + emojiObject.emoji); // ✅ Insert emoji into input
+    setShowEmojiPicker(false); // ✅ Close picker after selection
+  };
+
+  const themes = useTheme();
+  const pickerTheme = themes.palette.mode === 'dark' ? 'dark' : 'light';
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
@@ -331,7 +340,7 @@ export function ChatMessageInput({
         placeholder="Type a message"
         disabled={disabled}
         startAdornment={
-          <IconButton>
+          <IconButton onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
             <Iconify icon="eva:smiling-face-fill" />
           </IconButton>
         }
@@ -357,7 +366,25 @@ export function ChatMessageInput({
           }),
         ]}
       />
-
+      {showEmojiPicker && (
+        <Box
+          sx={{
+            position: 'absolute',
+            zIndex: 99,
+            borderRadius: 2,
+            boxShadow: 3,
+            bottom: 60
+          }}
+        >
+          <EmojiPicker
+            onEmojiClick={handleEmojiSelect}
+            emojiStyle="native"
+            previewConfig={{ showPreview: false }}
+            height={300}
+            theme={pickerTheme}
+          />
+        </Box>
+      )}
       <input
         type="file"
         ref={fileImageRef}
