@@ -42,7 +42,11 @@ export function ChatView() {
   const roomNav = useCollapseNav();
   const conversationsNav = useCollapseNav();
 
+  const [replyTo, setReplyTo] = useState(null); // ✅ Store reply message
+
   const [recipients, setRecipients] = useState([]);
+
+
   useEffect(() => {
     if (!selectedConversationId) {
       startTransition(() => {
@@ -58,6 +62,19 @@ export function ChatView() {
   const filteredParticipants = conversation
     ? conversation.participants.filter((participant) => participant.id !== `${user?.id}`)
     : [];
+
+  const handleReply = (message) => {
+    const sender = filteredParticipants.find((participant) => participant.id === message.senderId);
+
+    // ✅ Set the reply state with sender's name
+    setReplyTo({
+      id: message.id,
+      body: message.body,
+      senderName: message.senderId === user.id ? 'You' : sender ? sender.name : "Unknown",
+      attachments: message.attachments
+    });
+
+  };
 
   const hasConversation = selectedConversationId && conversation;
 
@@ -109,9 +126,11 @@ export function ChatView() {
                   />
                 ) : (
                   <ChatMessageList
+                    conversationId={selectedConversationId}
                     messages={conversation?.messages ?? []}
                     participants={filteredParticipants}
                     loading={conversationLoading}
+                    onReply={handleReply} // ✅ Pass handleReply to ChatMessageList
                   />
                 )
               ) : (
@@ -127,6 +146,8 @@ export function ChatView() {
                 onAddRecipients={handleAddRecipients}
                 selectedConversationId={selectedConversationId}
                 disabled={!recipients.length && !selectedConversationId}
+                replyTo={replyTo} // ✅ Pass replyTo to ChatMessageInput
+                setReplyTo={setReplyTo} // ✅ Pass function to clear reply
               />
             </>
           ),

@@ -17,7 +17,7 @@ export const FileThumbnail = forwardRef((props, ref) => {
   const { icon, removeBtn, downloadBtn, tooltip: tooltipProps } = slotProps ?? {};
 
   const { name, path } = fileData(file);
-
+  console.log(file)
   const previewUrl = typeof file === 'string' ? file : URL.createObjectURL(file);
 
   const format = fileFormat(path ?? previewUrl);
