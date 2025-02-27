@@ -60,13 +60,19 @@ const ItemBase = forwardRef((props, ref) => {
   );
 
   const renderImage = () =>
-    !!task?.attachments?.length && (
+    task?.attachments?.length > 0 && (
       <Box sx={[(theme) => ({ p: theme.spacing(1, 1, 0, 1) })]}>
         <ItemImage
           open={open}
           className={imageClasses.root}
-          alt={task?.attachments?.[0]}
-          src={task?.attachments?.[0]}
+          alt={task.attachments[0].file_name}
+          src={task.attachments[0].file_url}
+          sx={{
+            width: '100%',
+            height: 200,
+            objectFit: 'cover',
+            borderRadius: 1,
+          }}
         />
       </Box>
     );
@@ -96,7 +102,7 @@ const ItemBase = forwardRef((props, ref) => {
           <>
             <Box component="span" sx={{ mx: 0.75 }}>•</Box>
             <Iconify width={16} icon="eva:attach-2-fill" sx={{ mr: 0.25 }} />
-            <Box component="span">{task?.attachments?.length}</Box>
+            <Box component="span">{task.attachments.length}</Box>
           </>
         )}
       </Box>
@@ -226,19 +232,14 @@ const ItemContent = styled('div')(({ theme }) => ({
 }));
 
 const ItemImage = styled('img', {
-  shouldForwardProp: (prop) => !['open', 'sx'].includes(prop),
-})(({ theme }) => ({
-  width: 320,
-  height: 'auto',
-  aspectRatio: '4/3',
+  shouldForwardProp: (prop) => !['open'].includes(prop),
+})(({ theme, open }) => ({
+  width: '100%',
+  height: 200,
   objectFit: 'cover',
-  borderRadius: theme.shape.borderRadius * 1.5,
-  variants: [
-    {
-      props: { open: true },
-      style: {
-        opacity: 0.8,
-      },
-    },
-  ],
+  borderRadius: theme.shape.borderRadius,
+  transition: theme.transitions.create('opacity'),
+  ...(open && {
+    opacity: 0.8,
+  }),
 }));
