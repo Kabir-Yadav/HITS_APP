@@ -23,9 +23,7 @@ export function getNavItem({ currentUserId, conversation }) {
     const lastAttachment = lastMessage.attachments && lastMessage.attachments.length > 0
     ? lastMessage.attachments[lastMessage.attachments.length - 1]
     : null; 
-    if (lastAttachment) {
-      console.log(lastAttachment.type); 
-    } 
+   
     const sender = lastMessage.senderId === currentUserId ? 'You: ' : '';
 
     const message = lastMessage.body===''?lastAttachment?`Sent a ${lastAttachment.type}`:'Sent a file':lastMessage.body;

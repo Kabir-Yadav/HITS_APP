@@ -5,7 +5,7 @@ import useSWR, { mutate } from 'swr';
 import axios, {fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'http://13.61.143.129/api/chat';
+const BASE_URL = 'http://127.0.0.1:8000/api/chat';
 
 const enableServer = false;
 
@@ -87,33 +87,28 @@ export function useGetConversation(conversationId) {
 
 // ----------------------------------------------------------------------
 
-export async function sendMessage(conversationId, userId, messageData) {
+export async function sendMessage(conversationId, userId, messageData, parentId = null) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://13.61.143.129:8000/ws/chat/${userId}`);
+    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
 
     ws.onopen = () => {
       const messagePayload = JSON.stringify({
         conversation_id: conversationId,
         sender_id: userId,
+        parent_id: parentId,  // ✅ Add parent_id to support replies
         ...messageData,
       });
-      console.log(messagePayload)
+      // console.log("Sending message:", messagePayload);
       ws.send(messagePayload);
 
       resolve(messageData);
     };
 
     ws.onmessage = (event) => {
-      const url =  [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }];
+      const url = [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }];
       // When a new message is received, update the conversation list
-      mutate(
-        url,
-      );
-    
-      mutate(
-        `${BASE_URL}/conversations/`,
-        
-      );
+      mutate(url);
+      mutate(`${BASE_URL}/conversations/`);
     };
 
     ws.onerror = (error) => {
@@ -123,10 +118,10 @@ export async function sendMessage(conversationId, userId, messageData) {
 
     ws.onclose = () => {
       console.warn("WebSocket disconnected, attempting reconnection...");
-      // setTimeout(() => sendMessage(conversationId, userId, messageData), 1000);
     };
   });
 }
+
 
 
 
@@ -197,3 +192,84 @@ export async function clickConversation(conversationId) {
   );
 }
 
+//-------------------------------------------------------------------------------------
+
+export function useDeleteMessage() {
+  return async (messageId) => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/api/chat/messages/${messageId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Failed to delete message");
+
+      const { conversation_id } = await response.json(); // Extract conversation ID
+
+      console.log("DEBUG: Deleted message from conversation:", conversation_id);
+
+      // ✅ Optimistically update `conversations`
+      mutate(`${BASE_URL}/conversations/`, (currentData) => {
+        if (!currentData?.conversations) return currentData;
+
+        return {
+          ...currentData,
+          conversations: currentData.conversations.map((conversation) => ({
+            ...conversation,
+            messages: conversation.messages.filter((msg) => msg.id !== messageId),
+          })),
+        };
+      }, false);
+
+      // ✅ Optimistically update `conversationByID`
+      const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversation_id, endpoint: 'conversation' } }];
+      mutate(conversationByIdUrl, (currentData) => {
+        if (!currentData?.conversations?.length) return currentData;
+
+        return {
+          ...currentData,
+          conversations: currentData.conversations.map((conv) => ({
+            ...conv,
+            messages: conv.messages.filter((msg) => msg.id !== messageId),
+          })),
+        };
+      }, false);
+
+    } catch (error) {
+      console.error("Failed to delete message", error);
+    }
+  };
+}
+
+//-------------------------------------------------------------------------------------
+
+export async function handleAddReaction(messageId, userId, emoji,conversationId) {
+  try {
+    // ✅ Now, send the reaction request
+    const reactionResponse = await axios.post(`${BASE_URL}/messages/${messageId}/react`, {
+      user_id: userId,
+      emoji: emoji,
+    });
+
+    const { reactions } = reactionResponse.data; // ✅ Get updated reactions from response
+
+    // ✅ Optimistically update `conversationByID`
+    const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversationId, endpoint: 'conversation' } }];
+
+    mutate(conversationByIdUrl, (currentData) => {
+      if (!currentData?.conversations?.length) return currentData;
+
+      return {
+        ...currentData,
+        conversations: currentData.conversations.map((conv) => ({
+          ...conv,
+          messages: conv.messages.map((msg) =>
+            msg.id === messageId ? { ...msg, reactions } : msg // ✅ Correctly update reactions
+          ),
+        })),
+      };
+    }, false);
+
+  } catch (error) {
+    console.error('Failed to update reaction:', error);
+  }
+}

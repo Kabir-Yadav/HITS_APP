@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -10,6 +10,8 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
+import useGetFiles from 'src/actions/filemanager';
+import { deleteFiles } from 'src/actions/filemanager';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { _allFiles, FILE_TYPE_OPTIONS } from 'src/_mock';
 
@@ -37,7 +39,16 @@ export function FileManagerView() {
 
   const [displayMode, setDisplayMode] = useState('list');
 
-  const [tableData, setTableData] = useState(_allFiles);
+  const userId = 'cb7288da-aa6c-42df-a28a-86bd994296aa';
+  const { data, isLoading, isError } = useGetFiles(userId);
+  const [tableData, setTableData] = useState([]);
+
+  // ✅ Update tableData when data changes
+  useEffect(() => {
+    if (data) {
+      setTableData(data);
+    }
+  }, [data]);
 
   const filters = useSetState({
     name: '',
@@ -71,28 +82,57 @@ export function FileManagerView() {
     }
   }, []);
 
-  const handleDeleteItem = useCallback(
-    (id) => {
-      const deleteRow = tableData.filter((row) => row.id !== id);
+  const handleDeleteItem = useCallback(async (id) => {
+    try {
+      const result = await deleteFiles(userId, [id]); // API call with single file
 
-      toast.success('Delete success!');
+      if (result.success) {
+        toast.success('File deleted successfully!');
 
-      setTableData(deleteRow);
+        // ✅ Remove the deleted file from `tableData`
+        setTableData((prevData) => prevData.filter((row) => row.id !== id));
 
-      table.onUpdatePageDeleteRow(dataInPage.length);
-    },
-    [dataInPage.length, table, tableData]
-  );
+        // ✅ Clear selection if this file was selected
+        table.setSelected((prevSelected) => prevSelected.filter((selectedId) => selectedId !== id));
 
-  const handleDeleteItems = useCallback(() => {
-    const deleteRows = tableData.filter((row) => !table.selected.includes(row.id));
+        // ✅ Update pagination if needed
+        table.onUpdatePageDeleteRow(dataInPage.length);
+      } else {
+        throw new Error('Failed to delete file.');
+      }
+    } catch (error) {
+      toast.error('Error deleting file.');
+      console.error(error);
+    }
+  }, [userId, tableData]);
 
-    toast.success('Delete success!');
 
-    setTableData(deleteRows);
+  const handleDeleteItems = useCallback(async () => {
+    if (!table.selected.length) {
+      toast.error('No files selected for deletion.');
+      return;
+    }
 
-    table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
-  }, [dataFiltered.length, dataInPage.length, table, tableData]);
+    try {
+      const result = await deleteFiles(userId, table.selected);
+
+      if (result.success) {
+        toast.success('Files deleted successfully!');
+        table.setSelected([]);
+
+        // ✅ Remove deleted items from tableData
+        setTableData((prevData) => prevData.filter((row) => !table.selected.includes(row.id)));
+
+        // ✅ Update table pagination if needed
+        table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
+      } else {
+        throw new Error('Failed to delete files.');
+      }
+    } catch (error) {
+      toast.error('Error deleting files.');
+      console.error(error);
+    }
+  }, [userId, table.selected,]);
 
   const renderFilters = () => (
     <Box
@@ -134,7 +174,7 @@ export function FileManagerView() {
   );
 
   const renderNewFilesDialog = () => (
-    <FileManagerNewFolderDialog open={newFilesDialog.value} onClose={newFilesDialog.onFalse} />
+    < FileManagerNewFolderDialog open={newFilesDialog.value} onClose={newFilesDialog.onFalse} userId={userId} />
   );
 
   const renderConfirmDialog = () => (

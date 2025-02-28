@@ -9,7 +9,7 @@ import { useMessagesScroll } from './hooks/use-messages-scroll';
 
 // ----------------------------------------------------------------------
 
-export function ChatMessageList({ messages = [], participants, loading }) {
+export function ChatMessageList({ messages = [], conversationId, participants, loading, onReply }) {
   const { messagesEndRef } = useMessagesScroll(messages);
 
   // ✅ Collect all image attachments from messages
@@ -58,10 +58,13 @@ export function ChatMessageList({ messages = [], participants, loading }) {
           <ChatMessageItem
             key={message.id}
             message={message}
+            conversationId={conversationId}
             participants={participants}
             onOpenLightbox={(imageUrl) => {
               lightbox.onOpen(imageUrl);
             }}
+            onReply={onReply} // ✅ Pass to each message item
+            allmessages={messages}
           />
         ))}
       </Scrollbar>

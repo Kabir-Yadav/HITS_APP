@@ -23,6 +23,7 @@ export function MultiFilePreview({
   className,
   ...other
 }) {
+  console.log(files)
   return (
     <ListRoot
       thumbnail={thumbnail}
@@ -34,14 +35,14 @@ export function MultiFilePreview({
 
       {files.map((file) => {
         const { name, size } = fileData(file);
-
+        console.log(file.file_name)
         if (thumbnail) {
           return (
-            <ItemThumbnail key={name}>
+            <ItemThumbnail key={file.file_name}>
               <FileThumbnail
                 tooltip
                 imageView
-                file={file}
+                file={file.file_type}
                 onRemove={() => onRemove?.(file)}
                 sx={[
                   (theme) => ({
@@ -58,12 +59,12 @@ export function MultiFilePreview({
         }
 
         return (
-          <ItemRow key={name}>
-            <FileThumbnail file={file} {...slotProps?.thumbnail} />
+          <ItemRow key={file.file_name}>
+            <FileThumbnail file={file.file_type} {...slotProps?.thumbnail} />
 
             <ListItemText
-              primary={name}
-              secondary={fData(size)}
+              primary={file.file_name}
+              secondary={fData(file.file_size)}
               slotProps={{
                 secondary: { sx: { typography: 'caption' } },
               }}

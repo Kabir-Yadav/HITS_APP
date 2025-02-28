@@ -1,8 +1,9 @@
+import EmojiPicker from 'emoji-picker-react'; // ✅ New Emoji Picker
 import { uuidv4 } from 'minimal-shared/utils';
 import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import { Stack } from '@mui/material';
+import { Stack, useTheme } from '@mui/material';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
@@ -31,6 +32,8 @@ export function ChatMessageInput({
   recipients,
   onAddRecipients,
   selectedConversationId,
+  replyTo, // ✅ Accept replyTo message
+  setReplyTo, // ✅ Accept function to clear reply
 }) {
   const router = useRouter();
 
@@ -42,6 +45,14 @@ export function ChatMessageInput({
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
 
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false); // ✅ Track emoji picker visibility
+  const handleEmojiSelect = (emojiObject) => {
+    setMessage((prevMessage) => prevMessage + emojiObject.emoji); // ✅ Insert emoji into input
+    setShowEmojiPicker(false); // ✅ Close picker after selection
+  };
+
+  const themes = useTheme();
+  const pickerTheme = themes.palette.mode === 'dark' ? 'dark' : 'light';
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
@@ -122,10 +133,14 @@ export function ChatMessageInput({
           };
         }
 
+        if (replyTo) {
+          finalMessageData.parent_id = replyTo.id;
+        }
+
         // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
-            await sendMessage(selectedConversationId, user?.id, finalMessageData);
+            await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null);
           } else {
             const res = await createConversation(conversationData);
             router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
@@ -135,6 +150,7 @@ export function ChatMessageInput({
 
         setMessage('');
         setAttachments([]); // ✅ Clear attachments only after sending
+        setReplyTo(null); // ✅ Clear reply after sending
       } catch (error) {
         console.error(error);
       }
@@ -142,6 +158,8 @@ export function ChatMessageInput({
     [
       message,
       attachments,
+      replyTo, // ✅ Include replyTo in dependencies to avoid stale state
+      setReplyTo, // ✅ Ensure the function updates state correctly
       selectedConversationId,
       user?.id,
       conversationData,
@@ -152,6 +170,74 @@ export function ChatMessageInput({
   return (
     <>
       {/* ✅ Small preview inside input like WhatsApp */}
+      {replyTo && (
+        <Box
+          sx={{
+            p: 1,
+            m: 1,
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: 1,
+            bgcolor: 'background.neutral',
+            justifyContent: 'space-between',
+            borderLeft: '3px solid',
+            borderColor: 'primary.main',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+            <Typography variant="caption" color="text.secondary" marginBottom={1}>
+              Replying to {replyTo.senderName}:
+            </Typography>
+
+            {/* ✅ Show body if available, otherwise show attachment preview */}
+            {replyTo.body ? (
+              <Typography variant="body2" noWrap>
+                {replyTo.body}
+              </Typography>
+            ) : replyTo.attachments && replyTo.attachments.length > 0 ? (
+              <>
+                {/* ✅ If first attachment is an image, show it */}
+                {["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(
+                  replyTo.attachments[0].type
+                ) ? (
+                  <img
+                    src={replyTo.attachments[0].preview}
+                    alt="Attachment Preview"
+                    style={{ width: 70, height: 70, borderRadius: 5, objectFit: "cover" }}
+                  />
+                ) : (
+                  // ✅ Show file icon for non-image files
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <FileThumbnail
+                      imageView
+                      file={replyTo.attachments[0].preview}
+                      slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
+                      sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
+                    />
+                    <Typography variant="body2" noWrap>
+                      {replyTo.attachments[0].name}
+                    </Typography>
+                  </Stack>
+                )}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                [No Content]
+              </Typography>
+            )}
+          </Box>
+
+          {/* Close Reply Button */}
+          <IconButton size="small" onClick={() => setReplyTo(null)}>
+            <Iconify icon="mingcute:close-line" width={16} />
+          </IconButton>
+        </Box>
+      )}
+
       {attachments.length > 0 && (
         <Scrollbar
           sx={{
@@ -254,7 +340,7 @@ export function ChatMessageInput({
         placeholder="Type a message"
         disabled={disabled}
         startAdornment={
-          <IconButton>
+          <IconButton onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
             <Iconify icon="eva:smiling-face-fill" />
           </IconButton>
         }
@@ -280,7 +366,25 @@ export function ChatMessageInput({
           }),
         ]}
       />
-
+      {showEmojiPicker && (
+        <Box
+          sx={{
+            position: 'absolute',
+            zIndex: 99,
+            borderRadius: 2,
+            boxShadow: 3,
+            bottom: 60
+          }}
+        >
+          <EmojiPicker
+            onEmojiClick={handleEmojiSelect}
+            emojiStyle="native"
+            previewConfig={{ showPreview: false }}
+            height={300}
+            theme={pickerTheme}
+          />
+        </Box>
+      )}
       <input
         type="file"
         ref={fileImageRef}
