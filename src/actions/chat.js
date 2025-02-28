@@ -5,7 +5,7 @@ import useSWR, { mutate } from 'swr';
 import axios, {fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'http://127.0.0.1:8000/api/chat';
+const BASE_URL = 'http://13.51.59.185/api/chat';
 
 const enableServer = false;
 
@@ -19,6 +19,59 @@ const swrOptions = {
 
 // ----------------------------------------------------------------------
 
+class WebSocketManager {
+  constructor() {
+    this.ws = null;
+    this.eventHandlers = {}; // Store event listeners for different event types
+  }
+
+  connect(userId,url='',conversationsURL='') {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.ws = new WebSocket(`ws://13.51.59.185/ws/chat/${userId}`);
+
+      this.ws.onopen = () => console.log("✅ WebSocket connected!");
+
+      this.ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log("📩 Received WebSocket Event:", data);
+
+        // Dispatch event to handlers
+        if (this.eventHandlers[data.event]) {
+          this.eventHandlers[data.event](data);
+        }
+        
+        mutate(url)
+        mutate(conversationsURL)
+      };
+
+      this.ws.onerror = (error) => console.error("❌ WebSocket Error:", error);
+
+      this.ws.onclose = () => console.warn("⚠️ WebSocket disconnected!");
+    }
+  }
+
+  sendMessage(payload) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(payload));
+    } else {
+      console.warn("⚠️ WebSocket not open. Reconnecting...");
+      setTimeout(() => this.sendMessage(payload), 500);
+    }
+  }
+
+  on(event, callback) {
+    this.eventHandlers[event] = callback;
+  }
+
+  close() {
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+}
+
+export const websocketManager = new WebSocketManager();
 
 
 
@@ -44,7 +97,7 @@ export function useGetContacts() {
 
 export function useGetConversations(userId) {
   // const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-  const { data, isLoading, error, isValidating } =useSWR(`${BASE_URL}/conversations/`, fetcher,swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/conversations/`, fetcher, swrOptions);
   const memoizedValue = useMemo(() => {
     const userConversations = data?.conversations?.filter((conversation) =>
       conversation.participants.some((participant) => participant.id === userId)
@@ -71,6 +124,8 @@ export function useGetConversation(conversationId) {
     ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
     : '';
   const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+  console.log("DEBUG: useGetConversation data →", data); // ✅ Debug to check if data updates
+
   const memoizedValue = useMemo(
     () => ({
       conversation: data?.conversations?.[0] || null, // Ensure a valid conversation object
@@ -88,38 +143,22 @@ export function useGetConversation(conversationId) {
 // ----------------------------------------------------------------------
 
 export async function sendMessage(conversationId, userId, messageData, parentId = null) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
+  const url = conversationId
+    ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
+    : '';
+  const conversationsUrl = `${BASE_URL}/conversations/`;
 
-    ws.onopen = () => {
-      const messagePayload = JSON.stringify({
-        conversation_id: conversationId,
-        sender_id: userId,
-        parent_id: parentId,  // ✅ Add parent_id to support replies
-        ...messageData,
-      });
-      // console.log("Sending message:", messagePayload);
-      ws.send(messagePayload);
+  websocketManager.connect(userId,url,conversationsUrl); // Ensure WebSocket is connected
 
-      resolve(messageData);
-    };
+  const messagePayload = {
+    event: "message",
+    conversation_id: conversationId,
+    sender_id: userId,
+    parent_id: parentId,
+    ...messageData,
+  };
 
-    ws.onmessage = (event) => {
-      const url = [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }];
-      // When a new message is received, update the conversation list
-      mutate(url);
-      mutate(`${BASE_URL}/conversations/`);
-    };
-
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      reject(error);
-    };
-
-    ws.onclose = () => {
-      console.warn("WebSocket disconnected, attempting reconnection...");
-    };
-  });
+  websocketManager.sendMessage(messagePayload);
 }
 
 
@@ -135,6 +174,7 @@ export async function createConversation(conversationData) {
    * Work on server
    */
   const data = { conversationData };
+  console.log(data)
   const res = await axios.post(CHART_ENDPOINT, data);
 
   /**
@@ -155,7 +195,7 @@ export async function createConversation(conversationData) {
 
   return res.data;
 }
-
+  
 // ----------------------------------------------------------------------
 
 export async function clickConversation(conversationId) {
@@ -195,81 +235,39 @@ export async function clickConversation(conversationId) {
 //-------------------------------------------------------------------------------------
 
 export function useDeleteMessage() {
-  return async (messageId) => {
-    try {
-      const response = await fetch(`http://127.0.0.1:8000/api/chat/messages/${messageId}`, {
-        method: "DELETE",
-      });
+  return async (messageId, conversation_id, user_id) => {
+    const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversation_id, endpoint: 'conversation' } }];
+    const conversationsUrl = `${BASE_URL}/conversations/`;
 
-      if (!response.ok) throw new Error("Failed to delete message");
+    websocketManager.connect(user_id,conversationByIdUrl,conversationsUrl); // Ensure WebSocket is connected
 
-      const { conversation_id } = await response.json(); // Extract conversation ID
+    const deletePayload = {
+      action: "delete",
+      message_id: messageId,
+      conversation_id: conversation_id,
+    };
 
-      console.log("DEBUG: Deleted message from conversation:", conversation_id);
+    websocketManager.sendMessage(deletePayload);
 
-      // ✅ Optimistically update `conversations`
-      mutate(`${BASE_URL}/conversations/`, (currentData) => {
-        if (!currentData?.conversations) return currentData;
-
-        return {
-          ...currentData,
-          conversations: currentData.conversations.map((conversation) => ({
-            ...conversation,
-            messages: conversation.messages.filter((msg) => msg.id !== messageId),
-          })),
-        };
-      }, false);
-
-      // ✅ Optimistically update `conversationByID`
-      const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversation_id, endpoint: 'conversation' } }];
-      mutate(conversationByIdUrl, (currentData) => {
-        if (!currentData?.conversations?.length) return currentData;
-
-        return {
-          ...currentData,
-          conversations: currentData.conversations.map((conv) => ({
-            ...conv,
-            messages: conv.messages.filter((msg) => msg.id !== messageId),
-          })),
-        };
-      }, false);
-
-    } catch (error) {
-      console.error("Failed to delete message", error);
-    }
+    console.log("DEBUG: Sent delete request via WebSocket", deletePayload);
   };
 }
 
 //-------------------------------------------------------------------------------------
 
-export async function handleAddReaction(messageId, userId, emoji,conversationId) {
-  try {
-    // ✅ Now, send the reaction request
-    const reactionResponse = await axios.post(`${BASE_URL}/messages/${messageId}/react`, {
-      user_id: userId,
-      emoji: emoji,
-    });
+export async function handleAddReaction(messageId, userId, emoji, conversationId) {
+  const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversationId, endpoint: 'conversation' } }];
 
-    const { reactions } = reactionResponse.data; // ✅ Get updated reactions from response
+  websocketManager.connect(userId,conversationByIdUrl);
 
-    // ✅ Optimistically update `conversationByID`
-    const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversationId, endpoint: 'conversation' } }];
+  const reactionPayload = {
+    event: "reaction",
+    conversation_id: conversationId,
+    message_id: messageId,
+    sender_id: userId,
+    reaction: emoji,
+  };
 
-    mutate(conversationByIdUrl, (currentData) => {
-      if (!currentData?.conversations?.length) return currentData;
+  websocketManager.sendMessage(reactionPayload);
 
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) => ({
-          ...conv,
-          messages: conv.messages.map((msg) =>
-            msg.id === messageId ? { ...msg, reactions } : msg // ✅ Correctly update reactions
-          ),
-        })),
-      };
-    }, false);
-
-  } catch (error) {
-    console.error('Failed to update reaction:', error);
-  }
 }
