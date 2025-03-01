@@ -19,7 +19,7 @@ import { Markdown } from 'src/components/markdown';
 
 export function JobDetailsContent({ job, sx, ...other }) {
   const domain = 'employeeos.tech';
-  const applicationLink = `${domain}${paths.public.jobApplication(job.id)}`;
+  const applicationLink = `${domain}${paths.public.jobApplication(job.job_id)}`;
 
   const renderContent = () => (
     <Card
