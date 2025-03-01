@@ -18,7 +18,7 @@ import { Markdown } from 'src/components/markdown';
 // ----------------------------------------------------------------------
 
 export function JobDetailsContent({ job, sx, ...other }) {
-  const domain = 'ec2-44-208-32-14.compute-1.amazonaws.com:5173';
+  const domain = 'employeeos.tech';
   const applicationLink = `${domain}${paths.public.jobApplication(job.id)}`;
 
   const renderContent = () => (
