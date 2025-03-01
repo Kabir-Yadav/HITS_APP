@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
 import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
+import { useMemo, useState } from 'react';
 
 import axios, {fetcher, endpoints } from 'src/lib/axios';
 
@@ -25,7 +25,7 @@ class WebSocketManager {
     this.eventHandlers = {}; // Store event listeners for different event types
   }
 
-  connect(userId,url='',conversationsURL='') {
+  connect(userId,url='',conversationsURL='',setLoading) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       this.ws = new WebSocket(`ws://13.51.59.185/ws/chat/${userId}`);
 
@@ -41,7 +41,9 @@ class WebSocketManager {
         }
         
         mutate(url)
+        setLoading((prev) => ({ ...prev, sendingMessage: false }));
         mutate(conversationsURL)
+
       };
 
       this.ws.onerror = (error) => console.error("❌ WebSocket Error:", error);
@@ -73,6 +75,16 @@ class WebSocketManager {
 
 export const websocketManager = new WebSocketManager();
 
+const loadingState = {
+  sendingMessage: false,
+  sendingReaction: false,
+};
+
+export function useChatState() {
+  const [loading, setLoading] = useState(loadingState);
+
+  return { loading, setLoading };
+}
 
 
 export function useGetContacts() {
@@ -142,13 +154,13 @@ export function useGetConversation(conversationId) {
 
 // ----------------------------------------------------------------------
 
-export async function sendMessage(conversationId, userId, messageData, parentId = null) {
+export async function sendMessage(conversationId, userId, messageData, parentId = null, setLoading) {
   const url = conversationId
     ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
     : '';
   const conversationsUrl = `${BASE_URL}/conversations/`;
 
-  websocketManager.connect(userId,url,conversationsUrl); // Ensure WebSocket is connected
+  websocketManager.connect(userId, url, conversationsUrl,setLoading); // Ensure WebSocket is connected
 
   const messagePayload = {
     event: "message",
@@ -158,12 +170,17 @@ export async function sendMessage(conversationId, userId, messageData, parentId 
     ...messageData,
   };
 
+  setLoading((prev) => ({ ...prev, sendingMessage: true })); // ✅ Set loading state
+
+  console.log("DEBUG: Sending message →", messagePayload);
   websocketManager.sendMessage(messagePayload);
+
+  // ✅ Reset loading state when WebSocket confirms message sent
+  // websocketManager.on("message", () => {
+  //   console.log("✅ Message Sent Successfully!");
+  //   setLoading((prev) => ({ ...prev, sendingMessage: false }));
+  // });
 }
-
-
-
-
 
 // ----------------------------------------------------------------------
 
