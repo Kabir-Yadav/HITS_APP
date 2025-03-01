@@ -31,7 +31,7 @@ export const signUp = async ({ email, password, firstName, lastName, role }) => 
     password,
     options: {
       emailRedirectTo: `${window.location.origin}${paths.dashboard.root}`,
-      data: { 
+      data: {
         display_name: `${firstName} ${lastName}`,
         role,
         firstName,
