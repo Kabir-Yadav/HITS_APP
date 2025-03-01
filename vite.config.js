@@ -4,7 +4,6 @@ import eslintPlugin from 'vite-plugin-eslint';
 import { resolve } from 'path';
 
 export default defineConfig({
-  base: './', // 🔥 Fixes missing assets issue
   plugins: [
     react(),
     eslintPlugin({
@@ -17,6 +16,8 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: '0.0.0.0', 
+    port: 80,  
+    strictPort: true,
   },
 });
