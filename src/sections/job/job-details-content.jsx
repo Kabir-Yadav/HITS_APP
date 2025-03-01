@@ -3,6 +3,8 @@ import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -21,6 +23,17 @@ export function JobDetailsContent({ job, sx, ...other }) {
   const domain = 'employeeos.tech';
   const applicationLink = `${domain}${paths.public.jobApplication(job.id)}`;
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(applicationLink)
+      .then(() => {
+        toast.success('Application link copied to clipboard!');
+      })
+      .catch((error) => {
+        console.error('Failed to copy: ', error);
+        toast.error('Failed to copy link');
+      });
+  };
+
   const renderContent = () => (
     <Card
       sx={{
@@ -33,20 +46,70 @@ export function JobDetailsContent({ job, sx, ...other }) {
       <Stack spacing={2}>
         <Typography variant="h4">{job?.title}</Typography>
         
-        <Box sx={{ p: 2, bgcolor: 'background.neutral', borderRadius: 1 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Application Link:
-          </Typography>
-          <Typography 
-            variant="body2" 
-            sx={{ 
-              wordBreak: 'break-all',
-              color: 'primary.main',
-              cursor: 'text'
+        <Box 
+          sx={{ 
+            p: 2, 
+            bgcolor: 'background.neutral', 
+            borderRadius: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1
+          }}
+        >
+          <Stack 
+            direction="row" 
+            alignItems="center" 
+            justifyContent="space-between"
+          >
+            <Typography variant="subtitle2">
+              Application Link:
+            </Typography>
+            <Tooltip title="Copy application link">
+              <IconButton 
+                onClick={handleCopyLink} 
+                size="small" 
+                color="primary"
+                sx={{ ml: 1 }}
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+          
+          <Box 
+            sx={{
+              p: 1.5,
+              bgcolor: 'background.paper',
+              borderRadius: 1,
+              border: '1px solid',
+              borderColor: 'divider',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              overflow: 'hidden'
             }}
           >
-            {applicationLink}
-          </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: 'primary.main',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flexGrow: 1
+              }}
+            >
+              {applicationLink}
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<ContentCopyIcon />}
+              onClick={handleCopyLink}
+              sx={{ ml: 1, whiteSpace: 'nowrap' }}
+            >
+              Copy
+            </Button>
+          </Box>
         </Box>
       </Stack>
 
