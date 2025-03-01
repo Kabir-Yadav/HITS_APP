@@ -27,7 +27,7 @@ jobs:
         run: docker rm -f employeeos
       - name: Run new container with SSL
         run: |
-          docker run -d -p 80:80 -p 443:443 \
+          docker run -d -p 80:80 \
             --name employeeos \
             -v /etc/letsencrypt:/etc/letsencrypt:ro \
             -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
