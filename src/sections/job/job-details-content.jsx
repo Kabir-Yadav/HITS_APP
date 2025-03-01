@@ -64,16 +64,6 @@ export function JobDetailsContent({ job, sx, ...other }) {
             <Typography variant="subtitle2">
               Application Link:
             </Typography>
-            <Tooltip title="Copy application link">
-              <IconButton 
-                onClick={handleCopyLink} 
-                size="small" 
-                color="primary"
-                sx={{ ml: 1 }}
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
           </Stack>
           
           <Box 
