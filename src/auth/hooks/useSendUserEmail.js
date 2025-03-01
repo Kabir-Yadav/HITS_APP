@@ -7,7 +7,7 @@ export function useSendUserEmail() {
           return null;
         }
   
-        const response = await fetch(`https://employeeos.tech/api/chat/get-user?email=${encodeURIComponent(userData.email)}`, {
+        const response = await fetch(`http://13.51.59.185/api/chat/get-user?email=${encodeURIComponent(userData.email)}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

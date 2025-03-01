@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import axios, {fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'https://employeeos.tech/api/chat';
+const BASE_URL = 'http://13.51.59.185/api/chat';
 
 const enableServer = false;
 
