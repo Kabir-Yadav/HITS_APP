@@ -45,7 +45,7 @@ export function FileManagerView() {
 
   // ✅ Update tableData when data changes
   useEffect(() => {
-    if (data) {
+    if (data && JSON.stringify(data) !== JSON.stringify(tableData)) {
       setTableData(data);
     }
   }, [data]);
@@ -219,6 +219,22 @@ export function FileManagerView() {
         onOpenConfirm={confirmDialog.onTrue}
       />
     );
+  if (isError) {
+    return (
+      <DashboardContent>
+        <Typography variant="h4">File Manager</Typography>
+        <EmptyContent title="Error Loading Files" description="Something went wrong. Please try again." />
+      </DashboardContent>
+    );
+  }
+  if (isLoading) {
+    return (
+      <DashboardContent>
+        <Typography variant="h4">File Manager</Typography>
+        <EmptyContent title="Loading files..." />
+      </DashboardContent>
+    );
+  }
 
   return (
     <>
