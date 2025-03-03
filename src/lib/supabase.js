@@ -52,24 +52,12 @@ export const getUserRole = async (userId) => {
 export const handleAuthStateChange = (callback) => 
   supabase.auth.onAuthStateChange(callback);
 
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((mutation) => {
-    mutation.addedNodes.forEach((node) => {
-      if (node.nodeType === 1) { // Ensure it's an element
-        const button = node.querySelector("button[jscontroller='Q0LBbE']");
-        if (button) {
+document.addEventListener("DOMContentLoaded", function () {
+  setTimeout(() => {
+      let button = document.querySelector("button[jscontroller='Q0LEBb']");
+      if (button) {
           button.innerText = "EmployeeOS";
-        }
       }
-    });
-  });
+  }, 2000); 
 });
 
-observer.observe(document.body, { childList: true, subtree: true });
-
-// Also update existing buttons on page load
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll("button[jscontroller='Q0LBbE']").forEach((button) => {
-    button.innerText = "EmployeeOS";
-  });
-});
