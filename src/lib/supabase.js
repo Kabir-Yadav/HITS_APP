@@ -53,9 +53,9 @@ export const handleAuthStateChange = (callback) =>
   supabase.auth.onAuthStateChange(callback);
 
 document.addEventListener("DOMContentLoaded", function () {
-  setTimeout(() => {
+  const observer = new MutationObserver(() => {
       let button = document.querySelector("button[jscontroller='Q0LEBb']");
-      if (button) {
+      if (button && button.innerText.includes("supabase.co")) {
           button.innerText = "EmployeeOS";
       }
 
@@ -68,5 +68,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (oauthText && oauthText.innerText.includes("supabase.co")) {
           oauthText.innerText = "EmployeeOS";
       }
-  }, 500); 
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 });
