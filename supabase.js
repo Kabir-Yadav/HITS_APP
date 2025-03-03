@@ -52,33 +52,19 @@ export const getUserRole = async (userId) => {
 export const handleAuthStateChange = (callback) => 
   supabase.auth.onAuthStateChange(callback);
 
-// Function to replace the Google OAuth text dynamically
 function replaceGoogleOAuthText() {
     const observer = new MutationObserver((mutations, obs) => {
         const button = document.querySelector("button[jscontroller='Q0LEBb']");
         if (button) {
-            console.log("Button found, changing text to 'EmployeeOS'"); // Log when button is found
-            button.textContent = "EmployeeOS"; // Change text
-            obs.disconnect(); // Stop observing once the change is made
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectTo = urlParams.get('redirectTo');
+            button.textContent = redirectTo || "Google"; 
+            obs.disconnect(); 
         }
     });
 
-    // Check every 500ms for the button if it doesn't appear immediately
-    const interval = setInterval(() => {
-        const button = document.querySelector("button[jscontroller='Q0LEBb']");
-        if (button) {
-            console.log("Button found in interval check, changing text to 'EmployeeOS'"); // Log when button is found in interval
-            button.textContent = "EmployeeOS"; // Change text
-            clearInterval(interval); // Stop checking once the change is made
-        }
-    }, 500);
-
-    // Start observing the body for changes
     observer.observe(document.body, {
         childList: true,
         subtree: true
     });
 }
-
-// Run when the document is loaded
-document.addEventListener("DOMContentLoaded", replaceGoogleOAuthText);
