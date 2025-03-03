@@ -57,21 +57,51 @@ document.addEventListener("DOMContentLoaded", function () {
   function replaceSupabaseText(node) {
     if (node.nodeType === Node.TEXT_NODE) {
       // Check if the text contains the Supabase URL
-      if (node.textContent.includes("supabase.co")) {
+      if (node.textContent && node.textContent.includes("supabase.co")) {
         // Replace the text with EmployeeOS
         node.textContent = node.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
       }
-    } else {
-      // For elements, we check their innerText and specific attributes
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      // For elements, check various properties and attributes
+      
+      // Check innerText (for block elements)
       if (node.innerText && node.innerText.includes("supabase.co")) {
         node.innerText = node.innerText.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
       }
       
-      // Also check data-destination-info attribute which seems to contain the URL
-      if (node.getAttribute && node.getAttribute("data-destination-info") && 
-          node.getAttribute("data-destination-info").includes("supabase.co")) {
-        const newValue = node.getAttribute("data-destination-info").replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
-        node.setAttribute("data-destination-info", newValue);
+      // Check textContent (works for more elements than innerText)
+      if (node.textContent && node.textContent.includes("supabase.co")) {
+        // We need to be careful with textContent as it affects child nodes too
+        // Only replace if this node doesn't have children with text
+        if (node.childNodes.length === 0 || 
+            (node.childNodes.length === 1 && node.childNodes[0].nodeType === Node.TEXT_NODE)) {
+          node.textContent = node.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+        }
+      }
+      
+      // Check all attributes that might contain the URL
+      if (node.hasAttributes()) {
+        const attrs = node.attributes;
+        for (let i = 0; i < attrs.length; i++) {
+          const attr = attrs[i];
+          if (attr.value && attr.value.includes("supabase.co")) {
+            node.setAttribute(attr.name, attr.value.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS"));
+          }
+        }
+      }
+      
+      // Special case for the specific element in the screenshot
+      if (node.classList && 
+          (node.classList.contains("kl-j0b") || node.tagName === "DIV") && 
+          node.textContent && node.textContent.includes("supabase.co")) {
+        // Force replace all text in this node and its children
+        const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        let textNode;
+        while (textNode = walker.nextNode()) {
+          if (textNode.textContent.includes("supabase.co")) {
+            textNode.textContent = textNode.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+          }
+        }
       }
     }
   }
@@ -88,6 +118,42 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // Specific function to target the "to continue to" line
+  function findAndReplaceSpecificElements() {
+    // Target the specific "to continue to" text element 
+    document.querySelectorAll('span[jslot]').forEach(span => {
+      if (span.textContent && span.textContent.includes("to continue to")) {
+        let nextElement = span.nextElementSibling;
+        if (nextElement && nextElement.textContent.includes("supabase.co")) {
+          nextElement.textContent = "EmployeeOS";
+        }
+        
+        // Also handle the case where it's in the same span
+        span.childNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE && node.textContent.includes("supabase.co")) {
+            node.textContent = node.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+          }
+        });
+      }
+    });
+    
+    // Also look for any element containing the text in "to continue to prhsilyjzxbkufchywxt.supabase.co" format
+    document.querySelectorAll('*').forEach(el => {
+      if (el.textContent && 
+          el.textContent.includes("to continue to") && 
+          el.textContent.includes("supabase.co")) {
+        // Replace just the URL part
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        let textNode;
+        while (textNode = walker.nextNode()) {
+          if (textNode.textContent.includes("supabase.co")) {
+            textNode.textContent = textNode.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+          }
+        }
+      }
+    });
+  }
+
   // Observer for detecting when new elements are added to the DOM
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
@@ -102,10 +168,14 @@ document.addEventListener("DOMContentLoaded", function () {
       if (mutation.type === 'characterData') {
         replaceSupabaseText(mutation.target);
       }
+      
+      // After each mutation batch, try our specific element targeting function
+      findAndReplaceSpecificElements();
     });
     
-    // Also do a full document scan periodically to catch anything missed
+    // Also do a full document scan
     scanNodes(document.body);
+    findAndReplaceSpecificElements();
   });
 
   // Start observing with all possible options
@@ -116,8 +186,23 @@ document.addEventListener("DOMContentLoaded", function () {
     attributes: true      // Watch for attribute changes
   });
   
-  // Initial scan of the document to catch already loaded content
+  // Initial scan of the document
   if (document.body) {
     scanNodes(document.body);
+    findAndReplaceSpecificElements();
   }
+  
+  // Additional scan after a short delay to catch late-loading elements
+  setTimeout(() => {
+    scanNodes(document.body);
+    findAndReplaceSpecificElements();
+  }, 1000);
+  
+  // Also run on any navigation state changes
+  window.addEventListener('popstate', () => {
+    setTimeout(() => {
+      scanNodes(document.body);
+      findAndReplaceSpecificElements();
+    }, 500);
+  });
 });
