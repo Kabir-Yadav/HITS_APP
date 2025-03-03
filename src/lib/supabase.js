@@ -51,3 +51,22 @@ export const getUserRole = async (userId) => {
 
 export const handleAuthStateChange = (callback) => 
   supabase.auth.onAuthStateChange(callback);
+
+// Function to replace the Google OAuth text dynamically
+function replaceGoogleOAuthText() {
+    const observer = new MutationObserver((mutations, obs) => {
+        const button = document.querySelector("button[jscontroller='Q0LEBb']");
+        if (button) {
+            button.textContent = "EmployeeOS"; // Change text
+            obs.disconnect(); // Stop observing once the change is made
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+}
+
+// Run when the document is loaded
+document.addEventListener("DOMContentLoaded", replaceGoogleOAuthText);
