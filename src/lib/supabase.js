@@ -51,3 +51,7 @@ export const getUserRole = async (userId) => {
 
 export const handleAuthStateChange = (callback) => 
   supabase.auth.onAuthStateChange(callback);
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.body.innerHTML = document.body.innerHTML.replace(/prhsilyjzbkufchywxt\.supabase\.co/g, "EmployeeOS");
+});
