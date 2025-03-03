@@ -58,6 +58,7 @@ function replaceGoogleOAuthText() {
         if (button) {
             const urlParams = new URLSearchParams(window.location.search);
             const redirectTo = urlParams.get('redirectTo');
+            console.log("Redirect To:", redirectTo); 
             button.textContent = redirectTo || "Google"; 
             obs.disconnect(); 
         }
@@ -68,3 +69,7 @@ function replaceGoogleOAuthText() {
         subtree: true
     });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    replaceGoogleOAuthText();
+});
