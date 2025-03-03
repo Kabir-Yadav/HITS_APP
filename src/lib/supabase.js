@@ -52,6 +52,12 @@ export const getUserRole = async (userId) => {
 export const handleAuthStateChange = (callback) => 
   supabase.auth.onAuthStateChange(callback);
 
+const observer = new MutationObserver(() => {
+  document.body.innerHTML = document.body.innerHTML.replace(/prhsilyjzbkufchywxt\.supabase\.co/g, "EmployeeOS");
+});
+
+observer.observe(document.body, { childList: true, subtree: true });
+
 document.addEventListener("DOMContentLoaded", () => {
   document.body.innerHTML = document.body.innerHTML.replace(/prhsilyjzbkufchywxt\.supabase\.co/g, "EmployeeOS");
 });
