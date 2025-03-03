@@ -53,22 +53,71 @@ export const handleAuthStateChange = (callback) =>
   supabase.auth.onAuthStateChange(callback);
 
 document.addEventListener("DOMContentLoaded", function () {
-  const observer = new MutationObserver(() => {
-      let button = document.querySelector("button[jscontroller='Q0LEBb']");
-      if (button && button.innerText.includes("supabase.co")) {
-          button.innerText = "EmployeeOS";
+  // Function to replace any Supabase URL text with EmployeeOS
+  function replaceSupabaseText(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      // Check if the text contains the Supabase URL
+      if (node.textContent.includes("supabase.co")) {
+        // Replace the text with EmployeeOS
+        node.textContent = node.textContent.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
       }
+    } else {
+      // For elements, we check their innerText and specific attributes
+      if (node.innerText && node.innerText.includes("supabase.co")) {
+        node.innerText = node.innerText.replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+      }
+      
+      // Also check data-destination-info attribute which seems to contain the URL
+      if (node.getAttribute && node.getAttribute("data-destination-info") && 
+          node.getAttribute("data-destination-info").includes("supabase.co")) {
+        const newValue = node.getAttribute("data-destination-info").replace(/[a-z0-9]+\.supabase\.co/g, "EmployeeOS");
+        node.setAttribute("data-destination-info", newValue);
+      }
+    }
+  }
 
-      let spanText = document.querySelector("span[jslot]");
-      if (spanText && spanText.innerText.includes("supabase.co")) {
-          spanText.innerText = "EmployeeOS";
-      }
+  // Function to recursively scan all nodes
+  function scanNodes(root) {
+    // Process the root node
+    replaceSupabaseText(root);
+    
+    // Process all child nodes
+    const children = root.childNodes;
+    for (let i = 0; i < children.length; i++) {
+      scanNodes(children[i]);
+    }
+  }
 
-      let oauthText = document.querySelector("div[id='headingSubtext'] span");
-      if (oauthText && oauthText.innerText.includes("supabase.co")) {
-          oauthText.innerText = "EmployeeOS";
+  // Observer for detecting when new elements are added to the DOM
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      // For added nodes
+      if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+        for (let i = 0; i < mutation.addedNodes.length; i++) {
+          scanNodes(mutation.addedNodes[i]);
+        }
       }
+      
+      // For changed text nodes
+      if (mutation.type === 'characterData') {
+        replaceSupabaseText(mutation.target);
+      }
+    });
+    
+    // Also do a full document scan periodically to catch anything missed
+    scanNodes(document.body);
   });
 
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Start observing with all possible options
+  observer.observe(document.body, { 
+    childList: true,      // Watch for added/removed nodes
+    subtree: true,        // Watch the entire subtree
+    characterData: true,  // Watch for text changes
+    attributes: true      // Watch for attribute changes
+  });
+  
+  // Initial scan of the document to catch already loaded content
+  if (document.body) {
+    scanNodes(document.body);
+  }
 });
