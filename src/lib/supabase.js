@@ -58,6 +58,10 @@ document.addEventListener("DOMContentLoaded", function () {
       if (button) {
           button.innerText = "EmployeeOS";
       }
+
+      let spanText = document.querySelector("span[jslot]");
+      if (spanText && spanText.innerText.includes("supabase.co")) {
+          spanText.innerText = "EmployeeOS";
+      }
   }, 2000); 
 });
-
