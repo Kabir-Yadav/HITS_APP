@@ -63,5 +63,10 @@ document.addEventListener("DOMContentLoaded", function () {
       if (spanText && spanText.innerText.includes("supabase.co")) {
           spanText.innerText = "EmployeeOS";
       }
-  }, 2000); 
+
+      let oauthText = document.querySelector("div[id='headingSubtext'] span");
+      if (oauthText && oauthText.innerText.includes("supabase.co")) {
+          oauthText.innerText = "EmployeeOS";
+      }
+  }, 500); 
 });
