@@ -1,0 +1,37 @@
+name: EmployeeOS
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v3
+      - name: Login to DockerHub
+        run: docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Build Docker Image
+        run: docker build -t shreyasladhef13/employeeos_prod-f13technologies .
+      - name: Push Docker Image to DockerHub
+        run: docker push shreyasladhef13/employeeos_prod-f13technologies:latest
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Pull image from DockerHub
+        run: docker pull shreyasladhef13/employeeos_prod-f13technologies:latest
+      - name: Delete existing container
+        run: |
+          if [ $(docker ps -aq -f name=employeeos) ]; then
+            docker rm -f employeeos
+          fi
+      - name: Run new container
+        run: |
+          docker run -d --name employeeos \
+            -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
+            -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+            -e GOOGLE_CALENDAR_API_KEY=${{ secrets.GOOGLE_CALENDAR_API_KEY }} \
+            shreyasladhef13/employeeos_prod-f13technologies
