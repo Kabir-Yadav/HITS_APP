@@ -30,7 +30,7 @@ jobs:
           fi
       - name: Run new container
         run: |
-          docker run -d --name employeeos -p 80:80 \
+          docker run -d --name employeeos -p 8080:80 \
             -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
             -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
             -e GOOGLE_CALENDAR_API_KEY=${{ secrets.GOOGLE_CALENDAR_API_KEY }} \
