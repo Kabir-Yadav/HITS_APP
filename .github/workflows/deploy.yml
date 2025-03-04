@@ -1,0 +1,30 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          cd /home/ubuntu/employeeos
+          npm install
+
+      - name: Build project
+        run: |
+          cd /home/ubuntu/employeeos
+          npm run build
+
+      - name: Restart application
+        run: |
+          pm2 stop my-app || true
+          pm2 start npm --name "employeeos" -- run start
+          pm2 save
