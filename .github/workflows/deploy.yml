@@ -17,8 +17,7 @@ jobs:
 
       - name: Clone repository
         run: |
-          git clone https://github.com/ShreyasLadhe/EmployeeOS_F13.git
-          cd /home/ubuntu/EmployeeOS_F13
+          git clone https://github.com/ShreyasLadhe/EmployeeOS_F13.git /home/ubuntu/EmployeeOS_F13
 
       - name: Install dependencies and build
         run: |
