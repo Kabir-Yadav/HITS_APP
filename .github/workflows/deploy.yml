@@ -1,30 +1,35 @@
-name: Deploy to AWS EC2
+name: Deploy to EC2
 
 on:
   push:
     branches:
-      - main
+      - main  # Change this if your default branch is different
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: self-hosted  # Runs on the EC2 instance with the self-hosted runner
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install dependencies
         run: |
-          cd /home/ubuntu/employeeos
+          cd /home/ubuntu/EmployeeOS_F13
+          sudo rm -rf *  # Delete existing code
+          git clone https://github.com/your-username/your-repo.git /home/ubuntu/EmployeeOS_F13
+          cd /home/ubuntu/EmployeeOS_F13
+
+      - name: Install dependencies and build
+        run: |
+          cd /home/ubuntu/EmployeeOS_F13
           npm install
-
-      - name: Build project
-        run: |
-          cd /home/ubuntu/employeeos
           npm run build
 
-      - name: Restart application
+      - name: Move build folder to web directory
         run: |
-          pm2 stop my-app || true
-          pm2 start npm --name "employeeos" -- run start
-          pm2 save
+          sudo rm -rf /var/www/html/employeeos
+          sudo mv /home/ubuntu/EmployeeOS_F13/dist /var/www/html/employeeos
+          sudo chown -R www-data:www-data /var/www/html/employeeos
+          sudo chmod -R 755 /var/www/html/employeeos
+
+      - name: Restart Nginx (if required)
+        run: |
+          sudo systemctl restart nginx
