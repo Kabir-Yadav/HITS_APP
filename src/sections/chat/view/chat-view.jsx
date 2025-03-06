@@ -79,7 +79,7 @@ export function ChatView() {
   const hasConversation = selectedConversationId && conversation;
   useEffect(() => {
     websocketManager.connect(user?.id)
-  }, [user.id]);
+  }, [user?.id]);
 
   return (
     <DashboardContent

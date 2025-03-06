@@ -370,7 +370,7 @@ export function useDeleteMessage() {
 
 //-------------------------------------------------------------------------------------
 
-export async function handleAddReaction(messageId, userId, emoji, conversationId, setLoading) {
+export async function handleAddReaction(messageId, userId, emoji, conversationId) {
 
   websocketManager.connect(userId);
 
@@ -381,7 +381,6 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
     sender_id: userId,
     reaction: emoji,
   };
-  setLoading((prev) => ({ ...prev, sendingReaction: true })); // ✅ Set loading state to true before sending
 
   websocketManager.sendMessage(reactionPayload);
 
