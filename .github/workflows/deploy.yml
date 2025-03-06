@@ -1,0 +1,46 @@
+name: Deploy lastest commit to EC2
+
+on:
+  push:
+    branches:
+      - main  
+
+jobs:
+  deploy:
+    runs-on: self-hosted  
+
+    steps:
+      - name: Remove existing code
+        run: |
+          sudo rm -rf /home/ubuntu/EmployeeOS_F13
+          mkdir -p /home/ubuntu/EmployeeOS_F13
+
+      - name: Clone repository
+        run: |
+          git clone https://github.com/ShreyasLadhe/EmployeeOS_F13.git /home/ubuntu/EmployeeOS_F13
+
+      - name: Install dependencies and build
+        run: |
+          set -e  # Exit if any command fails
+          cd /home/ubuntu/EmployeeOS_F13
+          npm install
+          npm run build
+
+      - name: Move build folder to web directory
+        run: |
+          set -e  # Exit if any command fails
+          if [ -d "/home/ubuntu/EmployeeOS_F13/dist" ]; then
+            sudo rm -rf /var/www/html/employeeos
+            sudo mv /home/ubuntu/EmployeeOS_F13/dist /var/www/html/employeeos
+            sudo chown -R www-data:www-data /var/www/html/employeeos
+            sudo chmod -R 755 /var/www/html/employeeos
+          else
+            echo "❌ Error: Build directory not found!"
+            exit 1
+          fi
+
+      - name: Restart Nginx
+        run: |
+          echo "🔄 Restarting Nginx..."
+          sudo systemctl restart nginx
+          echo "✅ Nginx restarted successfully!"

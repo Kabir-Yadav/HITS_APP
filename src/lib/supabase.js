@@ -21,6 +21,9 @@ export const signInWithGoogle = async () => {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/supabase/callback`,
+        queryParams: {
+          login_hint: 'EmployeeOS',
+        }
       },
     });
 
