@@ -3,17 +3,20 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main  # Change this if your default branch is different
+      - main  
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Runs on the EC2 instance with the self-hosted runner
+    runs-on: self-hosted  
 
     steps:
-      - name: Checkout repository
+      - name: Remove existing code
         run: |
-          cd /home/ubuntu/EmployeeOS_F13
-          sudo rm -rf *  # Delete existing code
+          sudo rm -rf /home/ubuntu/EmployeeOS_F13
+          mkdir -p /home/ubuntu/EmployeeOS_F13
+
+      - name: Clone repository
+        run: |
           git clone https://github.com/your-username/your-repo.git /home/ubuntu/EmployeeOS_F13
           cd /home/ubuntu/EmployeeOS_F13
 
@@ -28,8 +31,4 @@ jobs:
           sudo rm -rf /var/www/html/employeeos
           sudo mv /home/ubuntu/EmployeeOS_F13/dist /var/www/html/employeeos
           sudo chown -R www-data:www-data /var/www/html/employeeos
-          sudo chmod -R 755 /var/www/html/employeeos
-
-      - name: Restart Nginx (if required)
-        run: |
-          sudo systemctl restart nginx
+          sudo chmod -R
