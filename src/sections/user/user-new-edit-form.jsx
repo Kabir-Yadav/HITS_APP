@@ -1,3 +1,4 @@
+import axios from 'axios';
 import dayjs from 'dayjs';
 import { z as zod } from 'zod';
 import { useState } from 'react';
@@ -88,23 +89,23 @@ export function UserNewEditForm({ currentUser }) {
   const onSubmit = handleSubmit(async (data) => {
     try {
       let avatarUrl = null;
-      
+
       // Upload avatar to Supabase Storage if provided
       if (data.avatarUrl instanceof File) {
         const fileExt = data.avatarUrl.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
-        
+
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from('avatars')
           .upload(fileName, data.avatarUrl);
-          
+
         if (uploadError) throw uploadError;
-        
+
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
-          
+
         avatarUrl = publicUrl;
       }
 
@@ -124,7 +125,7 @@ export function UserNewEditForm({ currentUser }) {
         if (updateError) throw updateError;
       } else {
         // Create new user without email verification
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
           options: {
@@ -141,6 +142,22 @@ export function UserNewEditForm({ currentUser }) {
         });
 
         if (signUpError) throw signUpError;
+
+        // ✅ Get newly created user from the signup response
+        if (signUpData?.user?.id) {
+          await axios.post('http://127.0.0.1:8000/api/chat/create', {
+            id: signUpData.user.id,
+            name: `${data.firstName}${data.lastName}`,
+            email: data.email,
+            role: data.role,
+            phone_number: data.phoneNumber,
+            avatar_url: avatarUrl,
+            address: '',
+            status: 'offline',
+          }).catch((error) => {
+            console.error('Failed to save user in DB:', error);
+          });
+        }
       }
 
       reset();
@@ -188,7 +205,7 @@ export function UserNewEditForm({ currentUser }) {
                 {errorMsg}
               </Alert>
             )}
-            
+
             <Box
               sx={{
                 rowGap: 3,
@@ -200,11 +217,11 @@ export function UserNewEditForm({ currentUser }) {
               <Field.Text name="firstName" label="First name" />
               <Field.Text name="lastName" label="Last name" />
               <Field.Text name="email" label="Email address" />
-              
+
               {!currentUser && (
-                <Field.Text 
-                  name="password" 
-                  label="Password" 
+                <Field.Text
+                  name="password"
+                  label="Password"
                   type="password"
                   helperText="Must contain at least 6 characters"
                 />

@@ -62,7 +62,7 @@ export function FileManagerView() {
 
   const dataFiltered = applyFilter({
     inputData: tableData,
-    comparator: getComparator(table.order, table.orderBy),
+    comparator: () => { },
     filters: currentFilters,
     dateError,
   });

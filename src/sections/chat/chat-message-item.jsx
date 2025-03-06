@@ -200,16 +200,19 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
         {message.reactions && message.reactions.length > 0 && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, justifyContent: isCurrentUser ? 'end' : 'start' }}>
             {message.reactions.slice(0, MAX_VISIBLE_REACTIONS).map((reaction, index) => (
-              <Typography
-                key={index}
-                variant="caption"
-                sx={{
-                  cursor: 'pointer',
-                  fontSize: 16,
-                }}
-              >
-                {reaction.emoji}
-              </Typography>
+              <Box sx={{ borderRadius: '50%', backgroundColor: reaction.user_id === user.id ? 'background.neutral' : 'transparent', p: .4 }}>
+                <Typography
+                  key={index}
+                  variant="caption"
+                  sx={{
+                    cursor: 'pointer',
+                    fontSize: 16,
+                  }}
+                >
+                  {reaction.emoji}
+                </Typography>
+              </Box>
+
             ))}
 
             {/* Show +X if there are more reactions */}

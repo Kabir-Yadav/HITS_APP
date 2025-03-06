@@ -145,7 +145,7 @@ export function ChatMessageInput({
             await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null, setLoading);
           } else {
             const res = await createConversation(conversationData);
-            router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+            router.push(`${paths.dashboard.chat}?id=${res.id}`);
             onAddRecipients([]);
           }
         }

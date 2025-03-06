@@ -2,10 +2,10 @@ import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
 import { useMemo, useState } from 'react';
 
-import axios, {fetcher, endpoints } from 'src/lib/axios';
+import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'http://13.51.59.185/api/chat';
+const BASE_URL = 'http://127.0.0.1:8000/api/chat';
 
 const enableServer = false;
 
@@ -22,12 +22,15 @@ const swrOptions = {
 class WebSocketManager {
   constructor() {
     this.ws = null;
-    this.eventHandlers = {}; // Store event listeners for different event types
+    this.eventHandlers = {};
+    this.setLoading = () => { }; // Default to an empty function if not provided
+
   }
 
-  connect(userId,url='',conversationsURL='',setLoading) {
+  connect(userId, setLoading = () => { }) {
+    this.setLoading = setLoading;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(`ws://13.51.59.185/ws/chat/${userId}`);
+      this.ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
 
       this.ws.onopen = () => console.log("✅ WebSocket connected!");
 
@@ -35,20 +38,30 @@ class WebSocketManager {
         const data = JSON.parse(event.data);
         console.log("📩 Received WebSocket Event:", data);
 
-        // Dispatch event to handlers
+        this.setLoading((prev) => ({ ...prev, sendingMessage: false }));
+        if (data.event === "message" || data.event === "reply") {
+          this.updateConversationCache(data.conversation_id, data);
+        }
+        if (data.event === 'reaction') {
+          this.updateReactionCache(data.conversation_id, data.message_id, data.sender_id, data.reactions);
+        }
+        if (data.event === 'delete') {
+          this.deleteMessageCache(data.conversation_id, data.message_id);
+        }
+        // ✅ Set loading state
         if (this.eventHandlers[data.event]) {
           this.eventHandlers[data.event](data);
         }
-        
-        mutate(url)
-        setLoading((prev) => ({ ...prev, sendingMessage: false }));
-        mutate(conversationsURL)
-
       };
 
-      this.ws.onerror = (error) => console.error("❌ WebSocket Error:", error);
+      this.ws.onerror = (error) => {
+        console.error("❌ WebSocket Error:", error);
+      };
 
-      this.ws.onclose = () => console.warn("⚠️ WebSocket disconnected!");
+      this.ws.onclose = () => {
+        console.warn("⚠️ WebSocket disconnected, attempting reconnection...");
+        setTimeout(() => this.connect(userId), 3000);
+      };
     }
   }
 
@@ -56,20 +69,123 @@ class WebSocketManager {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(payload));
     } else {
-      console.warn("⚠️ WebSocket not open. Reconnecting...");
+      console.warn("⚠️ WebSocket not open. Attempting to reconnect...");
       setTimeout(() => this.sendMessage(payload), 500);
     }
   }
+  deleteMessageCache(conversationId, messageId) {
+    const url = conversationId
+      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
+      : '';
 
-  on(event, callback) {
-    this.eventHandlers[event] = callback;
+    mutate(url, (currentData) => {
+      if (!currentData || !currentData.conversations) {
+        console.warn("deleteMessage: No cached conversation found. Skipping mutation.");
+        return currentData;
+      }
+
+      return {
+        ...currentData,
+        conversations: currentData.conversations.map((conv) =>
+          conv.id === conversationId
+            ? {
+              ...conv,
+              messages: conv.messages.filter((msg) => msg.id !== messageId),
+            }
+            : conv
+        ),
+      };
+    }, false);
+
+    mutate(
+      `${BASE_URL}/conversations/`,
+      (currentData) => {
+        const currentConversations = currentData.conversations;
+
+        const conversations = currentConversations.map(
+          (conversation) =>
+            conversation.id === conversationId
+              ? { ...conversation, messages: conversation.messages.filter((msg) => msg.id !== messageId) }
+              : conversation
+        );
+
+        return { ...currentData, conversations };
+      },
+      false
+    );
+  }
+  updateReactionCache(conversationId, messageId, userId, reactions) {
+    const url = conversationId
+      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
+      : '';
+
+    mutate(url, (currentData) => {
+      if (!currentData || !currentData.conversations) {
+        console.warn("handleAddReaction: No cached conversation found. Skipping mutation.");
+        return currentData;
+      }
+
+      return {
+        ...currentData,
+        conversations: currentData.conversations.map((conv) =>
+          conv.id === conversationId
+            ? {
+              ...conv,
+              messages: conv.messages.map((msg) => {
+                if (msg.id !== messageId) return msg;
+
+                return {
+                  ...msg,
+                  reactions: reactions,
+                };
+              }),
+            }
+            : conv
+        ),
+      };
+    }, false);
   }
 
-  close() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+  updateConversationCache(conversationId, newMessage) {
+    const url = conversationId
+      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
+      : '';
+    console.log(newMessage)
+    mutate(url, (currentData) => {
+      if (!currentData) {
+        console.warn("sendMessage: No cached data found for mutation. Skipping mutation.");
+        return currentData;
+      }
+      return {
+        ...currentData,
+        conversations: currentData.conversations.map((conv) =>
+          conv.id === conversationId
+            ? {
+              ...conv,
+              messages: [...conv.messages, newMessage], // ✅ Append message safely
+            }
+            : conv
+        ),
+      };
+    }, false);
+
+    mutate(
+      `${BASE_URL}/conversations/`,
+      (currentData) => {
+        const currentConversations = currentData.conversations;
+
+        const conversations = currentConversations.map(
+          (conversation) =>
+            conversation.id === conversationId
+              ? { ...conversation, messages: [...conversation.messages, newMessage] }
+              : conversation
+        );
+
+        return { ...currentData, conversations };
+      },
+      false
+    );
+
   }
 }
 
@@ -78,6 +194,7 @@ export const websocketManager = new WebSocketManager();
 const loadingState = {
   sendingMessage: false,
   sendingReaction: false,
+  deletingMessage: false
 };
 
 export function useChatState() {
@@ -90,7 +207,7 @@ export function useChatState() {
 export function useGetContacts() {
   // const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
 
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher,swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher, swrOptions);
   const memoizedValue = useMemo(
     () => ({
       contacts: data?.contacts || [],
@@ -136,7 +253,7 @@ export function useGetConversation(conversationId) {
     ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
     : '';
   const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-  console.log("DEBUG: useGetConversation data →", data); // ✅ Debug to check if data updates
+  // console.log("DEBUG: useGetConversation data →", data); // ✅ Debug to check if data updates
 
   const memoizedValue = useMemo(
     () => ({
@@ -155,12 +272,10 @@ export function useGetConversation(conversationId) {
 // ----------------------------------------------------------------------
 
 export async function sendMessage(conversationId, userId, messageData, parentId = null, setLoading) {
-  const url = conversationId
-    ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-    : '';
-  const conversationsUrl = `${BASE_URL}/conversations/`;
-
-  websocketManager.connect(userId, url, conversationsUrl,setLoading); // Ensure WebSocket is connected
+  if (!conversationId || !userId) {
+    console.error("sendMessage: Missing conversationId or userId");
+    return;
+  }
 
   const messagePayload = {
     event: "message",
@@ -170,49 +285,34 @@ export async function sendMessage(conversationId, userId, messageData, parentId 
     ...messageData,
   };
 
-  setLoading((prev) => ({ ...prev, sendingMessage: true })); // ✅ Set loading state
+  setLoading((prev) => ({ ...prev, sendingMessage: true })); // ✅ Set loading state to true before sending
 
   console.log("DEBUG: Sending message →", messagePayload);
+  websocketManager.connect(userId, setLoading); // ✅ Ensure WebSocket is connected before sending
   websocketManager.sendMessage(messagePayload);
-
-  // ✅ Reset loading state when WebSocket confirms message sent
-  // websocketManager.on("message", () => {
-  //   console.log("✅ Message Sent Successfully!");
-  //   setLoading((prev) => ({ ...prev, sendingMessage: false }));
-  // });
 }
 
 // ----------------------------------------------------------------------
 
 export async function createConversation(conversationData) {
-  const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
 
-  /**
-   * Work on server
-   */
-  const data = { conversationData };
-  console.log(data)
-  const res = await axios.post(CHART_ENDPOINT, data);
+  console.log(conversationData)
+  const response = await axios.post(`${BASE_URL}/create-conversation/`, {
+    conversationData, // Send the entire object
+  });
 
-  /**
-   * Work in local
-   */
+  if (response.data) {
+    console.log("✅ New conversation created:", response.data);
 
-  mutate(
-    url,
-    (currentData) => {
-      const currentConversations = currentData.conversations;
-
-      const conversations = [...currentConversations, conversationData];
-
-      return { ...currentData, conversations };
-    },
-    false
-  );
-
-  return res.data;
+    // Update SWR cache with the new conversation
+    mutate(`${BASE_URL}/conversations/`, (currentData) => ({
+      ...currentData,
+      conversations: [...currentData.conversations, response.data],
+    }));
+  }
+  return response.data;
 }
-  
+
 // ----------------------------------------------------------------------
 
 export async function clickConversation(conversationId) {
@@ -253,10 +353,8 @@ export async function clickConversation(conversationId) {
 
 export function useDeleteMessage() {
   return async (messageId, conversation_id, user_id) => {
-    const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversation_id, endpoint: 'conversation' } }];
-    const conversationsUrl = `${BASE_URL}/conversations/`;
 
-    websocketManager.connect(user_id,conversationByIdUrl,conversationsUrl); // Ensure WebSocket is connected
+    websocketManager.connect(user_id); // Ensure WebSocket is connected
 
     const deletePayload = {
       action: "delete",
@@ -272,10 +370,9 @@ export function useDeleteMessage() {
 
 //-------------------------------------------------------------------------------------
 
-export async function handleAddReaction(messageId, userId, emoji, conversationId) {
-  const conversationByIdUrl = [`${BASE_URL}/conversationByID/`, { params: { conversationId: conversationId, endpoint: 'conversation' } }];
+export async function handleAddReaction(messageId, userId, emoji, conversationId, setLoading) {
 
-  websocketManager.connect(userId,conversationByIdUrl);
+  websocketManager.connect(userId);
 
   const reactionPayload = {
     event: "reaction",
@@ -284,6 +381,7 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
     sender_id: userId,
     reaction: emoji,
   };
+  setLoading((prev) => ({ ...prev, sendingReaction: true })); // ✅ Set loading state to true before sending
 
   websocketManager.sendMessage(reactionPayload);
 

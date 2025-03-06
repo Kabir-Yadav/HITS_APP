@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
+import { useGetContacts, useGetConversation, useGetConversations, websocketManager } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -77,6 +77,9 @@ export function ChatView() {
   };
 
   const hasConversation = selectedConversationId && conversation;
+  useEffect(() => {
+    websocketManager.connect(user?.id)
+  }, [user.id]);
 
   return (
     <DashboardContent
