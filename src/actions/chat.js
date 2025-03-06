@@ -27,7 +27,7 @@ class WebSocketManager {
 
   connect(userId,url='',conversationsURL='',setLoading) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(`ws://apiemployeeos.duckdns.org:8443/ws/chat/${userId}`);
+      this.ws = new WebSocket(`wss://apiemployeeos.duckdns.org:8443/ws/chat/${userId}`);
 
       this.ws.onopen = () => console.log("✅ WebSocket connected!");
 
