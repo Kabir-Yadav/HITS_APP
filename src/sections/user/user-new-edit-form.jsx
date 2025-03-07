@@ -145,7 +145,7 @@ export function UserNewEditForm({ currentUser }) {
 
         // ✅ Get newly created user from the signup response
         if (signUpData?.user?.id) {
-          await axios.post('http://apiemployeeos.duckdns.org:8443/api/chat/create', {
+          await axios.post('https://apiemployeeos.duckdns.org:8443/api/chat/create', {
             id: signUpData.user.id,
             name: `${data.firstName}${data.lastName}`,
             email: data.email,
