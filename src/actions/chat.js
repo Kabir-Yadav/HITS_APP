@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'http://127.0.0.1:8000/api/chat';
+const BASE_URL = 'https://apiemployeeos.duckdns.org:8443/api/chat';
 
 const enableServer = false;
 
@@ -30,7 +30,7 @@ class WebSocketManager {
   connect(userId, setLoading = () => { }) {
     this.setLoading = setLoading;
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
+      this.ws = new WebSocket(`wss://apiemployeeos.duckdns.org:8443/ws/chat/${userId}`);
 
       this.ws.onopen = () => console.log("✅ WebSocket connected!");
 
