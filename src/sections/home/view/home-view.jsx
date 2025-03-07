@@ -21,17 +21,8 @@ import { HomeHighlightFeatures } from '../home-highlight-features';
 // ----------------------------------------------------------------------
 
 export function HomeView() {
-  const pageProgress = useScrollProgress();
-
-  const { onBackToTop, isVisible } = useBackToTop('90%');
-
   return (
     <>
-      <ScrollProgress
-        variant="linear"
-        progress={pageProgress.scrollYProgress}
-        sx={[(theme) => ({ position: 'fixed', zIndex: theme.zIndex.appBar + 1 })]}
-      />
       <HomeHero />
     </>
   );

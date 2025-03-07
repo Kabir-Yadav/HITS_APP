@@ -42,8 +42,8 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
           sx={{
             width: { xs: 80, md: 128 },
             height: { xs: 80, md: 128 },
-            border: (theme) => `solid 3px ${theme.vars.palette.common.white}`,
-            boxShadow: (theme) => theme.customShadows.z8,
+            border: 'solid 3px #ffffff',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.24)',
           }}
         >
           {name?.charAt(0).toUpperCase()}
@@ -58,7 +58,6 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
             textShadow: '2px 2px 4px rgba(0,0,0,0.4)',
             fontSize: { xs: '2.5rem', md: '3.5rem' },
             fontFamily: 'Playfair Display, serif',
-            fontStyle: 'italic',
             fontWeight: 600,
             position: 'relative',
             '&:after': {
@@ -72,7 +71,6 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
             },
             letterSpacing: '0.02em',
-            transform: 'rotate(-2deg)',
           }}
         >
           {name}
@@ -80,7 +78,7 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
       </Box>
 
       <Typography
-        variant="h5"
+        variant="h2"
         sx={{
           position: 'absolute',
           right: { xs: 24, md: 40 },

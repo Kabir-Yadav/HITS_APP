@@ -249,7 +249,7 @@ export function UserNewEditForm({ currentUser }) {
               <Field.Phone
                 name="phoneNumber"
                 label="Phone number"
-                country={!currentUser ? 'DE' : undefined}
+                country={!currentUser ? 'IN' : undefined}
               />
 
               <Controller

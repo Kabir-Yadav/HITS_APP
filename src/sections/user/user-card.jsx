@@ -20,10 +20,6 @@ import { Image } from 'src/components/image';
 // ----------------------------------------------------------------------
 
 export function UserCard({ user, sx, ...other }) {
-  // Generate random numbers for fallback images
-  const randomAvatar = Math.floor(Math.random() * 24) + 1;
-  const randomCover = Math.floor(Math.random() * 24) + 1;
-
   return (
     <Card 
       sx={[
@@ -40,44 +36,17 @@ export function UserCard({ user, sx, ...other }) {
       {...other}
     >
       <Box sx={{ position: 'relative', height: 320 }}>
-        <AvatarShape
-          sx={{
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            mx: 'auto',
-            bottom: -26,
-            position: 'absolute',
-          }}
-        />
-
-        <Avatar
-          alt={user.name}
-          src={user.avatarUrl || _mock.image.avatar(randomAvatar)}
-          sx={{
-            left: 0,
-            right: 0,
-            width: 80,
-            height: 80,
-            zIndex: 11,
-            mx: 'auto',
-            bottom: -40,
-            position: 'absolute',
-            border: (theme) => `solid 4px ${theme.palette.background.paper}`,
-          }}
-        />
-
         <Image
-          src={user.coverUrl || _mock.image.cover(randomCover)}
+          src={user.coverUrl}
           alt="cover"
           ratio="16/9"
           overlay={false}
           sx={{
-            filter: 'brightness(0.8)',
-            backgroundColor: 'grey.500',
+            backgroundColor: 'background.paper',
             height: '100%',
             width: '100%',
-            objectFit: 'cover',
+            objectFit: 'contain',
+            p: 2,
           }}
         />
       </Box>
@@ -87,7 +56,7 @@ export function UserCard({ user, sx, ...other }) {
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
-        pt: 5,
+        pt: 3,
         pb: 3,
       }}>
         <ListItemText
