@@ -154,9 +154,24 @@ export function KanbanColumnToolBar({
           size="small" 
           color={showAllTasks ? 'primary' : 'default'}
           onClick={onToggleShowAll}
-          sx={{ mr: 1 }}
+          sx={{
+            mr: 1,
+            transition: 'all 0.2s',
+            '&:hover': {
+              backgroundColor: (theme) => 
+                showAllTasks 
+                  ? theme.palette.primary.lighter 
+                  : theme.palette.action.hover,
+            },
+          }}
         >
-          <Iconify icon={showAllTasks ? "mdi:eye" : "mdi:eye-outline"} />
+          <Iconify 
+            icon={showAllTasks ? "mdi:eye" : "mdi:eye-outline"} 
+            sx={{
+              transition: 'transform 0.2s',
+              transform: showAllTasks ? 'scale(1.1)' : 'scale(1)',
+            }}
+          />
         </IconButton>
 
         <IconButton size="small" color="inherit" onClick={onToggleAddTask}>

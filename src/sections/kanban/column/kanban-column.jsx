@@ -1,6 +1,6 @@
 import { CSS } from '@dnd-kit/utilities';
 import { useBoolean } from 'minimal-shared/hooks';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable';
 
 import { createTask, clearColumn, deleteColumn, updateColumn } from 'src/actions/kanban';
@@ -20,32 +20,50 @@ const animateLayoutChanges = (args) => defaultAnimateLayoutChanges({ ...args, wa
 
 export function KanbanColumn({ children, column, tasks, disabled, sx }) {
   const openAddTask = useBoolean();
-  const [showAllTasks, setShowAllTasks] = useState(false);
+  const [showAllTasks, setShowAllTasks] = useState(true);
   const { user } = useAuthContext();
 
-  const { attributes, isDragging, listeners, setNodeRef, transition, active, over, transform } =
-    useSortable({
-      id: column.id,
-      data: { type: 'container', children: tasks },
-      animateLayoutChanges,
-    });
-
-  // Filter tasks based on user and showAllTasks state
-  const filteredTasks = tasks.filter((task) => {
-    if (showAllTasks) return true;
-    
-    const isAssignedToUser = task.assignee?.some((assignee) => assignee.id === user?.id);
-    const isCreatedByUser = task.reporter?.id === user?.id;
-    
-    return isAssignedToUser || isCreatedByUser;
+  const {
+    attributes,
+    isDragging,
+    listeners,
+    setNodeRef,
+    transition,
+    active,
+    over,
+    transform,
+  } = useSortable({
+    id: column.id,
+    data: { type: 'container', children: tasks },
+    animateLayoutChanges,
   });
 
-  const tasksIds = filteredTasks.map((task) => task.id);
+  // Improved filtering logic with memoization
+  const filteredTasks = useMemo(() => {
+    if (!tasks || !user?.id) return [];
+    
+    return tasks.filter((task) => {
+      if (showAllTasks) return true;
+      
+      const isAssignedToUser = Array.isArray(task.assignee) && 
+        task.assignee.some((assignee) => assignee?.id === user.id);
+      const isCreatedByUser = task.reporter?.id === user.id;
+      
+      return isAssignedToUser || isCreatedByUser;
+    });
+  }, [tasks, user?.id, showAllTasks]);
 
-  const isOverContainer = over
-    ? (column.id === over.id && active?.data.current?.type !== 'container') ||
-      tasksIds.includes(over.id)
-    : false;
+  const tasksIds = useMemo(() => 
+    filteredTasks.map((task) => task.id), 
+    [filteredTasks]
+  );
+
+  const isOverContainer = useMemo(() => {
+    if (!over || !active) return false;
+    
+    return (column.id === over.id && active?.data.current?.type !== 'container') ||
+      tasksIds.includes(over.id);
+  }, [over, active, column.id, tasksIds]);
 
   const handleUpdateColumn = useCallback(
     async (columnName) => {
@@ -90,6 +108,10 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
     [column.id, openAddTask]
   );
 
+  const handleToggleShowAll = useCallback(() => {
+    setShowAllTasks((prev) => !prev);
+  }, []);
+
   return (
     <ColumnBase
       ref={disabled ? undefined : setNodeRef}
@@ -114,7 +136,7 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
             onDeleteColumn={handleDeleteColumn}
             onToggleAddTask={openAddTask.onToggle}
             showAllTasks={showAllTasks}
-            onToggleShowAll={() => setShowAllTasks(!showAllTasks)}
+            onToggleShowAll={handleToggleShowAll}
           />
         ),
         main: React.Children.map(children, child => {
