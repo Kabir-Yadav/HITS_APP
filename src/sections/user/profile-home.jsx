@@ -342,21 +342,23 @@ export function ProfileHome({ info }) {
   return (
     <Grid container spacing={3}>
       {/* First Column - Born On and Contact Info */}
-      <Grid xs={12} md={4}>
+      <Grid xs={12} md={3}>
         <Stack spacing={3}>
           {renderBirthDate()}
           {renderContact()}
         </Stack>
       </Grid>
 
-      {/* Second Column - Quote Card and Social Links */}
-      <Grid xs={12} md={8}>
-        <Stack spacing={3}>
-          <Box>
-            <UserCard user={userCardData} />
-          </Box>
-          {renderSocialLinks()}
-        </Stack>
+      {/* Second Column - Quote Card */}
+      <Grid xs={12} md={6}>
+        <Box>
+          <UserCard user={userCardData} />
+        </Box>
+      </Grid>
+
+      {/* Third Column - Social Links */}
+      <Grid xs={12} md={3}>
+        {renderSocialLinks()}
       </Grid>
     </Grid>
   );

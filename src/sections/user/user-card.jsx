@@ -25,7 +25,7 @@ export function UserCard({ user, sx, ...other }) {
       sx={[
         { 
           textAlign: 'center',
-          maxWidth: 600,
+          maxWidth: 565,
           mx: 'auto',
           height: '100%',
           display: 'flex',
@@ -42,8 +42,8 @@ export function UserCard({ user, sx, ...other }) {
           ratio="16/9"
           overlay={false}
           sx={{
-            backgroundColor: 'background.paper',
-            height: '100%',
+            backgroundColor: '#ffffff',
+            height: '115%',
             width: '100%',
             objectFit: 'contain',
             p: 2,
@@ -67,6 +67,7 @@ export function UserCard({ user, sx, ...other }) {
               sx: { 
                 typography: 'h6',
                 fontSize: 24,
+                color: 'black',
               }
             },
           }}

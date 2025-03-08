@@ -3,7 +3,7 @@ import { varAlpha } from 'minimal-shared/utils';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import { alpha } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
+import ListItemText from '@mui/material/ListItemText';
 
 // ----------------------------------------------------------------------
 
@@ -18,9 +18,8 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
               `url(${coverUrl})`,
             ],
           }),
-          height: 280,
+          height: 1,
           color: 'common.white',
-          position: 'relative',
         }),
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
@@ -29,69 +28,41 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
       <Box
         sx={{
           display: 'flex',
-          alignItems: 'center',
-          position: 'absolute',
-          left: { xs: 24, md: 40 },
-          bottom: { xs: 24, md: 40 },
-          zIndex: 10,
+          left: { md: 24 },
+          bottom: { md: 24 },
+          zIndex: { md: 10 },
+          pt: { xs: 6, md: 0 },
+          position: { md: 'absolute' },
+          flexDirection: { xs: 'column', md: 'row' },
         }}
       >
         <Avatar
           alt={name}
           src={avatarUrl}
-          sx={{
-            width: { xs: 80, md: 128 },
-            height: { xs: 80, md: 128 },
-            border: 'solid 3px #ffffff',
-            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.24)',
-          }}
+          sx={[
+            (theme) => ({
+              mx: 'auto',
+              width: { xs: 64, md: 128 },
+              height: { xs: 64, md: 128 },
+              border: `solid 2px ${theme.vars.palette.common.white}`,
+            }),
+          ]}
         >
           {name?.charAt(0).toUpperCase()}
         </Avatar>
 
-        <Typography 
-          variant="h3" 
-          component="div"
-          sx={{ 
-            ml: { xs: 2, md: 4 },
-            color: 'common.white',
-            textShadow: '2px 2px 4px rgba(0,0,0,0.4)',
-            fontSize: { xs: '2.5rem', md: '3.5rem' },
-            fontFamily: 'Playfair Display, serif',
-            fontWeight: 600,
-            position: 'relative',
-            '&:after': {
-              content: '""',
-              position: 'absolute',
-              bottom: -8,
-              left: 4,
-              right: 4,
-              height: 2,
-              background: (theme) => alpha(theme.palette.common.white, 0.6),
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        <ListItemText
+          primary={name}
+          secondary={role}
+          slotProps={{
+            primary: { sx: { typography: 'h4' } },
+            secondary: {
+              sx: { mt: 0.5, opacity: 0.48, color: 'inherit' },
             },
-            letterSpacing: '0.02em',
           }}
-        >
-          {name}
-        </Typography>
+          sx={{ mt: 3, ml: { md: 3 }, textAlign: { xs: 'center', md: 'unset' } }}
+        />
       </Box>
-
-      <Typography
-        variant="h2"
-        sx={{
-          position: 'absolute',
-          right: { xs: 24, md: 40 },
-          bottom: { xs: 24, md: 40 },
-          color: 'common.white',
-          textTransform: 'uppercase',
-          opacity: 0.8,
-          textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-          letterSpacing: 1,
-        }}
-      >
-        {role}
-      </Typography>
     </Box>
   );
 }
