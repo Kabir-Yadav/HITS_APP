@@ -25,7 +25,7 @@ export function UserCard({ user, sx, ...other }) {
       sx={[
         { 
           textAlign: 'center',
-          maxWidth: 565,
+          maxWidth: 445,
           mx: 'auto',
           height: '100%',
           display: 'flex',

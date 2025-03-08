@@ -1,13 +1,16 @@
-import { useCallback } from 'react';
 import { CSS } from '@dnd-kit/utilities';
 import { useBoolean } from 'minimal-shared/hooks';
+import React, { useCallback, useState } from 'react';
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable';
 
 import { createTask, clearColumn, deleteColumn, updateColumn } from 'src/actions/kanban';
 
 import { toast } from 'src/components/snackbar';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import ColumnBase from './column-base';
+import { KanbanTaskItem } from '../item/kanban-task-item';
 import { KanbanTaskAdd } from '../components/kanban-task-add';
 import { KanbanColumnToolBar } from './kanban-column-toolbar';
 
@@ -17,6 +20,8 @@ const animateLayoutChanges = (args) => defaultAnimateLayoutChanges({ ...args, wa
 
 export function KanbanColumn({ children, column, tasks, disabled, sx }) {
   const openAddTask = useBoolean();
+  const [showAllTasks, setShowAllTasks] = useState(false);
+  const { user } = useAuthContext();
 
   const { attributes, isDragging, listeners, setNodeRef, transition, active, over, transform } =
     useSortable({
@@ -25,7 +30,17 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
       animateLayoutChanges,
     });
 
-  const tasksIds = tasks.map((task) => task.id);
+  // Filter tasks based on user and showAllTasks state
+  const filteredTasks = tasks.filter((task) => {
+    if (showAllTasks) return true;
+    
+    const isAssignedToUser = task.assignee?.some((assignee) => assignee.id === user?.id);
+    const isCreatedByUser = task.reporter?.id === user?.id;
+    
+    return isAssignedToUser || isCreatedByUser;
+  });
+
+  const tasksIds = filteredTasks.map((task) => task.id);
 
   const isOverContainer = over
     ? (column.id === over.id && active?.data.current?.type !== 'container') ||
@@ -37,7 +52,6 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
       try {
         if (column.name !== columnName) {
           updateColumn(column.id, columnName);
-
           toast.success('Update success!', { position: 'top-center' });
         }
       } catch (error) {
@@ -58,7 +72,6 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
   const handleDeleteColumn = useCallback(async () => {
     try {
       deleteColumn(column.id);
-
       toast.success('Delete success!', { position: 'top-center' });
     } catch (error) {
       console.error(error);
@@ -69,7 +82,6 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
     async (taskData) => {
       try {
         createTask(column.id, taskData);
-
         openAddTask.onFalse();
       } catch (error) {
         console.error(error);
@@ -95,15 +107,35 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
         header: (
           <KanbanColumnToolBar
             handleProps={{ ...attributes, ...listeners }}
-            totalTasks={tasks.length}
+            totalTasks={filteredTasks.length}
             columnName={column.name}
             onUpdateColumn={handleUpdateColumn}
             onClearColumn={handleClearColumn}
             onDeleteColumn={handleDeleteColumn}
             onToggleAddTask={openAddTask.onToggle}
+            showAllTasks={showAllTasks}
+            onToggleShowAll={() => setShowAllTasks(!showAllTasks)}
           />
         ),
-        main: children,
+        main: React.Children.map(children, child => {
+          if (React.isValidElement(child)) {
+            // Pass filtered tasks to SortableContext
+            if (child.type.name === 'SortableContext') {
+              return React.cloneElement(child, {
+                items: filteredTasks,
+                children: filteredTasks.map(task => (
+                  <KanbanTaskItem
+                    key={task.id}
+                    task={task}
+                    columnId={column.id}
+                    disabled={disabled}
+                  />
+                ))
+              });
+            }
+          }
+          return child;
+        }),
         action: (
           <KanbanTaskAdd
             status={column.name}

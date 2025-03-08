@@ -26,6 +26,8 @@ export function KanbanColumnToolBar({
   onToggleAddTask,
   onDeleteColumn,
   onUpdateColumn,
+  showAllTasks,
+  onToggleShowAll,
 }) {
   const inputId = useId();
 
@@ -147,6 +149,15 @@ export function KanbanColumnToolBar({
           inputProps={{ id: `${columnName}-${inputId}-column-input` }}
           sx={{ mx: 1 }}
         />
+
+        <IconButton 
+          size="small" 
+          color={showAllTasks ? 'primary' : 'default'}
+          onClick={onToggleShowAll}
+          sx={{ mr: 1 }}
+        >
+          <Iconify icon={showAllTasks ? "mdi:eye" : "mdi:eye-outline"} />
+        </IconButton>
 
         <IconButton size="small" color="inherit" onClick={onToggleAddTask}>
           <Iconify icon="solar:add-circle-bold" />
