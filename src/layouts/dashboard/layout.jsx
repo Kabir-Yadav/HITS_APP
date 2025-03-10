@@ -97,6 +97,11 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
           {isNavHorizontal && (
             <VerticalDivider sx={{ [theme.breakpoints.up(layoutQuery)]: { display: 'flex' } }} />
           )}
+
+          <WorkspacesPopover
+            data={_workspaces}
+            sx={{ color: 'var(--layout-nav-text-primary-color)' }}
+          />
         </>
       ),
       rightArea: (
