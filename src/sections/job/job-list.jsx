@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Alert from '@mui/material/Alert';
 import Pagination from '@mui/material/Pagination';
 import { paginationClasses } from '@mui/material/Pagination';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -9,18 +10,22 @@ import { paths } from 'src/routes/paths';
 
 import { supabase } from 'src/lib/supabase';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { JobItem } from './job-item';
+
 
 // ----------------------------------------------------------------------
 
 const ITEMS_PER_PAGE = 6;
 
 export function JobList({ jobs, loading }) {
+  const { user } = useAuthContext();
   const [page, setPage] = useState(1);
 
-  const handleChangePage = (event, newPage) => {
+  const handleChangePage = useCallback((event, newPage) => {
     setPage(newPage);
-  };
+  }, []);
 
   const handleDelete = useCallback(async (id) => {
     try {
@@ -32,6 +37,17 @@ export function JobList({ jobs, loading }) {
       console.error('Error deleting job:', error);
     }
   }, []);
+
+  // Check if user is an EMPLOYEE - moved after hooks
+  if (user?.user_metadata?.role === 'EMPLOYEE') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          You do not have access to view this page
+        </Alert>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (

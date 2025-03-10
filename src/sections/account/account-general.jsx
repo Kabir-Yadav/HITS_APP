@@ -207,6 +207,7 @@ export function AccountGeneral() {
                 name="role" 
                 label="Role"
                 placeholder="Select role"
+                disabled
               >
                 {ROLE_OPTIONS.map((option) => (
                   <MenuItem key={option.value} value={option.value}>

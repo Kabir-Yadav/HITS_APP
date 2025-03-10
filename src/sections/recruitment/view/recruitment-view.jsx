@@ -6,6 +6,7 @@ import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
+import Alert from '@mui/material/Alert';
 import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
@@ -13,6 +14,8 @@ import { paths } from 'src/routes/paths';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { RejectedSection } from '../rejected-section';
 import { SelectionSection } from '../selection-section';
@@ -36,15 +39,15 @@ const defaultFilters = {
 // ----------------------------------------------------------------------
 
 export default function RecruitmentView() {
+  const { user } = useAuthContext();
   const [currentTab, setCurrentTab] = useState(0);
   const [filters, setFilters] = useState(defaultFilters);
-  
   const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const tabParam = queryParams.get('tab');
-
   const openFilters = useBoolean();
   const openDateRange = useBoolean();
+  
+  const queryParams = new URLSearchParams(location.search);
+  const tabParam = queryParams.get('tab');
 
   const dateError = filters.startDate && filters.endDate ? filters.startDate > filters.endDate : false;
 
@@ -60,6 +63,17 @@ export default function RecruitmentView() {
       setCurrentTab(parseInt(tabParam, 10));
     }
   }, [tabParam]);
+
+  // Check if user is an EMPLOYEE
+  if (user?.user_metadata?.role === 'EMPLOYEE') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          You do not have access to view this page
+        </Alert>
+      </Box>
+    );
+  }
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
