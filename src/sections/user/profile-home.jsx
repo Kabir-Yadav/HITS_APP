@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Link from '@mui/material/Link';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -11,6 +12,8 @@ import { _mock } from 'src/_mock';
 import { countries } from 'src/assets/data';
 
 import { Iconify } from 'src/components/iconify';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { UserCard } from './user-card';
 
@@ -45,11 +48,11 @@ const FALLBACK_QUOTES = [
 ];
 
 export function ProfileHome({ info }) {
+  const { user } = useAuthContext();
   const [quote, setQuote] = useState(DEFAULT_QUOTE.content);
   const [quoteAuthor, setQuoteAuthor] = useState(DEFAULT_QUOTE.author);
   
-  // Add states for random avatar and cover
-  const [randomAvatar] = useState(() => Math.floor(Math.random() * 24) + 1);
+  // Remove randomAvatar, keep randomCover for now but we won't use it
   const [randomCover] = useState(() => Math.floor(Math.random() * 24) + 1);
 
   useEffect(() => {
@@ -129,7 +132,7 @@ export function ProfileHome({ info }) {
     <Card sx={{ py: 3, textAlign: 'center' }}>
       <Stack spacing={2} alignItems="center">
         <Typography variant="h6" sx={{ color: 'text.secondary', mb: 1 }}>
-          Born On
+          About
         </Typography>
 
         <Box
@@ -254,28 +257,92 @@ export function ProfileHome({ info }) {
     </Card>
   );
 
+  // Get social links from user metadata
+  const socialLinks = user?.user_metadata?.social_links || {
+    facebook: '',
+    instagram: '',
+    linkedin: '',
+    twitter: '',
+  };
+
   const userCardData = {
     name: `${info.firstName} ${info.lastName}`,
     role: info.role,
-    avatarUrl: _mock.image.avatar(randomAvatar),
-    coverUrl: _mock.image.cover(randomCover),
+    coverUrl: '/assets/F13-logo-new.png',
     quote: quote,
     quoteAuthor: quoteAuthor,
     totalFollowers: 0,
     totalFollowing: 0,
     totalPosts: 0,
-    socialLinks: {
-      facebook: '',
-      instagram: '',
-      linkedin: '',
-      twitter: '',
-    },
+    socialLinks, // Use the social links from metadata
+    hideAvatar: true, 
   };
+
+  const renderSocialLinks = () => (
+    <Card sx={{ py: 3, px: 3 }}>
+      <Stack spacing={2}>
+        <Typography variant="h6" sx={{ color: 'text.secondary' }}>
+          Social Links
+        </Typography>
+
+        {Object.entries(socialLinks).map(([platform, url]) => {
+          if (!url) return null;
+
+          const icons = {
+            facebook: 'eva:facebook-fill',
+            instagram: 'ant-design:instagram-filled',
+            linkedin: 'eva:linkedin-fill',
+            twitter: 'eva:twitter-fill',
+          };
+
+          return (
+            <Stack 
+              key={platform} 
+              direction="row" 
+              alignItems="center" 
+              spacing={2}
+            >
+              <Iconify 
+                icon={icons[platform]} 
+                width={24} 
+                sx={{ 
+                  color: {
+                    facebook: '#1877F2',
+                    instagram: '#E02D69',
+                    linkedin: '#0A66C2',
+                    twitter: '#1C9CEA',
+                  }[platform] 
+                }}
+              />
+              <Link 
+                href={url} 
+                target="_blank"
+                rel="noopener"
+                color="inherit"
+                sx={{ 
+                  typography: 'body1',
+                  '&:hover': { textDecoration: 'underline' }
+                }}
+              >
+                {url.replace(/^https?:\/\/(www\.)?/, '')}
+              </Link>
+            </Stack>
+          );
+        })}
+
+        {!Object.values(socialLinks).some(Boolean) && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            No social links added yet
+          </Typography>
+        )}
+      </Stack>
+    </Card>
+  );
 
   return (
     <Grid container spacing={3}>
       {/* First Column - Born On and Contact Info */}
-      <Grid xs={12} md={4}>
+      <Grid xs={12} md={3}>
         <Stack spacing={3}>
           {renderBirthDate()}
           {renderContact()}
@@ -283,10 +350,15 @@ export function ProfileHome({ info }) {
       </Grid>
 
       {/* Second Column - Quote Card */}
-      <Grid xs={12} md={8}>
-        <Box sx={{ height: '100%' }}>
+      <Grid xs={12} md={6}>
+        <Box>
           <UserCard user={userCardData} />
         </Box>
+      </Grid>
+
+      {/* Third Column - Social Links */}
+      <Grid xs={12} md={3}>
+        {renderSocialLinks()}
       </Grid>
     </Grid>
   );

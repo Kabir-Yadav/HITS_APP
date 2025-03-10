@@ -17,8 +17,6 @@ export function HeroBackground({ sx, ...other }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up('md'));
 
-  const strokeCount = 12;
-
   return (
     <MotionContainer>
       <Box
@@ -31,12 +29,6 @@ export function HeroBackground({ sx, ...other }) {
             '--hero-line-stroke-color': varAlpha(theme.vars.palette.grey['500Channel'], 0.32),
             ...theme.applyStyles('dark', {
               '--hero-line-stroke-color': varAlpha(theme.vars.palette.grey['600Channel'], 0.16),
-            }),
-            /* text */
-            '--hero-text-stroke-width': 1,
-            '--hero-text-stroke-color': varAlpha(theme.vars.palette.grey['500Channel'], 0.24),
-            ...theme.applyStyles('dark', {
-              '--hero-text-stroke-color': varAlpha(theme.vars.palette.grey['600Channel'], 0.12),
             }),
             /* circle */
             '--hero-circle-stroke-width': 1,
@@ -57,8 +49,6 @@ export function HeroBackground({ sx, ...other }) {
         {...other}
       >
         <Dots />
-
-        {mdUp && <Texts />}
 
         <Box
           component={m.svg}
@@ -92,7 +82,7 @@ export function HeroBackground({ sx, ...other }) {
           <g mask="url(#mask_id)">
             <Circles />
             <PlusIcon />
-            <Lines strokeCount={strokeCount} />
+            <Lines strokeCount={12} />
           </g>
         </Box>
 
@@ -105,7 +95,6 @@ export function HeroBackground({ sx, ...other }) {
               ...theme.mixins.bgGradient({
                 images: [
                   `linear-gradient(180deg, ${theme.vars.palette.background.default} 12%, ${varAlpha(theme.vars.palette.background.defaultChannel, 0.92)} 50%, ${theme.vars.palette.background.default} 88%)`,
-                  `url(${CONFIG.assetsDir}/assets/background/background-3.webp)`,
                 ],
               }),
               top: 0,
@@ -114,15 +103,6 @@ export function HeroBackground({ sx, ...other }) {
               height: 1,
               zIndex: -1,
               position: 'absolute',
-              ...theme.applyStyles('dark', {
-                ...theme.mixins.bgGradient({
-                  images: [
-                    `url(${CONFIG.assetsDir}/assets/images/home/hero-blur.webp)`,
-                    `linear-gradient(180deg, ${theme.vars.palette.background.default} 12%, ${varAlpha(theme.vars.palette.background.defaultChannel, 0.96)} 50%, ${theme.vars.palette.background.default} 88%)`,
-                    `url(${CONFIG.assetsDir}/assets/background/background-3.webp)`,
-                  ],
-                }),
-              }),
             },
           ]}
         />

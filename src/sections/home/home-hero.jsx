@@ -34,24 +34,8 @@ const motionProps = {
 };
 
 export function HomeHero({ sx, ...other }) {
-  const scrollProgress = useScrollPercent();
-
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up(mdKey));
-
-  const distance = mdUp ? scrollProgress.percent : 0;
-
-  const y1 = useTransformY(scrollProgress.scrollY, distance * -7);
-  const y2 = useTransformY(scrollProgress.scrollY, distance * -6);
-  const y3 = useTransformY(scrollProgress.scrollY, distance * -5);
-  const y4 = useTransformY(scrollProgress.scrollY, distance * -4);
-  const y5 = useTransformY(scrollProgress.scrollY, distance * -3);
-
-  const opacity = useTransform(
-    scrollProgress.scrollY,
-    [0, 1],
-    [1, mdUp ? Number((1 - scrollProgress.percent / 100).toFixed(1)) : 1]
-  );
 
   const renderHeading = () => (
     <m.div {...motionProps}>
@@ -74,10 +58,7 @@ export function HomeHero({ sx, ...other }) {
           },
         ]}
       >
-        <Box component="span" sx={{ width: 1, opacity: 0.24 }}>
-          Boost Productivity
-        </Box>
-        and Efficiency with
+        Welcome to
         <Box
           component={m.span}
           animate={{ backgroundPosition: '200% center' }}
@@ -101,79 +82,53 @@ export function HomeHero({ sx, ...other }) {
     </m.div>
   );
 
-  const renderText = () => (
-    <m.div {...motionProps}>
-      <Typography
-        variant="body2"
-        sx={{
-          mx: 'auto',
-          [theme.breakpoints.up(smKey)]: { whiteSpace: 'pre' },
-          [theme.breakpoints.up(lgKey)]: { fontSize: 20, lineHeight: '36px' },
-        }}
-      >
-        Your one stop solution for all your Employee Management needs including Job Tracking and
-        more.
-      </Typography>
-    </m.div>
-  );
-
   return (
     <Box
-      ref={scrollProgress.elementRef}
       component="section"
       sx={[
         {
           overflow: 'hidden',
           position: 'relative',
-          [theme.breakpoints.up(mdKey)]: {
-            minHeight: 760,
-            height: '100vh',
-            maxHeight: 1440,
-            display: 'block',
-            willChange: 'opacity',
-            mt: 'calc(var(--layout-header-desktop-height) * -1)',
-          },
+          height: '50vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         },
         ...(Array.isArray(sx) ? sx : [sx]),
       ]}
       {...other}
     >
-      <Box
-        component={m.div}
-        style={{ opacity }}
+      <Container
+        component={MotionContainer}
         sx={{
-          width: 1,
+          zIndex: 9,
           display: 'flex',
-          position: 'relative',
+          alignItems: 'center',
           flexDirection: 'column',
-          transition: theme.transitions.create(['opacity']),
-          [theme.breakpoints.up(mdKey)]: { height: 1, position: 'fixed', maxHeight: 'inherit' },
+          justifyContent: 'center',
+          textAlign: 'center',
         }}
       >
-        <Container
-          component={MotionContainer}
-          sx={{
-            py: 3,
-            gap: 5,
-            zIndex: 9,
-            display: 'flex',
-            alignItems: 'center',
-            flexDirection: 'column',
-            [theme.breakpoints.up(mdKey)]: {
-              flex: '1 1 auto',
-              justifyContent: 'center',
-              py: 'var(--layout-header-desktop-height)',
-            },
-          }}
-        >
-          <Stack spacing={3} sx={{ textAlign: 'center' }}>
-            <m.div style={{ y: y1 }}>{renderHeading()}</m.div>
-            <m.div style={{ y: y2 }}>{renderText()}</m.div>
-          </Stack>
-        </Container>
+        {renderHeading()}
 
-        <HeroBackground />
-      </Box>
+        <m.div {...motionProps}>
+          <Typography
+            variant="body1"
+            sx={{
+              mt: 3,
+              mx: 'auto',
+              maxWidth: 670,
+              fontSize: { xs: 16, md: 20 },
+              lineHeight: { xs: '28px', md: '36px' },
+            }}
+          >
+            Your one stop solution for all your Employee Management needs including Job Tracking and
+            more.
+          </Typography>
+        </m.div>
+      </Container>
+
+      <HeroBackground />
     </Box>
   );
 }

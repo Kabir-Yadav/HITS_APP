@@ -7,6 +7,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AccountLayout } from 'src/sections/account/account-layout';
+import { AccountSocialsView } from 'src/sections/account/view/account-socials-view';
 
 import { AuthGuard } from 'src/auth/guard';
 
@@ -102,7 +103,15 @@ const accountLayout = () => (
 export const dashboardRoutes = [
   {
     path: 'dashboard',
-    element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
+    element: (
+      <AuthGuard>
+        <DashboardLayout>
+          <Suspense fallback={<LoadingScreen />}>
+            <Outlet />
+          </Suspense>
+        </DashboardLayout>
+      </AuthGuard>
+    ),
     children: [
       { index: true, element: <IndexPage /> },
       { path: 'ecommerce', element: <OverviewEcommercePage /> },
@@ -127,8 +136,8 @@ export const dashboardRoutes = [
               { index: true, element: <AccountGeneralPage /> },
               { path: 'billing', element: <AccountBillingPage /> },
               { path: 'notifications', element: <AccountNotificationsPage /> },
-              { path: 'socials', element: <AccountSocialsPage /> },
               { path: 'change-password', element: <AccountChangePasswordPage /> },
+              { path: 'social-links', element: <AccountSocialsView /> },
             ],
           },
         ],

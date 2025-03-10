@@ -1,8 +1,13 @@
+import { memo } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 import { mergeClasses } from 'minimal-shared/utils';
 
 import Collapse from '@mui/material/Collapse';
 import { useTheme } from '@mui/material/styles';
+
+import { usePathname } from 'src/routes/hooks';
+
+import { useNavData } from 'src/layouts/nav-config-dashboard-wrapper';
 
 import { NavList } from './nav-list';
 import { Nav, NavUl, NavLi, NavSubheader } from '../components';
@@ -22,6 +27,11 @@ export function NavSectionVertical({
   ...other
 }) {
   const theme = useTheme();
+  const pathname = usePathname();
+  
+  // Use dynamic nav data if no data is provided
+  const dynamicData = useNavData();
+  const navData = data.length ? data : dynamicData;
 
   const cssVars = { ...navSectionCssVars.vertical(theme), ...overridesVars };
 
@@ -32,15 +42,16 @@ export function NavSectionVertical({
       {...other}
     >
       <NavUl sx={{ flex: '1 1 auto', gap: 'var(--nav-item-gap)' }}>
-        {data.map((group) => (
+        {navData.map((group, index) => (
           <Group
-            key={group.subheader ?? group.items[0].title}
+            key={group.subheader || index}
             subheader={group.subheader}
             items={group.items}
             render={render}
             slotProps={slotProps}
             currentRole={currentRole}
             enabledRootRedirect={enabledRootRedirect}
+            pathname={pathname}
           />
         ))}
       </NavUl>
@@ -48,9 +59,11 @@ export function NavSectionVertical({
   );
 }
 
+export default memo(NavSectionVertical);
+
 // ----------------------------------------------------------------------
 
-function Group({ items, render, subheader, slotProps, currentRole, enabledRootRedirect }) {
+function Group({ items, render, subheader, slotProps, currentRole, enabledRootRedirect, pathname }) {
   const groupOpen = useBoolean(true);
 
   const renderContent = () => (
@@ -64,6 +77,7 @@ function Group({ items, render, subheader, slotProps, currentRole, enabledRootRe
           slotProps={slotProps}
           currentRole={currentRole}
           enabledRootRedirect={enabledRootRedirect}
+          pathname={pathname}
         />
       ))}
     </NavUl>

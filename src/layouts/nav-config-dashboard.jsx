@@ -53,7 +53,7 @@ export const navData = [
     subheader: 'Overview',
     items: [
       { title: 'User Dashboard', path: paths.dashboard.user.root, icon: ICONS.user },
-      { title: 'Recruitment Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard },
+      { title: 'Recruitment Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard, caption: 'Only admin and HR can access', },
     ],
   },
   /**
@@ -83,6 +83,7 @@ export const navData = [
           { title: 'Interview Scheduling', path: paths.dashboard.recruitment.root },
 
         ],
+        caption: 'Only admin and HR can access',
       },
       {
         title: 'User Management',

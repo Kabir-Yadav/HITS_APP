@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useState } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -37,60 +39,7 @@ export function JobListView() {
   const { user } = useAuthContext();
 
   const isAdmin = user?.role === 'ADMIN';
-
-  const fetchJobs = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      let query = supabase.from('jobs').select(`
-        *,
-        posted_by_name,
-        posted_by_email
-      `);
-
-      // If not admin, only show jobs created by the user
-      if (!isAdmin) {
-        query = query.eq('created_by', user?.id);
-      }
-
-      // Apply filters
-      if (filters.filters.jobId) {
-        query = query.ilike('id', `%${filters.filters.jobId}%`);
-      }
-
-      if (filters.filters.joiningType.length > 0) {
-        query = query.in('joining_type', filters.filters.joiningType);
-      }
-
-      if (filters.filters.isInternship !== 'all') {
-        query = query.eq('is_internship', filters.filters.isInternship === 'true');
-      }
-
-      if (filters.filters.startDate && filters.filters.endDate) {
-        query = query
-          .gte('created_at', filters.filters.startDate)
-          .lte('created_at', filters.filters.endDate);
-      }
-
-      // Apply posted_by filter
-      if (filters.filters.posted_by) {
-        query = query.or(`posted_by_name.ilike.%${filters.filters.posted_by}%,posted_by_email.ilike.%${filters.filters.posted_by}%`);
-      }
-
-      // Apply sorting
-      query = query.order('created_at', { ascending: sortBy === 'oldest' });
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      setJobs(data || []);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [sortBy, filters.filters, user?.id, isAdmin]);
+  const isHR = user?.role === 'HR';
 
   const handleOpenFilters = useCallback(() => {
     setOpenFilters(true);
@@ -196,11 +145,76 @@ export function JobListView() {
         toast.error('An unexpected error occurred');
       }
     }
-  }, [isAdmin, user?.id, fetchJobs]);
+  }, [isAdmin, user?.id]);
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      let query = supabase.from('jobs').select(`
+        *,
+        posted_by_name,
+        posted_by_email
+      `);
+
+      // If not admin, only show jobs created by the user
+      if (!isAdmin) {
+        query = query.eq('created_by', user?.id);
+      }
+
+      // Apply filters
+      if (filters.filters.jobId) {
+        query = query.ilike('id', `%${filters.filters.jobId}%`);
+      }
+
+      if (filters.filters.joiningType.length > 0) {
+        query = query.in('joining_type', filters.filters.joiningType);
+      }
+
+      if (filters.filters.isInternship !== 'all') {
+        query = query.eq('is_internship', filters.filters.isInternship === 'true');
+      }
+
+      if (filters.filters.startDate && filters.filters.endDate) {
+        query = query
+          .gte('created_at', filters.filters.startDate)
+          .lte('created_at', filters.filters.endDate);
+      }
+
+      // Apply posted_by filter
+      if (filters.filters.posted_by) {
+        query = query.or(`posted_by_name.ilike.%${filters.filters.posted_by}%,posted_by_email.ilike.%${filters.filters.posted_by}%`);
+      }
+
+      // Apply sorting
+      query = query.order('created_at', { ascending: sortBy === 'oldest' });
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setJobs(data || []);
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [sortBy, filters.filters, user?.id, isAdmin]);
 
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // Check if user is an EMPLOYEE
+  if (user?.user_metadata?.role === 'EMPLOYEE') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          You do not have access to view this page
+        </Alert>
+      </Box>
+    );
+  }
 
   const renderFilters = (
     <Stack
@@ -273,14 +287,16 @@ export function JobListView() {
           { name: 'List' },
         ]}
         action={
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.job.new}
-            variant="contained"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-          >
-            New Job
-          </Button>
+          isHR && (
+            <Button
+              component={RouterLink}
+              href={paths.dashboard.job.new}
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+            >
+              New Job
+            </Button>
+          )
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
