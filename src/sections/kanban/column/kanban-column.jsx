@@ -3,6 +3,8 @@ import { useBoolean } from 'minimal-shared/hooks';
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSortable, defaultAnimateLayoutChanges } from '@dnd-kit/sortable';
 
+import { Typography, Box } from '@mui/material';
+
 import { createTask, clearColumn, deleteColumn, updateColumn } from 'src/actions/kanban';
 
 import { toast } from 'src/components/snackbar';
@@ -20,7 +22,6 @@ const animateLayoutChanges = (args) => defaultAnimateLayoutChanges({ ...args, wa
 
 export function KanbanColumn({ children, column, tasks, disabled, sx }) {
   const openAddTask = useBoolean();
-  const [showAllTasks, setShowAllTasks] = useState(true);
   const { user } = useAuthContext();
 
   const {
@@ -38,24 +39,37 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
     animateLayoutChanges,
   });
 
-  // Improved filtering logic with memoization
-  const filteredTasks = useMemo(() => {
-    if (!tasks || !user?.id) return [];
+  // Modified filtering/grouping logic
+  const groupedTasks = useMemo(() => {
+    if (!tasks || !user?.id) {
+      return { all: tasks || [] };
+    }
     
-    return tasks.filter((task) => {
-      if (showAllTasks) return true;
-      
-      const isAssignedToUser = Array.isArray(task.assignee) && 
-        task.assignee.some((assignee) => assignee?.id === user.id);
-      const isCreatedByUser = task.reporter?.id === user.id;
-      
-      return isAssignedToUser || isCreatedByUser;
+    const grouped = {
+      created: [],
+      assigned: [],
+    };
+    
+    tasks.forEach((task) => {
+      // Check if user created the task
+      if (task.reporter?.id === user.id) {
+        grouped.created.push(task);
+      }
+      // Check if task is assigned to user
+      else if (Array.isArray(task.assignee) && 
+        task.assignee.some((assignee) => assignee?.id === user.id)) {
+        grouped.assigned.push(task);
+      }
+      // We're no longer collecting other tasks
     });
-  }, [tasks, user?.id, showAllTasks]);
 
+    return grouped;
+  }, [tasks, user?.id]);
+
+  // Get all task IDs for drag and drop
   const tasksIds = useMemo(() => 
-    filteredTasks.map((task) => task.id), 
-    [filteredTasks]
+    [...(groupedTasks.created || []), ...(groupedTasks.assigned || [])].map(task => task.id), 
+    [groupedTasks]
   );
 
   const isOverContainer = useMemo(() => {
@@ -64,6 +78,16 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
     return (column.id === over.id && active?.data.current?.type !== 'container') ||
       tasksIds.includes(over.id);
   }, [over, active, column.id, tasksIds]);
+
+  // Calculate relevant tasks count
+  const relevantTasksCount = useMemo(() => {
+    if (!tasks || !user?.id) return 0;
+    
+    return tasks.filter(task => 
+      task.reporter?.id === user.id || 
+      (Array.isArray(task.assignee) && task.assignee.some(assignee => assignee?.id === user.id))
+    ).length;
+  }, [tasks, user?.id]);
 
   const handleUpdateColumn = useCallback(
     async (columnName) => {
@@ -108,9 +132,54 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
     [column.id, openAddTask]
   );
 
-  const handleToggleShowAll = useCallback(() => {
-    setShowAllTasks((prev) => !prev);
-  }, []);
+  const renderTasks = (tasksToRender, label = null) => {
+    if (!tasksToRender?.length) return null;
+
+    return (
+      <Box
+        sx={{
+          mb: 2,
+          borderRadius: 1.5,
+          bgcolor: (theme) => theme.palette.background.neutral,
+          '&:last-of-type': {
+            mb: 0,
+          }
+        }}
+      >
+        {label && (
+          <Typography
+            variant="caption"
+            sx={{
+              px: 2,
+              py: 1.5,
+              display: 'block',
+              color: 'text.secondary',
+              borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
+            }}
+          >
+            {label} ({tasksToRender.length})
+          </Typography>
+        )}
+        <Box
+          sx={{
+            p: 1.5,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.5,
+          }}
+        >
+          {tasksToRender.map(task => (
+            <KanbanTaskItem
+              key={task.id}
+              task={task}
+              columnId={column.id}
+              disabled={disabled}
+            />
+          ))}
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <ColumnBase
@@ -129,30 +198,25 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
         header: (
           <KanbanColumnToolBar
             handleProps={{ ...attributes, ...listeners }}
-            totalTasks={filteredTasks.length}
+            totalTasks={relevantTasksCount}
             columnName={column.name}
             onUpdateColumn={handleUpdateColumn}
             onClearColumn={handleClearColumn}
             onDeleteColumn={handleDeleteColumn}
             onToggleAddTask={openAddTask.onToggle}
-            showAllTasks={showAllTasks}
-            onToggleShowAll={handleToggleShowAll}
           />
         ),
         main: React.Children.map(children, child => {
           if (React.isValidElement(child)) {
-            // Pass filtered tasks to SortableContext
             if (child.type.name === 'SortableContext') {
               return React.cloneElement(child, {
-                items: filteredTasks,
-                children: filteredTasks.map(task => (
-                  <KanbanTaskItem
-                    key={task.id}
-                    task={task}
-                    columnId={column.id}
-                    disabled={disabled}
-                  />
-                ))
+                items: tasksIds,
+                children: (
+                  <>
+                    {renderTasks(groupedTasks.created, 'Created by me')}
+                    {renderTasks(groupedTasks.assigned, 'Assigned to me')}
+                  </>
+                )
               });
             }
           }

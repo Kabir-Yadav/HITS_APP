@@ -384,7 +384,7 @@ export function KanbanView() {
           justifyContent: 'space-between',
         }}
       >
-        <Typography variant="h4">Kanban Dashboard</Typography>
+        <Typography variant="h4">Kanban</Typography>
 
         <FormControlLabel
           label="Fixed column"

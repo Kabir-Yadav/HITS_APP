@@ -4,6 +4,7 @@ import { useId, useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
@@ -26,8 +27,6 @@ export function KanbanColumnToolBar({
   onToggleAddTask,
   onDeleteColumn,
   onUpdateColumn,
-  showAllTasks,
-  onToggleShowAll,
 }) {
   const inputId = useId();
 
@@ -150,33 +149,11 @@ export function KanbanColumnToolBar({
           sx={{ mx: 1 }}
         />
 
-        <IconButton 
-          size="small" 
-          color={showAllTasks ? 'primary' : 'default'}
-          onClick={onToggleShowAll}
-          sx={{
-            mr: 1,
-            transition: 'all 0.2s',
-            '&:hover': {
-              backgroundColor: (theme) => 
-                showAllTasks 
-                  ? theme.palette.primary.lighter 
-                  : theme.palette.action.hover,
-            },
-          }}
-        >
-          <Iconify 
-            icon={showAllTasks ? "mdi:eye" : "mdi:eye-outline"} 
-            sx={{
-              transition: 'transform 0.2s',
-              transform: showAllTasks ? 'scale(1.1)' : 'scale(1)',
-            }}
-          />
-        </IconButton>
-
-        <IconButton size="small" color="inherit" onClick={onToggleAddTask}>
-          <Iconify icon="solar:add-circle-bold" />
-        </IconButton>
+        <Tooltip title="Add new task">
+          <IconButton size="small" onClick={onToggleAddTask}>
+            <Iconify icon="solar:add-circle-bold" />
+          </IconButton>
+        </Tooltip>
 
         <IconButton
           size="small"
