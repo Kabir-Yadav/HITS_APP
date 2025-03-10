@@ -43,20 +43,22 @@ export function FileManagerPanel({
         >
           <Typography variant="h6"> {title} </Typography>
 
-          <IconButton
-            size="small"
-            color="primary"
-            onClick={onOpen}
-            sx={{
-              width: 24,
-              height: 24,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': { bgcolor: 'primary.dark' },
-            }}
-          >
-            <Iconify width={16} icon="mingcute:add-line" />
-          </IconButton>
+          {onOpen && (
+            <IconButton
+              size="small"
+              color="primary"
+              onClick={onOpen}
+              sx={{
+                width: 24,
+                height: 24,
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                '&:hover': { bgcolor: 'primary.dark' },
+              }}
+            >
+              <Iconify width={16} icon="mingcute:add-line" />
+            </IconButton>
+          )}
         </Box>
 
         <Box sx={{ typography: 'body2', color: 'text.disabled', mt: 0.5 }}>{subtitle}</Box>

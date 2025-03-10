@@ -32,7 +32,15 @@ export function HomeView() {
         progress={pageProgress.scrollYProgress}
         sx={[(theme) => ({ position: 'fixed', zIndex: theme.zIndex.appBar + 1 })]}
       />
+      <BackToTopButton isVisible={isVisible} onClick={onBackToTop} />
       <HomeHero />
+      <Stack sx={{ position: 'relative', bgcolor: 'background.default' }}>
+        <HomeMinimal />
+
+        <HomeHighlightFeatures />
+
+        <HomeIntegrations />
+      </Stack>
     </>
   );
 }

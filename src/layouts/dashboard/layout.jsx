@@ -101,7 +101,22 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
       ),
       rightArea: (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0, sm: 0.75 } }}>
-          
+          {/** @slot Searchbar */}
+          <Searchbar data={navData} />
+
+          {/** @slot Language popover */}
+          <LanguagePopover
+            data={[
+              { value: 'en', label: 'English', countryCode: 'GB' },
+              { value: 'fr', label: 'French', countryCode: 'FR' },
+              { value: 'vi', label: 'Vietnamese', countryCode: 'VN' },
+              { value: 'cn', label: 'Chinese', countryCode: 'CN' },
+              { value: 'ar', label: 'Arabic', countryCode: 'SA' },
+            ]}
+          />
+
+          {/** @slot Notifications popover */}
+          <NotificationsDrawer data={_notifications} />
 
           {/** @slot Settings button */}
           <SettingsButton />
