@@ -36,24 +36,21 @@ export function AuthGuard({ children }) {
     const params = new URLSearchParams(window.location.search);
     const returnTo = params.get('returnTo');
 
-    if (!authenticated) {
+    // Only redirect to sign in if trying to access protected routes
+    const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/app');
+    
+    if (!authenticated && isProtectedRoute) {
       const { method } = CONFIG.auth;
       const signInPath = signInPaths[method];
       
-      // If we're not on the sign-in page, save current path
-      if (!pathname.includes(signInPath)) {
-        const redirectPath = `${signInPath}?returnTo=${encodeURIComponent(pathname)}`;
-        router.replace(redirectPath);
-      }
+      const redirectPath = `${signInPath}?returnTo=${encodeURIComponent(pathname)}`;
+      router.replace(redirectPath);
       return;
     }
 
     // If authenticated and there's a returnTo, go there
-    if (returnTo) {
+    if (authenticated && returnTo) {
       router.replace(returnTo);
-    } else if (pathname === '/') {
-      // If on root path, redirect to user dashboard
-      router.replace(paths.dashboard.user.root);
     }
 
     setIsChecking(false);

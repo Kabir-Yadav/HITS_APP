@@ -6,6 +6,8 @@ import { useTheme } from '@mui/material/styles';
 
 import { usePathname } from 'src/routes/hooks';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavDropdown, NavDropdownPaper } from '../components';
@@ -24,8 +26,9 @@ export function NavList({
   const theme = useTheme();
 
   const pathname = usePathname();
+  const { user } = useAuthContext();
 
-  const isActive = isActiveLink(pathname, data.path, !!data.children);
+  const active = isActiveLink(pathname, data.path, !!data.children);
 
   const { open, onOpen, onClose, anchorEl, elementRef: navItemRef } = usePopoverHover();
 
@@ -40,9 +43,9 @@ export function NavList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const handleOpenMenu = useCallback(() => {
+  const handleOpenPopover = useCallback((event) => {
     if (data.children) {
-      onOpen();
+      onOpen(event);
     }
   }, [data.children, onOpen]);
 
@@ -57,7 +60,7 @@ export function NavList({
       title={data.title}
       caption={data.caption}
       // state
-      active={isActive}
+      active={active}
       open={open}
       disabled={data.disabled}
       // options
@@ -69,7 +72,7 @@ export function NavList({
       // styles
       slotProps={depth === 1 ? slotProps?.rootItem : slotProps?.subItem}
       // actions
-      onMouseEnter={handleOpenMenu}
+      onMouseEnter={handleOpenPopover}
       onMouseLeave={onClose}
     />
   );
@@ -85,7 +88,7 @@ export function NavList({
         transformOrigin={{ vertical: 'center', horizontal: isRtl ? 'right' : 'left' }}
         slotProps={{
           paper: {
-            onMouseEnter: handleOpenMenu,
+            onMouseEnter: handleOpenPopover,
             onMouseLeave: onClose,
             className: navSectionClasses.dropdown.root,
           },
@@ -109,8 +112,8 @@ export function NavList({
       </NavDropdown>
     );
 
-  // Hidden item by role
-  if (data.roles && currentRole && !data.roles.includes(currentRole)) {
+  // Skip rendering if item has roles and user's role is not included
+  if (data.roles && !data.roles.includes(user?.role)) {
     return null;
   }
 

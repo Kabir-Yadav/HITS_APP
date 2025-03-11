@@ -39,16 +39,15 @@ export function AuthProvider({ children }) {
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get('returnTo');
 
-        // If there's a returnTo parameter, use it, otherwise go to user dashboard
+        // If there's a returnTo parameter, use it, otherwise go to /dashboard/user
         if (returnTo) {
           router.push(returnTo);
         } else {
-          router.push(paths.dashboard.user.root);
+          router.push('/dashboard/user');
         }
       } else {
         setState({ user: null, loading: false });
         delete axios.defaults.headers.common.Authorization;
-        router.push(paths.auth.supabase.signIn);
       }
     } catch (error) {
       console.error(error);
