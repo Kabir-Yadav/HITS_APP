@@ -13,7 +13,7 @@ import { useGetContacts, useGetConversation, useGetConversations, sendMessage } 
 
 import { EmptyContent } from 'src/components/empty-content';
 
-import { useUser } from 'src/auth/hooks';
+import { useMockedUser } from 'src/auth/hooks';
 
 import { ChatNav } from '../chat-nav';
 import { ChatLayout } from '../layout';
@@ -30,7 +30,7 @@ export function ChatView() {
   const router = useRouter();
 
   // ✅ **Use Supabase-authenticated user**
-  const { user } = useUser();
+  const { user } = useMockedUser();
 
   // ✅ **Fetch contacts & conversations via Supabase**
   const { contacts } = useGetContacts();

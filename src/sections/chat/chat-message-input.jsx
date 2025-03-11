@@ -16,7 +16,7 @@ import { useRouter } from 'src/routes/hooks';
 import { today } from 'src/utils/format-time';
 import { fDateTime } from 'src/utils/format-time';
 
-import { sendMessage, createConversation, useChatState } from 'src/actions/chat';
+import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -43,7 +43,6 @@ export function ChatMessageInput({
   const fileImageRef = useRef(null); // ✅ Reference for images
   const fileDocRef = useRef(null);   // ✅ Reference for non-image files
 
-  const { loading, setLoading } = useChatState();
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
 
@@ -142,7 +141,7 @@ export function ChatMessageInput({
         // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
-            await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null, setLoading);
+            await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null,);
           } else {
             const res = await createConversation(conversationData);
             router.push(`${paths.dashboard.chat}?id=${res.id}`);
@@ -172,21 +171,6 @@ export function ChatMessageInput({
 
   return (
     <>
-      {loading.sendingMessage && (
-        <Stack sx={{ flex: '1 1 auto', position: 'relative' }}>
-          <LinearProgress
-            color="inherit"
-            sx={{
-              top: 0,
-              left: 0,
-              width: 1,
-              height: 2,
-              borderRadius: 0,
-              position: 'absolute',
-            }}
-          />
-        </Stack>
-      )}
 
       {/* ✅ Small preview inside input like WhatsApp */}
       {replyTo && (

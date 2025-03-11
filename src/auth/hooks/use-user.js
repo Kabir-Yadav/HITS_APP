@@ -16,7 +16,7 @@ import { useState, useEffect } from 'react';
 
 import { supabase } from 'src/lib/supabase';
 
-export function useUser() {
+export function useMockedUser() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,13 +24,13 @@ export function useUser() {
     const fetchUser = async () => {
       const { data: { user: authUser }, error } = await supabase.auth.getUser();
 
-      
+
       if (error || !authUser) {
         setUser(null);
         setLoading(false);
         return;
       }
-      
+
 
       // Fetch additional profile details from your profiles table if needed
       const { data: profile, error: profileError } = await supabase
