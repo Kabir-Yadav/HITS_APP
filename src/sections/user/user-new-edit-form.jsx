@@ -52,6 +52,17 @@ export const NewUserSchema = zod.object({
   }),
   phoneNumber: schemaHelper.phoneNumber({ isValid: isValidPhoneNumber }),
   role: zod.string().min(1, { message: 'Role is required!' }),
+  designation: zod.string().min(1, { message: 'Designation is required!' }),
+  dateOfJoining: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
+  dateOfLeaving: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
 });
 
 // ----------------------------------------------------------------------
@@ -85,6 +96,9 @@ export function UserNewEditForm({ currentUser }) {
     role: defaultRole,
     password: '',
     dateOfBirth: dayjs(),
+    designation: '',
+    dateOfJoining: dayjs(),
+    dateOfLeaving: null,
   };
 
   const methods = useForm({
@@ -148,6 +162,9 @@ export function UserNewEditForm({ currentUser }) {
             phone_number: data.phoneNumber,
             role: data.role,
             date_of_birth: data.dateOfBirth ? dayjs(data.dateOfBirth).format('YYYY-MM-DD') : null,
+            designation: data.designation,
+            date_of_joining: data.dateOfJoining ? dayjs(data.dateOfJoining).format('YYYY-MM-DD') : null,
+            date_of_leaving: data.dateOfLeaving ? dayjs(data.dateOfLeaving).format('YYYY-MM-DD') : null,
           },
         });
 
@@ -165,6 +182,9 @@ export function UserNewEditForm({ currentUser }) {
               phone_number: data.phoneNumber,
               role: data.role,
               date_of_birth: data.dateOfBirth ? dayjs(data.dateOfBirth).format('YYYY-MM-DD') : null,
+              designation: data.designation,
+              date_of_joining: data.dateOfJoining ? dayjs(data.dateOfJoining).format('YYYY-MM-DD') : null,
+              date_of_leaving: data.dateOfLeaving ? dayjs(data.dateOfLeaving).format('YYYY-MM-DD') : null,
             },
             emailRedirectTo: undefined, // Disable email verification
           },
@@ -281,6 +301,12 @@ export function UserNewEditForm({ currentUser }) {
                 country={!currentUser ? 'IN' : undefined}
               />
 
+              <Field.Text 
+                name="designation" 
+                label="Designation"
+                placeholder="Enter designation"
+              />
+
               <Controller
                 name="role"
                 control={control}
@@ -302,6 +328,42 @@ export function UserNewEditForm({ currentUser }) {
                       <FormHelperText>{error.message}</FormHelperText>
                     )}
                   </FormControl>
+                )}
+              />
+
+              <Controller
+                name="dateOfJoining"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <Field.DatePicker
+                    {...field}
+                    label="Date of Joining"
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
+                )}
+              />
+
+              <Controller
+                name="dateOfLeaving"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <Field.DatePicker
+                    {...field}
+                    label="Date of Leaving"
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
                 )}
               />
             </Box>

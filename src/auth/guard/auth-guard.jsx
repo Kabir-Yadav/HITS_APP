@@ -27,25 +27,33 @@ export function AuthGuard({ children }) {
 
   const [isChecking, setIsChecking] = useState(true);
 
-  const createRedirectPath = (currentPath) => {
-    const queryString = new URLSearchParams({ returnTo: pathname }).toString();
-    return `${currentPath}?${queryString}`;
-  };
-
   const checkPermissions = async () => {
     if (loading) {
       return;
     }
 
+    // Get returnTo from URL if it exists
+    const params = new URLSearchParams(window.location.search);
+    const returnTo = params.get('returnTo');
+
     if (!authenticated) {
       const { method } = CONFIG.auth;
-
       const signInPath = signInPaths[method];
-      const redirectPath = createRedirectPath(signInPath);
-
-      router.replace(redirectPath);
-
+      
+      // If we're not on the sign-in page, save current path
+      if (!pathname.includes(signInPath)) {
+        const redirectPath = `${signInPath}?returnTo=${encodeURIComponent(pathname)}`;
+        router.replace(redirectPath);
+      }
       return;
+    }
+
+    // If authenticated and there's a returnTo, go there
+    if (returnTo) {
+      router.replace(returnTo);
+    } else if (pathname === '/') {
+      // If on root path, redirect to user dashboard
+      router.replace(paths.dashboard.user.root);
     }
 
     setIsChecking(false);

@@ -24,72 +24,117 @@ export function useGetBoard() {
   const { data, isLoading, error, isValidating } = useSWR(
     KANBAN_CACHE_KEY,
     async () => {
-      // Fetch columns ordered by position
-      const { data: columns, error: columnsError } = await supabase
-        .from('kanban_columns')
-        .select('*')
-        .order('position');
+      try {
+        console.log('Fetching kanban board data...');
 
-      if (columnsError) throw columnsError;
+        // Fetch columns ordered by position with detailed logging
+        const columnsQuery = supabase
+          .from('kanban_columns')
+          .select('*')
+          .order('position');
+        
+        console.log('Columns query:', columnsQuery.toString());
 
-      // Fetch tasks with assignees, attachments, and subtasks
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('kanban_tasks')
-        .select(`
-          *,
-          assignees:kanban_task_assignees(
-            user:user_profiles(*)
-          ),
-          attachments:kanban_task_attachments(*),
-          reporter:user_profiles!kanban_tasks_reporter_id_fkey(*),
-          subtasks:kanban_task_subtasks(*)
-        `)
-        .order('created_at');
+        const { data: columns, error: columnsError, status: columnsStatus } = await columnsQuery;
 
-      if (tasksError) throw tasksError;
+        console.log('Columns response:', {
+          status: columnsStatus,
+          data: columns,
+          error: columnsError,
+          count: columns?.length || 0
+        });
 
-      // Organize tasks by column
-      const tasks = columns.reduce((acc, column) => {
-        acc[column.id] = tasksData
-          .filter(task => task.column_id === column.id)
-          .map(task => ({
-            id: task.id,
-            name: task.name,
-            description: task.description,
-            priority: task.priority,
-            status: column.name,
-            column_id: task.column_id,
-            due: [task.due_start, task.due_end],
-            assignee: task.assignees?.map(({ user }) => ({
-              id: user.id,
-              name: user.name || user.email,
-              email: user.email,
-              avatarUrl: user.avatar_url,
-            })) || [],
-            attachments: task.attachments?.map(att => ({
-              id: att.id,
-              file_name: att.file_name,
-              file_url: att.file_url,
-              file_type: att.file_type,
-              file_size: att.file_size,
-            })) || [],
-            reporter: task.reporter ? {
-              id: task.reporter.id,
-              name: task.reporter.name || task.reporter.email,
-              email: task.reporter.email,
-              avatarUrl: task.reporter.avatar_url,
-            } : null,
-            subtasks: task.subtasks || [],
-          }));
-        return acc;
-      }, {});
+        if (columnsError) {
+          console.error('Error fetching columns:', columnsError);
+          throw columnsError;
+        }
 
-      return {
-        board: {
-          columns,
-          tasks,
-        },
-      };
+        if (!columns || columns.length === 0) {
+          console.log('No columns found in the database');
+          return {
+            board: {
+              columns: [],
+              tasks: {},
+            },
+          };
+        }
+
+        // Fetch tasks with assignees, attachments, and subtasks
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('kanban_tasks')
+          .select(`
+            *,
+            assignees:kanban_task_assignees(
+              user:user_profiles(*)
+            ),
+            attachments:kanban_task_attachments(*),
+            reporter:user_profiles!kanban_tasks_reporter_id_fkey(*),
+            subtasks:kanban_task_subtasks(*)
+          `)
+          .order('created_at');
+
+        // Log tasks result  
+        console.log('Tasks:', tasksData);
+        console.log('Tasks error:', tasksError);
+
+        if (tasksError) {
+          console.error('Error fetching tasks:', tasksError);
+          throw tasksError;
+        }
+
+        // Initialize tasks object with empty arrays for all columns
+        const tasks = columns.reduce((acc, column) => {
+          acc[column.id] = [];
+          return acc;
+        }, {});
+
+        // Organize tasks by column
+        if (tasksData) {
+          tasksData.forEach(task => {
+            if (task.column_id && Object.prototype.hasOwnProperty.call(tasks, task.column_id)) {
+              tasks[task.column_id].push({
+                id: task.id,
+                name: task.name,
+                description: task.description,
+                priority: task.priority,
+                status: columns.find(col => col.id === task.column_id)?.name || '',
+                column_id: task.column_id,
+                due: [task.due_start, task.due_end],
+                assignee: task.assignees?.map(({ user }) => ({
+                  id: user.id,
+                  name: user.name || user.email,
+                  email: user.email,
+                  avatarUrl: user.avatar_url,
+                })) || [],
+                attachments: task.attachments?.map(att => ({
+                  id: att.id,
+                  file_name: att.file_name,
+                  file_url: att.file_url,
+                  file_type: att.file_type,
+                  file_size: att.file_size,
+                })) || [],
+                reporter: task.reporter ? {
+                  id: task.reporter.id,
+                  name: task.reporter.name || task.reporter.email,
+                  email: task.reporter.email,
+                  avatarUrl: task.reporter.avatar_url,
+                } : null,
+                subtasks: task.subtasks || [],
+              });
+            }
+          });
+        }
+
+        return {
+          board: {
+            columns,
+            tasks,
+          },
+        };
+      } catch (fetchError) {
+        console.error('Error fetching board:', fetchError);
+        throw fetchError;
+      }
     }
   );
 
@@ -985,5 +1030,79 @@ export async function updateTaskName(taskId, newName) {
   } catch (error) {
     console.error('Error updating task name:', error);
     throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function testKanbanQueries() {
+  // Test columns
+  const { data: columns, error: columnsError } = await supabase
+    .from('kanban_columns')
+    .select('*');
+  
+  console.log('Test columns:', columns);
+  console.log('Test columns error:', columnsError);
+
+  // Test tasks
+  const { data: tasks, error: tasksError } = await supabase
+    .from('kanban_tasks')
+    .select('*');
+
+  console.log('Test tasks:', tasks);
+  console.log('Test tasks error:', tasksError);
+}
+
+export async function testColumnQuery() {
+  try {
+    console.log('Testing direct column query...');
+    
+    // Test direct query with detailed logging
+    const query = supabase
+      .from('kanban_columns')
+      .select('*')
+      .order('position');
+    
+    console.log('Query string:', query.toString());
+    
+    const { data, error, status } = await query;
+    
+    console.log('Query response:', {
+      status,
+      data,
+      error,
+      count: data?.length || 0
+    });
+
+    if (error) {
+      console.error('Query error:', error);
+    } else if (!data || data.length === 0) {
+      console.log('No data returned from query');
+    } else {
+      console.log('Found columns:', data);
+    }
+
+  } catch (error) {
+    console.error('Test query error:', error);
+  }
+}
+
+export async function testSupabaseConnection() {
+  try {
+    console.log('Testing Supabase connection...');
+    
+    // Test the connection by getting the current user
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    console.log('Connection test results:', {
+      isConnected: !error,
+      user: user ? 'Authenticated' : 'Not authenticated',
+      error
+    });
+
+    return !error;
+  } catch (error) {
+    console.error('Connection test error:', error);
+    return false;
   }
 }

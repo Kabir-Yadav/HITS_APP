@@ -34,10 +34,21 @@ export function AuthProvider({ children }) {
 
         setState({ user: { ...session, ...session?.user }, loading: false });
         axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+        // Get returnTo from URL if it exists
+        const params = new URLSearchParams(window.location.search);
+        const returnTo = params.get('returnTo');
+
+        // If there's a returnTo parameter, use it, otherwise go to user dashboard
+        if (returnTo) {
+          router.push(returnTo);
+        } else {
+          router.push(paths.dashboard.user.root);
+        }
       } else {
         setState({ user: null, loading: false });
         delete axios.defaults.headers.common.Authorization;
-        router.push(paths.home);
+        router.push(paths.auth.supabase.signIn);
       }
     } catch (error) {
       console.error(error);

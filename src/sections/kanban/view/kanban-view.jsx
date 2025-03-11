@@ -27,7 +27,7 @@ import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { moveTask, moveColumn, useGetBoard } from 'src/actions/kanban';
+import { moveTask, moveColumn, useGetBoard, testKanbanQueries, testColumnQuery, testSupabaseConnection } from 'src/actions/kanban';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -166,6 +166,22 @@ export function KanbanView() {
   useEffect(() => {
     requestAnimationFrame(() => {
       recentlyMovedToNewContainer.current = false;
+    });
+  }, []);
+
+  useEffect(() => {
+    testKanbanQueries();
+  }, []);
+
+  useEffect(() => {
+    testColumnQuery();
+  }, []);
+
+  useEffect(() => {
+    testSupabaseConnection().then(isConnected => {
+      if (!isConnected) {
+        console.error('Failed to connect to Supabase');
+      }
     });
   }, []);
 
