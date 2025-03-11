@@ -1,2 +1,2 @@
-export { useMockedUser } from './use-mocked-user';
+export { useUser } from './use-user';
 export { useAuthContext } from './use-auth-context';

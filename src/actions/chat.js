@@ -1,387 +1,213 @@
-import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
-import axios, { fetcher, endpoints } from 'src/lib/axios';
+import { supabase } from 'src/lib/supabase';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'http://127.0.0.1:8000/api/chat';
-
-const enableServer = false;
-
-const CHART_ENDPOINT = endpoints.chat;
 
 const swrOptions = {
-  revalidateIfStale: enableServer,
-  revalidateOnFocus: enableServer,
-  revalidateOnReconnect: enableServer,
+  revalidateOnFocus: false,
+  revalidateOnReconnect: false,
 };
 
-// ----------------------------------------------------------------------
-
-class WebSocketManager {
-  constructor() {
-    this.ws = null;
-    this.eventHandlers = {};
-    this.setLoading = () => { }; // Default to an empty function if not provided
-
-  }
-
-  connect(userId, setLoading = () => { }) {
-    this.setLoading = setLoading;
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/${userId}`);
-
-      this.ws.onopen = () => console.log("✅ WebSocket connected!");
-
-      this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log("📩 Received WebSocket Event:", data);
-
-        this.setLoading((prev) => ({ ...prev, sendingMessage: false }));
-        if (data.event === "message" || data.event === "reply") {
-          this.updateConversationCache(data.conversation_id, data);
-        }
-        if (data.event === 'reaction') {
-          this.updateReactionCache(data.conversation_id, data.message_id, data.sender_id, data.reactions);
-        }
-        if (data.event === 'delete') {
-          this.deleteMessageCache(data.conversation_id, data.message_id);
-        }
-        // ✅ Set loading state
-        if (this.eventHandlers[data.event]) {
-          this.eventHandlers[data.event](data);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("❌ WebSocket Error:", error);
-      };
-
-      this.ws.onclose = () => {
-        console.warn("⚠️ WebSocket disconnected, attempting reconnection...");
-        setTimeout(() => this.connect(userId), 3000);
-      };
-    }
-  }
-
-  sendMessage(payload) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(payload));
-    } else {
-      console.warn("⚠️ WebSocket not open. Attempting to reconnect...");
-      setTimeout(() => this.sendMessage(payload), 500);
-    }
-  }
-  deleteMessageCache(conversationId, messageId) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-
-    mutate(url, (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        console.warn("deleteMessage: No cached conversation found. Skipping mutation.");
-        return currentData;
-      }
-
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: conv.messages.filter((msg) => msg.id !== messageId),
-            }
-            : conv
-        ),
-      };
-    }, false);
-
-    mutate(
-      `${BASE_URL}/conversations/`,
-      (currentData) => {
-        const currentConversations = currentData.conversations;
-
-        const conversations = currentConversations.map(
-          (conversation) =>
-            conversation.id === conversationId
-              ? { ...conversation, messages: conversation.messages.filter((msg) => msg.id !== messageId) }
-              : conversation
-        );
-
-        return { ...currentData, conversations };
+/* ----------------------------------------------------------------------
+   1) Fetch Contacts (Users)
+   ---------------------------------------------------------------------- */
+   export function useGetContacts() {
+    const { data: contactsData, error: contactsError, isLoading } = useSWR(
+      'contacts',
+      async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, name, avatar_url, email');
+  
+        if (error) throw error;
+        return data;
       },
-      false
+      swrOptions
     );
-  }
-  updateReactionCache(conversationId, messageId, userId, reactions) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-
-    mutate(url, (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        console.warn("handleAddReaction: No cached conversation found. Skipping mutation.");
-        return currentData;
-      }
-
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: conv.messages.map((msg) => {
-                if (msg.id !== messageId) return msg;
-
-                return {
-                  ...msg,
-                  reactions: reactions,
-                };
-              }),
-            }
-            : conv
-        ),
-      };
-    }, false);
-  }
-
-  updateConversationCache(conversationId, newMessage) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-    console.log(newMessage)
-    mutate(url, (currentData) => {
-      if (!currentData) {
-        console.warn("sendMessage: No cached data found for mutation. Skipping mutation.");
-        return currentData;
-      }
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: [...conv.messages, newMessage], // ✅ Append message safely
-            }
-            : conv
-        ),
-      };
-    }, false);
-
-    mutate(
-      `${BASE_URL}/conversations/`,
-      (currentData) => {
-        const currentConversations = currentData.conversations;
-
-        const conversations = currentConversations.map(
-          (conversation) =>
-            conversation.id === conversationId
-              ? { ...conversation, messages: [...conversation.messages, newMessage] }
-              : conversation
-        );
-
-        return { ...currentData, conversations };
-      },
-      false
-    );
-
-  }
-}
-
-export const websocketManager = new WebSocketManager();
-
-const loadingState = {
-  sendingMessage: false,
-  sendingReaction: false,
-  deletingMessage: false
-};
-
-export function useChatState() {
-  const [loading, setLoading] = useState(loadingState);
-
-  return { loading, setLoading };
-}
-
-
-export function useGetContacts() {
-  // const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
-
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher, swrOptions);
-  const memoizedValue = useMemo(
-    () => ({
-      contacts: data?.contacts || [],
-      contactsLoading: isLoading,
-      contactsError: error,
-      contactsValidating: isValidating,
-      contactsEmpty: !isLoading && !isValidating && !data?.contacts.length,
-    }),
-    [data?.contacts, error, isLoading, isValidating]
-  );
-
-  return memoizedValue;
-}
-
-// ----------------------------------------------------------------------
-
-export function useGetConversations(userId) {
-  // const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/conversations/`, fetcher, swrOptions);
-  const memoizedValue = useMemo(() => {
-    const userConversations = data?.conversations?.filter((conversation) =>
-      conversation.participants.some((participant) => participant.id === userId)
-    ) || [];
-
-    const byId = userConversations.length ? keyBy(userConversations, (conv) => conv.id) : {};
-    const allIds = Object.keys(byId);
+  
     return {
-      conversations: { byId, allIds },
-      conversationsLoading: isLoading,
-      conversationsError: error,
-      conversationsValidating: isValidating,
-      conversationsEmpty: !isLoading && !isValidating && !allIds.length,
+      contacts: contactsData || [],
+      contactsLoading: isLoading,
+      contactsError,
+      contactsEmpty: !isLoading && !contactsData?.length,
     };
-  }, [data?.conversations, userId, error, isLoading, isValidating]);
-
-  return memoizedValue;
-}
-
-// ----------------------------------------------------------------------
-
-export function useGetConversation(conversationId) {
-  const url = conversationId
-    ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-    : '';
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-  // console.log("DEBUG: useGetConversation data →", data); // ✅ Debug to check if data updates
-
-  const memoizedValue = useMemo(
-    () => ({
-      conversation: data?.conversations?.[0] || null, // Ensure a valid conversation object
+  }
+  
+  /* ----------------------------------------------------------------------
+     2️⃣ Fetch Conversations for a User
+  ---------------------------------------------------------------------- */
+  export function useGetConversations(userId) {
+    const { data: conversationsData, error: conversationsError, isLoading } = useSWR(
+      userId ? ['conversations', userId] : null,
+      async () => {
+        const { data, error } = await supabase
+          .from('conversation_participants')
+          .select('conversations(*)')
+          .eq('participant_id', userId);
+  
+        if (error) throw error;
+        return data.map(row => row.conversations);
+      },
+      swrOptions
+    );
+  
+    return {
+      conversations: conversationsData || [],
+      conversationsLoading: isLoading,
+      conversationsError,
+    };
+  }
+  
+  /* ----------------------------------------------------------------------
+     3️⃣ Fetch Single Conversation & Messages
+  ---------------------------------------------------------------------- */
+  export function useGetConversation(conversationId) {
+    const { data: conversationData, error: conversationError, isLoading, mutate: updateConversation } = useSWR(
+      conversationId ? ['conversation', conversationId] : null,
+      async () => {
+        const { data, error } = await supabase
+          .from('conversations')
+          .select('*, messages(*, attachments(*))')
+          .eq('id', conversationId)
+          .single();
+  
+        if (error) throw error;
+        return data;
+      },
+      swrOptions
+    );
+  
+    useEffect(() => {
+      if (!conversationId) return;
+    
+      const channel = supabase
+        .channel(`conversation-${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload) => {
+            updateConversation((prev) =>
+              prev ? { ...prev, messages: [...prev.messages, payload.new] } : prev
+            );
+          }
+        )
+        .subscribe();
+    
+      // ✅ ENSURE Cleanup Function Doesn't Return a Value
+      return () => {
+        void supabase.removeChannel(channel); // ✅ Ensure no return value
+      };
+      
+    }, [conversationId, updateConversation]);
+    
+    
+  
+    return {
+      conversation: conversationData || null,
       conversationLoading: isLoading,
-      conversationError: error,
-      conversationValidating: isValidating,
-      conversationEmpty: !isLoading && !isValidating && (!data?.conversations || data.conversations.length === 0),
-    }),
-    [data?.conversations, error, isLoading, isValidating]
-  );
-
-  return memoizedValue;
-}
-
-// ----------------------------------------------------------------------
-
-export async function sendMessage(conversationId, userId, messageData, parentId = null, setLoading) {
-  if (!conversationId || !userId) {
-    console.error("sendMessage: Missing conversationId or userId");
-    return;
+      conversationError,
+    };
   }
-
-  const messagePayload = {
-    event: "message",
-    conversation_id: conversationId,
-    sender_id: userId,
-    parent_id: parentId,
-    ...messageData,
-  };
-
-  setLoading((prev) => ({ ...prev, sendingMessage: true })); // ✅ Set loading state to true before sending
-
-  console.log("DEBUG: Sending message →", messagePayload);
-  websocketManager.connect(userId, setLoading); // ✅ Ensure WebSocket is connected before sending
-  websocketManager.sendMessage(messagePayload);
-}
-
-// ----------------------------------------------------------------------
-
-export async function createConversation(conversationData) {
-
-  console.log(conversationData)
-  const response = await axios.post(`${BASE_URL}/create-conversation/`, {
-    conversationData, // Send the entire object
-  });
-
-  if (response.data) {
-    console.log("✅ New conversation created:", response.data);
-
-    // Update SWR cache with the new conversation
-    mutate(`${BASE_URL}/conversations/`, (currentData) => ({
-      ...currentData,
-      conversations: [...currentData.conversations, response.data],
-    }));
-  }
-  return response.data;
-}
-
-// ----------------------------------------------------------------------
-
-export async function clickConversation(conversationId) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    try {
-      await axios.get(`${BASE_URL}/markAsSeen/`, {
-        params: { conversationId },
-      });
-    } catch (error) {
-      console.error("Failed to mark conversation as seen:", error);
+  
+  /* ----------------------------------------------------------------------
+     4️⃣ Send Message (Now Using Supabase)
+  ---------------------------------------------------------------------- */
+  export async function sendMessage(conversationId, senderId, body, parentId = null) {
+    if (!conversationId || !senderId) {
+      console.error('sendMessage: Missing conversationId or senderId');
+      return;
+    }
+  
+    const { error } = await supabase.from('messages').insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      body,
+      parent_id: parentId,
+      content_type: 'text',
+    });
+  
+    if (error) {
+      console.error('sendMessage error:', error);
+      throw error;
     }
   }
-
-  /**
-   * Work in local
-   */
-  mutate(
-    [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }],
-    (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        return currentData; // Ensure a consistent return value
-      }
-
-      const updatedConversations = currentData.conversations.map((conversation) =>
-        conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation
-      );
-
-      return { ...currentData, conversations: updatedConversations };
-    },
-    false
-  );
-}
-
-//-------------------------------------------------------------------------------------
-
-export function useDeleteMessage() {
-  return async (messageId, conversation_id, user_id) => {
-
-    websocketManager.connect(user_id); // Ensure WebSocket is connected
-
-    const deletePayload = {
-      action: "delete",
+  
+  /* ----------------------------------------------------------------------
+     5️⃣ Create a New Conversation
+  ---------------------------------------------------------------------- */
+  export async function createConversation({ type, participantIds }) {
+    const { data: newConversation, error } = await supabase.from('conversations').insert({ type }).single();
+  
+    if (error) throw error;
+  
+    if (participantIds?.length) {
+      const participantsData = participantIds.map((pid) => ({
+        conversation_id: newConversation.id,
+        participant_id: pid,
+      }));
+      const { error: partErr } = await supabase.from('conversation_participants').insert(participantsData);
+      if (partErr) throw partErr;
+    }
+  
+    return newConversation;
+  }
+  
+  /* ----------------------------------------------------------------------
+     6️⃣ Upload Attachment (Supabase Storage)
+  ---------------------------------------------------------------------- */
+  export async function uploadAttachment(file, messageId) {
+    const { data, error } = await supabase.storage
+      .from('chat-attachments')
+      .upload(`attachments/${Date.now()}-${file.name}`, file);
+  
+    if (error) throw error;
+  
+    const fileUrl = `${supabase.storageUrl}/storage/v1/object/public/chat-attachments/${data.path}`;
+  
+    const { error: insertErr } = await supabase.from('attachments').insert({
       message_id: messageId,
-      conversation_id: conversation_id,
-    };
-
-    websocketManager.sendMessage(deletePayload);
-
-    console.log("DEBUG: Sent delete request via WebSocket", deletePayload);
-  };
-}
-
-//-------------------------------------------------------------------------------------
-
-export async function handleAddReaction(messageId, userId, emoji, conversationId) {
-
-  websocketManager.connect(userId);
-
-  const reactionPayload = {
-    event: "reaction",
-    conversation_id: conversationId,
-    message_id: messageId,
-    sender_id: userId,
-    reaction: emoji,
-  };
-
-  websocketManager.sendMessage(reactionPayload);
-
-}
+      name: file.name,
+      path: data.path,
+      preview: fileUrl,
+      size: file.size,
+      type: file.type,
+    });
+  
+    if (insertErr) throw insertErr;
+    return fileUrl;
+  }
+  
+  /* ----------------------------------------------------------------------
+     7️⃣ Toggle Reaction
+  ---------------------------------------------------------------------- */
+  export async function toggleReaction(messageId, userId, emoji) {
+    const { error } = await supabase.from('message_reactions').upsert({
+      message_id: messageId,
+      user_id: userId,
+      emoji,
+    });
+  
+    if (error) throw error;
+  }
+  
+  /* ----------------------------------------------------------------------
+     8️⃣ Delete Message
+  ---------------------------------------------------------------------- */
+  export async function deleteMessage(messageId) {
+    const { error } = await supabase.from('messages').delete().eq('id', messageId);
+    if (error) throw error;
+  }
+  
+  /* ----------------------------------------------------------------------
+     9️⃣ Mark Conversation as Read
+  ---------------------------------------------------------------------- */
+  export async function markConversationAsRead(conversationId) {
+    await supabase.from('messages').update({ read: true }).eq('conversation_id', conversationId);
+  }

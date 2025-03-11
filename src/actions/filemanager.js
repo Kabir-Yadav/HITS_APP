@@ -4,7 +4,7 @@ import useSWR, { mutate } from 'swr';
 
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
-const BASE_URL = 'http://127.0.0.1:8000/api/filemanager';
+const BASE_URL = 'http://127.0.0.1:8080/api/filemanager';
 
 const enableServer = false;
 
