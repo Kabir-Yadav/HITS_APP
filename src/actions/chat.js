@@ -82,8 +82,7 @@ export function useGetConversations(userId) {
             user_info: user_info (
               id,
               email,
-              first_name,
-              last_name,
+              full_name,
               phone_number,
               avatar_url,
               role
@@ -141,7 +140,7 @@ export function useGetConversations(userId) {
                 id: p.user_info?.id || "",
                 role: p.user_info?.role || "participant",
                 status: "offline",
-                name: `${p.user_info?.first_name || ""} ${p.user_info?.last_name || ""}`.trim(),
+                name: `${p.user_info?.full_name}`.trim(),
                 email: p.user_info?.email || "",
                 phoneNumber: p.user_info?.phone_number || "",
                 avatarUrl: p.user_info?.avatar_url || "",
@@ -219,11 +218,11 @@ export function useGetConversation(conversationId) {
           user_info: user_info (
             id,
             email,
-            first_name,
-            last_name,
+            full_name,
             phone_number,
             avatar_url,
-            role
+            role,
+            last_activity
           )
         `)
         .eq("conversation_id", conversationId);
@@ -276,10 +275,11 @@ export function useGetConversation(conversationId) {
           id: p.user_info?.id || "",
           role: p.user_info?.role || "participant",
           status: "offline",
-          name: `${p.user_info?.first_name || ""} ${p.user_info?.last_name || ""}`.trim(),
+          name: `${p.user_info?.full_name}`.trim(),
           email: p.user_info?.email || "",
           phoneNumber: p.user_info?.phone_number || "",
           avatarUrl: p.user_info?.avatar_url || "",
+          last_activity: p.user_info?.last_activity || ''
         })),
         messages: await Promise.all(
           messages.map(async (msg) => ({
@@ -311,19 +311,20 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
     console.error('sendMessage: Missing conversationId or senderId');
     return;
   }
-
-  const { error } = await supabase.from('messages').insert({
+  const newMessage = {
     conversation_id: conversationId,
     sender_id: senderId,
-    body,
     parent_id: parentId,
-    content_type: 'text',
-  });
-
+    ...body
+  };
+  // Optimistically update UI
+  console.log(newMessage)
+  const { error } = await supabase.from('messages').insert(newMessage);
   if (error) {
     console.error('sendMessage error:', error);
     throw error;
   }
+  // Revalidate SWR cache to ensure real-time accuracy
 }
 
 /* ----------------------------------------------------------------------

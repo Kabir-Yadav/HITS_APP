@@ -94,7 +94,7 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
 
       if (inputValue) {
         const results = contacts.filter((contact) =>
-          `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(inputValue.toLowerCase())
+          `${contact.full_name}`.toLowerCase().includes(inputValue.toLowerCase())
         );
 
         setSearchContacts((prevState) => ({ ...prevState, results }));

@@ -14,7 +14,6 @@ import { CollapseButton } from './styles';
 // ----------------------------------------------------------------------
 
 export function ChatRoomAttachments({ attachments }) {
-  console.log(attachments)
   const collapse = useBoolean(true);
   const totalAttachments = attachments.length;
   // ✅ Sort attachments in descending order by `createdAt`

@@ -106,7 +106,6 @@ export function ChatMessageInput({
           preview: e.target.result,
           size: file.size,
           createdAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
           type: file.type.split('/')[1],
         });
 
@@ -138,7 +137,7 @@ export function ChatMessageInput({
           finalMessageData.parent_id = replyTo.id;
         }
 
-        // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
+        console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
             await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null,);

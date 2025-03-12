@@ -38,8 +38,8 @@ export function ChatNavSearchResults({ query, results, onClickResult }) {
                 typography: 'subtitle2',
               }}
             >
-              <Avatar alt={`${result.first_name} ${result.last_name}`} src={result.avatar_url} />
-              {`${result.first_name} ${result.last_name}`}
+              <Avatar alt={result.full_name} src={result.avatar_url} />
+              {result.full_name}
             </ListItemButton>
           </li>
         ))}

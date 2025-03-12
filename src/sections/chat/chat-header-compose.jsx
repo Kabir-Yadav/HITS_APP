@@ -41,7 +41,7 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }) {
         onChange={(event, newValue) => handleAddRecipients(newValue)}
         onInputChange={(event, newValue) => setSearchRecipients(newValue)}
         options={contacts}
-        getOptionLabel={(recipient) => `${recipient.first_name} ${recipient.last_name}`}
+        getOptionLabel={(recipient) => recipient.full_name}
         isOptionEqualToValue={(option, value) => option.id === value.id}
         renderInput={(params) => <TextField {...params} placeholder="+ Recipients" />}
         renderOption={(props, recipient, { selected }) => (
@@ -57,7 +57,7 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }) {
                 position: 'relative',
               }}
             >
-              <Avatar alt={`${recipient.first_name} ${recipient.last_name}`} src={recipient.avatar_url} sx={{ width: 1, height: 1 }} />
+              <Avatar alt={recipient.full_name} src={recipient.avatar_url} sx={{ width: 1, height: 1 }} />
               <Box
                 sx={[
                   (theme) => ({
@@ -83,7 +83,7 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }) {
               </Box>
             </Box>
 
-            {`${recipient.first_name} ${recipient.last_name}`}
+            {`${recipient.full_name}`}
           </li>
         )}
         renderTags={(selected, getTagProps) =>
@@ -91,8 +91,8 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }) {
             <Chip
               {...getTagProps({ index })}
               key={recipient.id}
-              label={`${recipient.first_name} ${recipient.last_name}`}
-              avatar={<Avatar alt={`${recipient.first_name} ${recipient.last_name}`} src={recipient.avatar_url} />}
+              label={recipient.full_name}
+              avatar={<Avatar alt={recipient.full_name} src={recipient.avatar_url} />}
               size="small"
               variant="soft"
             />

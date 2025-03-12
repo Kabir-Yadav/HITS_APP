@@ -31,7 +31,6 @@ export function ChatView() {
 
   // ✅ **Use Supabase-authenticated user**
   const { user } = useMockedUser();
-  // console.log(user)
   // ✅ **Fetch contacts & conversations via Supabase**
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();
@@ -43,7 +42,6 @@ export function ChatView() {
 
   const roomNav = useCollapseNav();
   const conversationsNav = useCollapseNav();
-
   const [replyTo, setReplyTo] = useState(null); // ✅ Store reply message
   const [recipients, setRecipients] = useState([]);
 
@@ -65,7 +63,6 @@ export function ChatView() {
   const filteredParticipants = conversation
     ? conversation.participants.filter((participant) => participant.id !== `${user?.id}`)
     : [];
-
   // ✅ **Handle replying to a message**
   const handleReply = (message) => {
     const sender = filteredParticipants.find((participant) => participant.id === message.senderId);
