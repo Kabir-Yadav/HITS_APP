@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useTabs } from 'minimal-shared/hooks';
+import { useSearchParams } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Badge from '@mui/material/Badge';
+import Container from '@mui/material/Container';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -28,6 +30,8 @@ const JOB_DETAILS_TABS = [
 // ----------------------------------------------------------------------
 
 export function JobDetailsView({ id }) {
+  const [searchParams] = useSearchParams();
+  const [currentTab, setCurrentTab] = useState('content');
   const tabs = useTabs('content');
   const router = useRouter();
   const { user } = useAuthContext();
@@ -84,6 +88,14 @@ export function JobDetailsView({ id }) {
     }
   }, [id, user?.id, isAdmin, router]);
 
+  useEffect(() => {
+    // Get tab from URL parameter
+    const tab = searchParams.get('tab');
+    if (tab === 'applications') {
+      setCurrentTab('applications');
+    }
+  }, [searchParams]);
+
   if (loading) {
     return null;
   }
@@ -98,7 +110,7 @@ export function JobDetailsView({ id }) {
   );
 
   const renderTabs = () => (
-    <Tabs value={tabs.value} onChange={tabs.onChange} sx={{ mb: { xs: 3, md: 5 } }}>
+    <Tabs value={currentTab} onChange={(event, newValue) => setCurrentTab(newValue)} sx={{ mb: { xs: 3, md: 5 } }}>
       {JOB_DETAILS_TABS.map((tab) => (
         <Tab
           key={tab.value}
@@ -137,8 +149,8 @@ export function JobDetailsView({ id }) {
 
       {renderTabs()}
       
-      {tabs.value === 'content' && <JobDetailsContent job={job} />}
-      {tabs.value === 'applications' && <JobApplications jobId={id} />}
+      {currentTab === 'content' && <JobDetailsContent job={job} />}
+      {currentTab === 'applications' && <JobApplications jobId={id} />}
     </DashboardContent>
   );
 }

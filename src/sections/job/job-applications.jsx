@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import { visuallyHidden } from '@mui/utils';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
@@ -13,6 +14,7 @@ import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
+import TableSortLabel from '@mui/material/TableSortLabel';
 
 import { fDate } from 'src/utils/format-time';
 
@@ -25,6 +27,8 @@ import { Iconify } from 'src/components/iconify';
 export function JobApplications({ jobId }) {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [orderBy, setOrderBy] = useState('created_at');
+  const [order, setOrder] = useState('desc');
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -33,7 +37,7 @@ export function JobApplications({ jobId }) {
           .from('applications')
           .select('*')
           .eq('job_id', jobId)
-          .order('created_at', { ascending: false });
+          .order(orderBy, { ascending: order === 'asc' });
 
         if (error) throw error;
 
@@ -48,7 +52,13 @@ export function JobApplications({ jobId }) {
     if (jobId) {
       fetchApplications();
     }
-  }, [jobId]);
+  }, [jobId, orderBy, order]);
+
+  const handleRequestSort = (property) => {
+    const isAsc = orderBy === property && order === 'asc';
+    setOrder(isAsc ? 'desc' : 'asc');
+    setOrderBy(property);
+  };
 
   const handleViewResume = (resumeUrl) => {
     window.open(resumeUrl, '_blank');
@@ -82,8 +92,36 @@ export function JobApplications({ jobId }) {
               <TableCell>Applicant</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Applied On</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === 'status'}
+                  direction={orderBy === 'status' ? order : 'asc'}
+                  onClick={() => handleRequestSort('status')}
+                  hideSortIcon={false}
+                >
+                  Status
+                  {orderBy === 'status' ? (
+                    <Box component="span" sx={visuallyHidden}>
+                      {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                    </Box>
+                  ) : null}
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={orderBy === 'created_at'}
+                  direction={orderBy === 'created_at' ? order : 'asc'}
+                  onClick={() => handleRequestSort('created_at')}
+                  hideSortIcon={false}
+                >
+                  Applied On
+                  {orderBy === 'created_at' ? (
+                    <Box component="span" sx={visuallyHidden}>
+                      {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
+                    </Box>
+                  ) : null}
+                </TableSortLabel>
+              </TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -107,7 +145,8 @@ export function JobApplications({ jobId }) {
                       textTransform: 'capitalize',
                       color: 
                         (application.status === 'rejected' && 'error.main') ||
-                        (application.status === 'accepted' && 'success.main') ||
+                        (application.status === 'shortlisted' && 'success.main') ||
+                        (application.status === 'pending' && 'warning.main') ||
                         'text.secondary',
                     }}
                   >
