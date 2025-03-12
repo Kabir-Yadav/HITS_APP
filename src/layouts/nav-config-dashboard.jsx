@@ -52,7 +52,7 @@ export const navData = [
   {
     subheader: 'Overview',
     items: [
-      { title: 'User Dashboard', path: paths.dashboard.user.root, icon: ICONS.user },
+      { title: 'User Dashboard', path: paths.dashboard.user.dashboard, icon: ICONS.user },
       { title: 'Recruitment Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard, caption: 'Only admin and HR can access', },
     ],
   },
@@ -86,12 +86,17 @@ export const navData = [
         caption: 'Only admin and HR can access',
       },
       {
+        title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
+      },
+      {
         title: 'User Management',
         path: paths.dashboard.user.root,
         icon: ICONS.userManagement,
         children: [
           { title: 'Create', path: paths.dashboard.user.new },
           { title: 'Account', path: paths.dashboard.user.account },
+          { title: 'Profile', path: paths.dashboard.user.profile },
+          { title: 'Card', path: paths.dashboard.user.cards }
         ],
         roles: ['ADMIN', 'HR'],
       },

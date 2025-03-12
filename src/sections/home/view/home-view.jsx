@@ -21,6 +21,10 @@ import { HomeHighlightFeatures } from '../home-highlight-features';
 // ----------------------------------------------------------------------
 
 export function HomeView() {
+  const pageProgress = useScrollProgress();
+
+  const { onBackToTop, isVisible } = useBackToTop('100%');
+
   return (
     <>
       <ScrollProgress

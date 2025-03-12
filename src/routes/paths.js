@@ -189,6 +189,7 @@ export const paths = {
     },
     user: {
       root: '/dashboard/user',
+      dashboard: `${ROOTS.DASHBOARD}/user/dashboard`,
       new: `${ROOTS.DASHBOARD}/user/new`,
       list: `${ROOTS.DASHBOARD}/user/list`,
       cards: `${ROOTS.DASHBOARD}/user/cards`,

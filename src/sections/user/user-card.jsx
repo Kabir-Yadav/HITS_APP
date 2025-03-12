@@ -21,72 +21,76 @@ import { Image } from 'src/components/image';
 
 export function UserCard({ user, sx, ...other }) {
   return (
-    <Card 
-      sx={[
-        { 
-          textAlign: 'center',
-          maxWidth: 445,
-          mx: 'auto',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }, 
-        ...(Array.isArray(sx) ? sx : [sx])
-      ]} 
-      {...other}
-    >
-      <Box sx={{ position: 'relative', height: 320 }}>
+    <Card sx={[{ textAlign: 'center' }, ...(Array.isArray(sx) ? sx : [sx])]} {...other}>
+      <Box sx={{ position: 'relative' }}>
+        <AvatarShape
+          sx={{
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            mx: 'auto',
+            bottom: -26,
+            position: 'absolute',
+          }}
+        />
+
+        <Avatar
+          alt={user.name}
+          src={user.avatarUrl}
+          sx={{
+            left: 0,
+            right: 0,
+            width: 64,
+            height: 64,
+            zIndex: 11,
+            mx: 'auto',
+            bottom: -32,
+            position: 'absolute',
+          }}
+        />
+
         <Image
           src={user.coverUrl}
-          alt="cover"
+          alt={user.coverUrl}
           ratio="16/9"
-          overlay={false}
-          sx={{
-            backgroundColor: '#ffffff',
-            height: '115%',
-            width: '100%',
-            objectFit: 'contain',
-            p: 2,
+          slotProps={{
+            overlay: {
+              sx: (theme) => ({
+                bgcolor: varAlpha(theme.vars.palette.common.blackChannel, 0.48),
+              }),
+            },
           }}
         />
       </Box>
 
-      <Box sx={{ 
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        pt: 3,
-        pb: 3,
-      }}>
-        <ListItemText
-          sx={{ mb: 2 }}
-          primary={user.quoteAuthor}
-          slotProps={{
-            primary: { 
-              sx: { 
-                typography: 'h6',
-                fontSize: 24,
-                color: 'black',
-              }
-            },
-          }}
-        />
+      <ListItemText
+        sx={{ mt: 7, mb: 1 }}
+        primary={user.name}
+        secondary={user.role}
+        slotProps={{
+          primary: { sx: { typography: 'subtitle1' } },
+          secondary: { sx: { mt: 0.5 } },
+        }}
+      />
 
-        <Box sx={{ px: 3 }}>
-          <Typography 
-            variant="body1"
-            sx={{ 
-              fontStyle: 'italic', 
-              color: 'text.secondary',
-              fontSize: '1.5rem',
-              lineHeight: 1.6,
-            }}
-          >
-            &ldquo;{user.quote}&rdquo;
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          mb: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {_socials.map((social) => (
+          <IconButton key={social.label}>
+            {social.value === 'twitter' && <TwitterIcon />}
+            {social.value === 'facebook' && <FacebookIcon />}
+            {social.value === 'instagram' && <InstagramIcon />}
+            {social.value === 'linkedin' && <LinkedinIcon />}
+          </IconButton>
+        ))}
       </Box>
     </Card>
   );
 }
+

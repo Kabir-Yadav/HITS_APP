@@ -4,38 +4,21 @@ import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
-import Grid from '@mui/material/Grid2';
-import Button from '@mui/material/Button';
-import { useTheme } from '@mui/material/styles';
 
+import { paths } from 'src/routes/paths';
+import { RouterLink } from 'src/routes/components';
 import { usePathname, useSearchParams } from 'src/routes/hooks';
 
-import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { SeoIllustration } from 'src/assets/illustrations';
-import {
-  _appAuthors, _appRelated, _appFeatured, _appInvoices, _appInstalled,
-  _userAbout, _userFeeds, _userFriends, _userGallery, _userFollowers,
-  _analyticPosts, _analyticOrderTimeline, _analyticTraffic, _analyticTasks
-} from 'src/_mock';
+import { _userAbout, _userFeeds, _userFriends, _userGallery, _userFollowers } from 'src/_mock';
 
 import { Iconify } from 'src/components/iconify';
-
-import { AppWelcome } from 'src/sections/overview/app/app-welcome';
-import { AppFeatured } from 'src/sections/overview/app/app-featured';
-import { AnalyticsNews } from 'src/sections/overview/analytics/analytics-news';
-import { AppUpcomingBirthdays } from 'src/sections/overview/app/app-top-authors';
-import { AnalyticsTasks } from 'src/sections/overview/analytics/analytics-tasks';
-import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics/analytics-widget-summary';
-import { AnalyticsOrderTimeline } from 'src/sections/overview/analytics/analytics-order-timeline';
-import { AnalyticsTrafficBySite } from 'src/sections/overview/analytics/analytics-traffic-by-site';
+import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { useAuthContext } from 'src/auth/hooks';
 
 import { ProfileHome } from '../profile-home';
 import { ProfileCover } from '../profile-cover';
-
-
 
 // ----------------------------------------------------------------------
 
@@ -56,7 +39,6 @@ export function UserProfileView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedTab = searchParams.get(TAB_PARAM) ?? '';
-  const theme = useTheme();
 
   const { user } = useAuthContext();
 
@@ -75,112 +57,66 @@ export function UserProfileView() {
   const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`;
 
   return (
-    <DashboardContent maxWidth="xl">
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 8 }}>
-          <AppWelcome
-            title={`Welcome back 👋 \n ${fullName}`}
-            description="If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything."
-            img={<SeoIllustration hideBackground />}
-            action={
-              <Button variant="contained" color="primary">
-                Go now
-              </Button>
-            }
-          />
-        </Grid>
+    <DashboardContent>
+      <CustomBreadcrumbs
+        heading="Profile"
+        links={[
+          { name: 'Dashboard', href: paths.dashboard.root },
+          { name: 'User', href: paths.dashboard.user.root },
+          { name: fullName },
+        ]}
+        sx={{ mb: { xs: 3, md: 5 } }}
+      />
 
-        <Grid size={{ xs: 12, md: 4 }}>
-          <AppFeatured list={_appFeatured} />
-        </Grid>
+      <Card sx={{ mb: 3, height: 290 }}>
+        <ProfileCover
+          role={user?.user_metadata?.role}
+          name={fullName}
+          avatarUrl={user?.user_metadata?.avatar_url}
+          coverUrl={_userAbout.coverUrl}
+        />
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <AnalyticsWidgetSummary
-            title="Weekly sales"
-            percent={2.6}
-            total={714000}
-            icon={
-              <img
-                alt="Weekly sales"
-                src={`${CONFIG.assetsDir}/assets/icons/glass/ic-glass-bag.svg`}
+        <Box
+          sx={{
+            width: 1,
+            bottom: 0,
+            zIndex: 9,
+            px: { md: 3 },
+            display: 'flex',
+            position: 'absolute',
+            bgcolor: 'background.paper',
+            justifyContent: { xs: 'center', md: 'flex-end' },
+          }}
+        >
+          <Tabs value={selectedTab}>
+            {NAV_ITEMS.map((tab) => (
+              <Tab
+                component={RouterLink}
+                key={tab.value}
+                value={tab.value}
+                icon={tab.icon}
+                label={tab.label}
+                href={createRedirectPath(pathname, tab.value)}
               />
-            }
-            chart={{
-              categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
-              series: [22, 8, 35, 50, 82, 84, 77, 12],
-            }}
-          />
-        </Grid>
+            ))}
+          </Tabs>
+        </Box>
+      </Card>
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <AnalyticsWidgetSummary
-            title="New users"
-            percent={-0.1}
-            total={1352831}
-            color="secondary"
-            icon={
-              <img
-                alt="New users"
-                src={`${CONFIG.assetsDir}/assets/icons/glass/ic-glass-users.svg`}
-              />
-            }
-            chart={{
-              categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
-              series: [56, 47, 40, 62, 73, 30, 23, 54],
-            }}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <AnalyticsWidgetSummary
-            title="OnBoarding"
-            percent={2.8}
-            total={1723315}
-            color="warning"
-            icon={
-              <img
-                alt="OnBoarding"
-                src={`${CONFIG.assetsDir}/assets/icons/glass/ic-glass-buy.svg`}
-              />
-            }
-            chart={{
-              categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
-              series: [40, 70, 50, 28, 70, 75, 7, 64],
-            }}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <AnalyticsWidgetSummary
-            title="Messages"
-            percent={3.6}
-            total={234}
-            color="error"
-            icon={
-              <img
-                alt="Messages"
-                src={`${CONFIG.assetsDir}/assets/icons/glass/ic-glass-message.svg`}
-              />
-            }
-            chart={{
-              categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
-              series: [56, 30, 23, 54, 47, 40, 62, 73],
-            }}
-          />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6, lg: 12 }}>
-          <AnalyticsNews title="News" list={_analyticPosts} />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-          <AppUpcomingBirthdays title="UpComing Birthdays" list={_appAuthors} />
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
-          <AnalyticsTasks title="Tasks" list={_analyticTasks} />
-        </Grid>
-      </Grid>
+      {selectedTab === '' && (
+        <ProfileHome
+          info={{
+            ..._userAbout,
+            role: user?.user_metadata?.role,
+            email: user?.email,
+            phoneNumber: user?.user_metadata?.phone_number,
+            firstName: user?.user_metadata?.first_name,
+            lastName: user?.user_metadata?.last_name,
+            dateOfBirth: user?.user_metadata?.date_of_birth,
+          }}
+          posts={_userFeeds}
+        />
+      )}
     </DashboardContent>
   );
 }
