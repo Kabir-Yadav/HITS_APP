@@ -306,47 +306,125 @@ export function useGetConversation(conversationId) {
 /* ----------------------------------------------------------------------
    4️⃣ Send Message (Now Using Supabase)
 ---------------------------------------------------------------------- */
-export async function sendMessage(conversationId, senderId, body, parentId = null) {
+// export async function sendMessage(conversationId, senderId, body, parentId = null) {
+//   if (!conversationId || !senderId) {
+//     console.error('sendMessage: Missing conversationId or senderId');
+//     return;
+//   }
+//   const newMessage = {
+//     conversation_id: conversationId,
+//     sender_id: senderId,
+//     parent_id: parentId,
+//     ...body
+//   };
+//   // Optimistically update UI
+//   console.log(newMessage)
+//   const { error } = await supabase.from('messages').insert(newMessage);
+//   if (error) {
+//     console.error('sendMessage error:', error);
+//     throw error;
+//   }
+//   // Revalidate SWR cache to ensure real-time accuracy
+// }
+
+// /* ----------------------------------------------------------------------
+//    5️⃣ Create a New Conversation
+// ---------------------------------------------------------------------- */
+// export async function createConversation({ type, participantIds }) {
+//   const { data: newConversation, error } = await supabase.from('conversations').insert({ type }).single();
+
+//   if (error) throw error;
+
+//   if (participantIds?.length) {
+//     const participantsData = participantIds.map((pid) => ({
+//       conversation_id: newConversation.id,
+//       participant_id: pid,
+//     }));
+//     const { error: partErr } = await supabase.from('conversation_participants').insert(participantsData);
+//     if (partErr) throw partErr;
+//   }
+
+//   return newConversation;
+// }
+export async function sendMessage({
+  conversationId,
+  senderId,
+  body = "",
+  parentId = null,
+  attachments = [],
+  reactions = [],
+}) {
   if (!conversationId || !senderId) {
-    console.error('sendMessage: Missing conversationId or senderId');
+    console.error("sendMessage: Missing conversationId or senderId");
     return;
   }
-  const newMessage = {
+
+  let messageData = {
     conversation_id: conversationId,
     sender_id: senderId,
-    parent_id: parentId,
-    ...body
+    body,
+    parent_id: parentId, // If it's a reply, store parent_id
+    content_type: attachments.length > 0 ? "file" : "text",
+    created_at: new Date().toISOString(),
   };
-  // Optimistically update UI
-  console.log(newMessage)
-  const { error } = await supabase.from('messages').insert(newMessage);
-  if (error) {
-    console.error('sendMessage error:', error);
-    throw error;
-  }
-  // Revalidate SWR cache to ensure real-time accuracy
-}
 
-/* ----------------------------------------------------------------------
-   5️⃣ Create a New Conversation
----------------------------------------------------------------------- */
-export async function createConversation({ type, participantIds }) {
-  const { data: newConversation, error } = await supabase.from('conversations').insert({ type }).single();
+  // Insert message into Supabase
+  const { data: insertedMessage, error: messageError } = await supabase
+    .from("messages")
+    .insert(messageData)
+    .select()
+    .single();
 
-  if (error) throw error;
-
-  if (participantIds?.length) {
-    const participantsData = participantIds.map((pid) => ({
-      conversation_id: newConversation.id,
-      participant_id: pid,
-    }));
-    const { error: partErr } = await supabase.from('conversation_participants').insert(participantsData);
-    if (partErr) throw partErr;
+  if (messageError) {
+    console.error("sendMessage error:", messageError);
+    throw messageError;
   }
 
-  return newConversation;
-}
+  // Handle attachments
+  if (attachments.length > 0) {
+    await Promise.all(
+      attachments.map(async (file) => {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("chat-attachments")
+          .upload(`attachments/${Date.now()}-${file.name}`, file);
 
+        if (uploadError) throw uploadError;
+
+        const fileUrl = `${supabase.storageUrl}/storage/v1/object/public/chat-attachments/${uploadData.path}`;
+
+        const { error: attachmentError } = await supabase.from("attachments").insert({
+          message_id: insertedMessage.id,
+          name: file.name,
+          path: uploadData.path,
+          preview: fileUrl,
+          size: file.size,
+          type: file.type,
+        });
+
+        if (attachmentError) throw attachmentError;
+      })
+    );
+  }
+
+  // Handle reactions
+  if (reactions.length > 0) {
+    await Promise.all(
+      reactions.map(async (emoji) => {
+        const { error: reactionError } = await supabase.from("message_reactions").insert({
+          message_id: insertedMessage.id,
+          user_id: senderId,
+          emoji,
+        });
+        if (reactionError) throw reactionError;
+      })
+    );
+  }
+
+  // Revalidate messages via SWR to update UI instantly
+  mutate(["messages", conversationId]);
+
+  return insertedMessage;
+}
 /* ----------------------------------------------------------------------
    6️⃣ Upload Attachment (Supabase Storage)
 ---------------------------------------------------------------------- */
