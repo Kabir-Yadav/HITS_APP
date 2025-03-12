@@ -32,25 +32,13 @@ export function AuthGuard({ children }) {
       return;
     }
 
-    // Get returnTo from URL if it exists
-    const params = new URLSearchParams(window.location.search);
-    const returnTo = params.get('returnTo');
-
     // Only redirect to sign in if trying to access protected routes
     const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/app');
     
     if (!authenticated && isProtectedRoute) {
-      const { method } = CONFIG.auth;
-      const signInPath = signInPaths[method];
-      
-      const redirectPath = `${signInPath}?returnTo=${encodeURIComponent(pathname)}`;
-      router.replace(redirectPath);
+      // Use state parameter instead of query string for cleaner URLs
+      router.replace('/sign-in', { state: { from: pathname } });
       return;
-    }
-
-    // If authenticated and there's a returnTo, go there
-    if (authenticated && returnTo) {
-      router.replace(returnTo);
     }
 
     setIsChecking(false);

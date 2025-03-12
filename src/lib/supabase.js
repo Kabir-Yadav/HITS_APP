@@ -17,26 +17,19 @@ export const supabase = isSupabase ? createClient(supabaseUrl, supabaseKey) : {}
 
 export const signInWithGoogle = async () => {
   try {
-
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/supabase/callback`,
         queryParams: {
-          login_hint: 'EmployeeOS',
           hd: 'f13.tech',
           prompt: 'consent',
-          access_type: 'offline'
+          access_type: 'offline',
         },
       },
     });
 
     if (error) throw error;
-    
-    // Check user's email after sign in
-    const session = await supabase.auth.getSession();
-    const userEmail = session?.data?.session?.user?.email;
-
     return { data, error: null };
   } catch (error) {
     return { data: null, error };

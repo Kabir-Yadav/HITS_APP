@@ -34,20 +34,24 @@ export function UserCard({ user, sx, ...other }) {
           }}
         />
 
-        <Avatar
-          alt={user.name}
-          src={user.avatarUrl}
-          sx={{
-            left: 0,
-            right: 0,
-            width: 64,
-            height: 64,
-            zIndex: 11,
-            mx: 'auto',
-            bottom: -32,
-            position: 'absolute',
-          }}
-        />
+        {!user.hideAvatar && (
+          <Avatar
+            alt={user.name}
+            src={user.avatarUrl}
+            sx={{
+              left: 0,
+              right: 0,
+              width: 64,
+              height: 64,
+              zIndex: 11,
+              mx: 'auto',
+              bottom: -32,
+              position: 'absolute',
+            }}
+          >
+            {user.name?.charAt(0).toUpperCase()}
+          </Avatar>
+        )}
 
         <Image
           src={user.coverUrl}
@@ -66,7 +70,7 @@ export function UserCard({ user, sx, ...other }) {
       <ListItemText
         sx={{ mt: 7, mb: 1 }}
         primary={user.name}
-        secondary={user.designation || 'Employee'}
+        secondary={user.designation}
         slotProps={{
           primary: { sx: { typography: 'subtitle1' } },
           secondary: { sx: { mt: 0.5 } },

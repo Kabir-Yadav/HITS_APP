@@ -270,13 +270,14 @@ export function ProfileHome({ info }) {
     designation: user?.user_metadata?.designation || '',
     role: info.role,
     coverUrl: '/assets/F13-logo-new.png',
+    avatarUrl: user?.user_metadata?.avatar_url || '',
     quote: quote,
     quoteAuthor: quoteAuthor,
     totalFollowers: 0,
     totalFollowing: 0,
     totalPosts: 0,
     socialLinks,
-    hideAvatar: true, 
+    hideAvatar: !user?.user_metadata?.avatar_url,
   };
 
   const renderSocialLinks = () => (
