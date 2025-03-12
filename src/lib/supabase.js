@@ -25,7 +25,8 @@ export const signInWithGoogle = async () => {
         queryParams: {
           login_hint: 'EmployeeOS',
           hd: 'f13.tech',
-          prompt: 'select_account',
+          prompt: 'consent',
+          access_type: 'offline'
         },
       },
     });
