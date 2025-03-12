@@ -376,17 +376,17 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
     created_at: new Date().toISOString(),
   };
 
-  // Insert message into Supabase
-  const { data: insertedMessage, error: messageError } = await supabase
-    .from("messages")
-    .insert(messageData)
-    .select()
-    .single();
+  //   // Insert message into Supabase
+  //   const { data: insertedMessage, error: messageError } = await supabase
+  //     .from("messages")
+  //     .insert(messageData)
+  //     .select()
+  //     .single();
 
-  if (messageError) {
-    console.error("sendMessage error:", messageError);
-    throw messageError;
-  }
+  //   if (messageError) {
+  //     console.error("sendMessage error:", messageError);
+  //     throw messageError;
+  //   }
 
   // Handle attachments
   if (attachments.length > 0) {
