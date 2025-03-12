@@ -51,7 +51,7 @@ export function PermissionDeniedView() {
         </ToggleButton>
       </ToggleButtonGroup>
 
-      <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={[role]} sx={{ py: 10 }}>
+      <RoleBasedGuard hasContent currentRole={user.user_metadata?.role} acceptRoles={[role]} sx={{ py: 10 }}>
         <Box
           sx={{
             gap: 3,

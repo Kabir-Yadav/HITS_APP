@@ -31,7 +31,7 @@ export function ChatView() {
 
   // ✅ **Use Supabase-authenticated user**
   const { user } = useMockedUser();
-
+  // console.log(user)
   // ✅ **Fetch contacts & conversations via Supabase**
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();

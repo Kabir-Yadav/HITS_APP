@@ -16,56 +16,12 @@ import { useState, useEffect } from 'react';
 
 import { supabase } from 'src/lib/supabase';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 export function useMockedUser() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuthContext();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user: authUser }, error } = await supabase.auth.getUser();
-
-
-      if (error || !authUser) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-
-      // Fetch additional profile details from your profiles table if needed
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Profile fetch error:', profileError);
-        setUser({ ...user });
-      } else {
-        setUser({ ...user, ...profile });
-      }
-
-      setLoading(false);
-    };
-
-    fetchUser();
-
-    // Auth state change listener
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-      } else {
-        setUser(null);
-      }
-    });
-
-    return () => {
-      listener.subscription.unsubscribe();
-    };
-  }, []);
-
-  return { user, loading };
+  return { user };
 }
 
 

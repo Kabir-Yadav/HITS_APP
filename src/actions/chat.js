@@ -1,5 +1,6 @@
+import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useId } from 'react';
 
 import { supabase } from 'src/lib/supabase';
 
@@ -10,108 +11,295 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
+const CHAT_CACHE_KEY = 'chat_board';
+
 /* ----------------------------------------------------------------------
    1) Fetch Contacts (Users)
    ---------------------------------------------------------------------- */
 export function useGetContacts() {
-  const { data: contactsData, error: contactsError, isLoading } = useSWR(
+  const { data, error, isLoading, isValidating } = useSWR(
     'contacts',
     async () => {
-      const { data, error } = await supabase
-        .from('auth.users')
-        .select('id, name, avatar_url, email');
-      if (error) throw error;
-      return data;
+      const { data: contactsData, error: contactsError } = await supabase.from('user_info').select('*');
+      if (contactsError) throw error;
+      return {
+        contacts: contactsData,
+      };
     },
     swrOptions
   );
 
-  return {
-    contacts: contactsData || [],
-    contactsLoading: isLoading,
-    contactsError,
-    contactsEmpty: !isLoading && !contactsData?.length,
-  };
+  const memoizedValue = useMemo(
+    () => ({
+      contacts: data?.contacts || [],
+      contactsLoading: isLoading,
+      contactsError: error,
+      contactsValidating: isValidating,
+      contactsEmpty: !isLoading && !isValidating && !data.length,
+    }),
+    [data, error, isLoading, isValidating]
+  );
+  return memoizedValue;
 }
 
 /* ----------------------------------------------------------------------
    2️⃣ Fetch Conversations for a User
 ---------------------------------------------------------------------- */
 export function useGetConversations(userId) {
-  const { data: conversationsData, error: conversationsError, isLoading } = useSWR(
-    userId ? ['conversations', userId] : null,
-    async () => {
-      const { data, error } = await supabase
-        .from('conversation_participants')
-        .select('conversations(*)')
-        .eq('participant_id', userId);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-      if (error) throw error;
-      return data.map(row => row.conversations);
-    },
-    swrOptions
-  );
-  console.log(conversationsData, "<=Conversation")
-  return {
-    conversations: conversationsData || [],
-    conversationsLoading: isLoading,
-    conversationsError,
-  };
+  useEffect(() => {
+    if (!userId) return () => { };
+
+    async function fetchConversations() {
+      setLoading(true);
+
+      try {
+        // 🔹 Step 1: Get conversations where the user is a participant
+        const { data: userConversations, error: convError } = await supabase
+          .from("conversation_participants")
+          .select(`
+            conversation_id, 
+            conversations ( id, name, is_group, created_at )
+          `)
+          .eq("participant_id", userId);
+
+        if (convError) throw convError;
+        if (!userConversations.length) {
+          setLoading(false);
+          return;
+        }
+
+        const conversationIds = userConversations.map((c) => c.conversations.id);
+
+        // 🔹 Step 2: Fetch participants for each conversation
+        const { data: participantsData, error: participantsError } = await supabase
+          .from("conversation_participants")
+          .select(`
+            conversation_id, 
+            participant_id,
+            user_info: user_info (
+              id,
+              email,
+              first_name,
+              last_name,
+              phone_number,
+              avatar_url,
+              role
+            )
+          `)
+          .in("conversation_id", conversationIds);
+
+        if (participantsError) throw participantsError;
+
+        // 🔹 Step 3: Fetch messages and attachments
+        const { data: messagesData, error: messagesError } = await supabase
+          .from("messages")
+          .select(`
+            id, 
+            sender_id, 
+            conversation_id, 
+            body, 
+            content_type, 
+            parent_id,
+            created_at,
+            attachments: attachments (
+              id, 
+              name, 
+              path, 
+              size, 
+              created_at, 
+              type
+            )
+          `)
+          .in("conversation_id", conversationIds)
+          .order("created_at", { ascending: true });
+
+        if (messagesError) throw messagesError;
+
+        // 🔹 Generate Public URLs for attachments
+        const fetchPublicUrls = async (attachments) =>
+          Promise.all(
+            attachments.map(async (attachment) => {
+              const { data } = supabase.storage.from("chat_attachments").getPublicUrl(attachment.path);
+              return { ...attachment, path: data.publicUrl };
+            })
+          );
+
+
+        // 🔹 Step 4: Structure the data properly
+        const formattedConversations = await Promise.all(
+          userConversations.map(async (conv) => ({
+            id: conv.conversations.id,
+            name: conv.conversations.name,
+            type: conv.conversations.is_group ? "GROUP" : "ONE_TO_ONE",
+            unreadCount: 0,
+            participants: participantsData
+              .filter((p) => p.conversation_id === conv.conversations.id)
+              .map((p) => ({
+                id: p.user_info?.id || "",
+                role: p.user_info?.role || "participant",
+                status: "offline",
+                name: `${p.user_info?.first_name || ""} ${p.user_info?.last_name || ""}`.trim(),
+                email: p.user_info?.email || "",
+                phoneNumber: p.user_info?.phone_number || "",
+                avatarUrl: p.user_info?.avatar_url || "",
+              })),
+            messages: await Promise.all(
+              messagesData
+                .filter((msg) => msg.conversation_id === conv.conversations.id)
+                .map(async (msg) => ({
+                  id: msg.id,
+                  senderId: msg.sender_id,
+                  body: msg.body || "",
+                  contentType: msg.content_type || "text",
+                  createdAt: msg.created_at,
+                  parentId: msg.parent_id || null,
+                  attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+                }))
+            ),
+          }))
+        );
+
+        setConversations(formattedConversations);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching conversations:", error);
+        setLoading(false);
+      }
+    }
+
+    fetchConversations();
+
+    return () => { };
+  }, [userId]);
+
+  const memoizedValue = useMemo(() => {
+    const byId = conversations.length ? keyBy(conversations, (conv) => conv.id) : {};
+    const allIds = Object.keys(byId);
+    return {
+      conversations: { byId, allIds },
+      conversationsLoading: loading,
+      conversationsEmpty: !loading && !allIds.length,
+    };
+  }, [conversations, userId, loading]);
+
+  return memoizedValue;
 }
 
 /* ----------------------------------------------------------------------
    3️⃣ Fetch Single Conversation & Messages
 ---------------------------------------------------------------------- */
 export function useGetConversation(conversationId) {
-  const { data: conversationData, error: conversationError, isLoading, mutate: updateConversation } = useSWR(
-    conversationId ? ['conversation', conversationId] : null,
+  const {
+    data: conversationData,
+    error: conversationError,
+    isLoading,
+    isValidating,
+    mutate: updateConversation,
+  } = useSWR(
+    conversationId ? ["conversation", conversationId] : null,
     async () => {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*, messages(*, attachments(*))')
-        .eq('id', conversationId)
+      // Fetch conversation details
+      const { data: conversation, error: convError } = await supabase
+        .from("conversations")
+        .select("id, is_group, created_at")
+        .eq("id", conversationId)
         .single();
 
-      if (error) throw error;
-      return data;
-    },
-    swrOptions
+      if (convError) throw convError;
+
+      // Fetch participants
+      const { data: participants, error: participantsError } = await supabase
+        .from("conversation_participants")
+        .select(`
+          conversation_id, 
+          participant_id, 
+          user_info: user_info (
+            id,
+            email,
+            first_name,
+            last_name,
+            phone_number,
+            avatar_url,
+            role
+          )
+        `)
+        .eq("conversation_id", conversationId);
+
+      if (participantsError) throw participantsError;
+
+      // Fetch messages
+      const { data: messages, error: messagesError } = await supabase
+        .from("messages")
+        .select(`
+          id, 
+          sender_id, 
+          conversation_id, 
+          body, 
+          content_type, 
+          created_at,
+          attachments: attachments (
+            id, 
+            name, 
+            path, 
+            size, 
+            created_at, 
+            type
+          )
+        `)
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+
+      if (messagesError) throw messagesError;
+
+      // Generate Public URLs for attachments
+      const fetchPublicUrls = async (attachments) =>
+        Promise.all(
+          attachments.map(async (attachment) => {
+            // Ensure `attachment.path` is relative to the bucket root
+            const cleanPath = attachment.path.replace(/^storage\/public\/chat_attachments/, "");
+
+            const { data } = supabase.storage
+              .from("chat_attachment") // Correct bucket name
+              .getPublicUrl(cleanPath);
+
+            return { ...attachment, path: data.publicUrl };
+          })
+        );
+
+      return {
+        id: conversation.id,
+        type: conversation.is_group ? "GROUP" : "ONE_TO_ONE",
+        participants: participants.map((p) => ({
+          id: p.user_info?.id || "",
+          role: p.user_info?.role || "participant",
+          status: "offline",
+          name: `${p.user_info?.first_name || ""} ${p.user_info?.last_name || ""}`.trim(),
+          email: p.user_info?.email || "",
+          phoneNumber: p.user_info?.phone_number || "",
+          avatarUrl: p.user_info?.avatar_url || "",
+        })),
+        messages: await Promise.all(
+          messages.map(async (msg) => ({
+            id: msg.id,
+            senderId: msg.sender_id,
+            body: msg.body,
+            contentType: msg.content_type,
+            createdAt: msg.created_at,
+            attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+          }))
+        ),
+      };
+    }
   );
-
-  useEffect(() => {
-    if (!conversationId) return () => { };
-
-    const channel = supabase
-      .channel(`conversation-${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload) => {
-          updateConversation((prev) =>
-            prev ? { ...prev, messages: [...prev.messages, payload.new] } : prev
-          );
-        }
-      )
-      .subscribe();
-
-    // ✅ ENSURE Cleanup Function Doesn't Return a Value
-    return () => {
-      void supabase.removeChannel(channel); // ✅ Ensure no return value
-    };
-
-  }, [conversationId, updateConversation]);
-
-
-
   return {
     conversation: conversationData || null,
     conversationLoading: isLoading,
     conversationError,
+    conversationValidating: isValidating,
+    updateConversation,
   };
 }
 

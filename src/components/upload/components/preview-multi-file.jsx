@@ -23,7 +23,6 @@ export function MultiFilePreview({
   className,
   ...other
 }) {
-  console.log(files)
   return (
     <ListRoot
       thumbnail={thumbnail}
@@ -35,7 +34,6 @@ export function MultiFilePreview({
 
       {files.map((file) => {
         const { name, size } = fileData(file);
-        console.log(file.file_name)
         if (thumbnail) {
           return (
             <ItemThumbnail key={file.file_name}>

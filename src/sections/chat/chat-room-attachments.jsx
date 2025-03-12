@@ -14,18 +14,19 @@ import { CollapseButton } from './styles';
 // ----------------------------------------------------------------------
 
 export function ChatRoomAttachments({ attachments }) {
+  console.log(attachments)
   const collapse = useBoolean(true);
   const totalAttachments = attachments.length;
   // ✅ Sort attachments in descending order by `createdAt`
   const sortedAttachments = [...attachments].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
   );
   const renderList = () =>
     sortedAttachments.map((attachment, index) => (
       <Box key={attachment.name + index} sx={{ gap: 1.5, display: 'flex', alignItems: 'center' }}>
         <FileThumbnail
           imageView
-          file={attachment.preview}
+          file={attachment.path}
           onDownload={() => console.info('DOWNLOAD')}
           slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
           sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
@@ -33,7 +34,7 @@ export function ChatRoomAttachments({ attachments }) {
 
         <ListItemText
           primary={attachment.name}
-          secondary={fDateTime(attachment.createdAt)}
+          secondary={fDateTime(attachment.created_at)}
           slotProps={{
             primary: { noWrap: true, sx: { typography: 'body2' } },
             secondary: {

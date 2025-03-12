@@ -97,8 +97,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
       <Stack spacing={1} sx={{ mb: 1, alignItems: isCurrentUser ? 'end' : 'start' }}>
         {attachments.map((attachment, index) => {
           const fileType = attachment.type.toLowerCase();
-          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
-
+          const isImage = attachment.type.startsWith("image/") || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
           return isImage ? (
             <Box
               key={attachment.name + index}
@@ -124,7 +123,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
             >
               <FileThumbnail
                 imageView
-                file={attachment.preview}
+                file={attachment.path}
                 onDownload={() => window.open(attachment.path, '_blank')}
                 slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
                 sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
@@ -356,7 +355,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
               parentMessage.attachments[0].type
             ) ? (
               <img
-                src={parentMessage.attachments[0].preview}
+                src={parentMessage.attachments[0].path}
                 alt="Attachment Preview"
                 style={{ width: 100, height: 80, borderRadius: 5, objectFit: "cover" }}
               />
@@ -365,12 +364,11 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
               <Stack direction="row" alignItems="center" spacing={1}>
                 <FileThumbnail
                   imageView
-                  file={parentMessage.attachments[0].preview}
+                  file={parentMessage.attachments[0].path}
                   slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
                   sx={{ width: 30, height: 30, bgcolor: "background.neutral" }}
                 />
                 <ListItemText
-                  primary={parentMessage.attachments[0].name}
                   secondary={formatFileSize(parentMessage.attachments[0].size)}
                   slotProps={{
                     primary: { noWrap: true, sx: { typography: 'body2' } },

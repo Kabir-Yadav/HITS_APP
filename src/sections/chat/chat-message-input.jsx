@@ -57,13 +57,13 @@ export function ChatMessageInput({
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
-      role: `${user?.role}`,
-      email: `${user?.email}`,
-      address: `${user?.address}`,
-      name: `${user?.name}`,
+      role: `${user.user_metadata?.role}`,
+      email: `${user.user_metadata?.email}`,
+      address: `${user.user_metadata?.address}`,
+      name: `${user.user_metadata?.first_name} ${user.user_metadata?.last_name}`,
       lastActivity: today(),
-      avatarUrl: `${user?.avatar_url}`,
-      phoneNumber: `${user?.phone_number}`,
+      avatarUrl: `${user.user_metadata?.avatar_url}`,
+      phoneNumber: `${user.user_metadata?.phone_number}`,
       status: 'online',
     }),
     [user]
@@ -208,7 +208,7 @@ export function ChatMessageInput({
                   replyTo.attachments[0].type
                 ) ? (
                   <img
-                    src={replyTo.attachments[0].preview}
+                    src={replyTo.attachments[0].path}
                     alt="Attachment Preview"
                     style={{ width: 70, height: 70, borderRadius: 5, objectFit: "cover" }}
                   />
@@ -217,7 +217,7 @@ export function ChatMessageInput({
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <FileThumbnail
                       imageView
-                      file={replyTo.attachments[0].preview}
+                      file={replyTo.attachments[0].path}
                       slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
                       sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
                     />
