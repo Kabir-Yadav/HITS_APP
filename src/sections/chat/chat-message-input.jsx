@@ -140,7 +140,7 @@ export function ChatMessageInput({
         console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
-            await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null,);
+            await sendMessage(selectedConversationId, user?.id, finalMessageData.body, replyTo?.id || null, finalMessageData.attachments);
           } else {
             const res = await createConversation(conversationData);
             router.push(`${paths.dashboard.chat}?id=${res.id}`);

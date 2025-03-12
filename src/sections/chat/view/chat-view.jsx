@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetContacts, useGetConversation, useGetConversations, sendMessage } from 'src/actions/chat';
+import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -73,24 +73,6 @@ export function ChatView() {
       senderName: message.senderId === user.id ? 'You' : sender ? sender.name : "Unknown",
       attachments: message.attachments
     });
-  };
-
-  // ✅ **Send message via Supabase**
-  const handleSendMessage = async (text) => {
-    if (!selectedConversationId) {
-      console.warn('No conversation selected');
-      return;
-    }
-    if (!user?.id) {
-      console.warn('No user logged in');
-      return;
-    }
-    try {
-      await sendMessage(selectedConversationId, user.id, text, replyTo?.id || null);
-      setReplyTo(null); // ✅ Reset reply after sending
-    } catch (error) {
-      console.error('handleSendMessage error:', error);
-    }
   };
 
   const hasConversation = selectedConversationId && conversation;
@@ -165,7 +147,6 @@ export function ChatView() {
                 disabled={!recipients.length && !selectedConversationId}
                 replyTo={replyTo} // ✅ Keep reply functionality
                 setReplyTo={setReplyTo} // ✅ Allow clearing reply
-                onSend={handleSendMessage} // ✅ Send messages via Supabase
               />
             </>
           ),
