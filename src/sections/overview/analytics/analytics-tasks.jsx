@@ -59,11 +59,6 @@ function TaskItem({ item, selected, onChange, sx, ...other }) {
     console.info('MARK COMPLETE', item.id);
   };
 
-  const handleShare = () => {
-    menuActions.onClose();
-    console.info('SHARE', item.id);
-  };
-
   const handleEdit = () => {
     menuActions.onClose();
     console.info('EDIT', item.id);
@@ -125,11 +120,6 @@ function TaskItem({ item, selected, onChange, sx, ...other }) {
           <MenuItem onClick={handleEdit}>
             <Iconify icon="solar:pen-bold" />
             Edit
-          </MenuItem>
-
-          <MenuItem onClick={handleShare}>
-            <Iconify icon="solar:share-bold" />
-            Share
           </MenuItem>
 
           <Divider sx={{ borderStyle: 'dashed' }} />

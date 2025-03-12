@@ -39,11 +39,11 @@ export function AuthProvider({ children }) {
         const params = new URLSearchParams(window.location.search);
         const returnTo = params.get('returnTo');
 
-        // If there's a returnTo parameter, use it, otherwise go to /dashboard/user
+        // If there's a returnTo parameter, use it, otherwise go to /dashboard/user/dashboard
         if (returnTo) {
           router.push(returnTo);
         } else {
-          router.push('/dashboard/user');
+          router.push('/dashboard/user/dashboard');
         }
       } else {
         setState({ user: null, loading: false });

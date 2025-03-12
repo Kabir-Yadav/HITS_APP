@@ -71,6 +71,7 @@ export function UserProfileView() {
       <Card sx={{ mb: 3, height: 290 }}>
         <ProfileCover
           role={user?.user_metadata?.role}
+          designation={user?.user_metadata?.designation}
           name={fullName}
           avatarUrl={user?.user_metadata?.avatar_url}
           coverUrl={_userAbout.coverUrl}

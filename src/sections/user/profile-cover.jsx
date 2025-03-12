@@ -7,7 +7,7 @@ import ListItemText from '@mui/material/ListItemText';
 
 // ----------------------------------------------------------------------
 
-export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) {
+export function ProfileCover({ sx, name, role, designation, coverUrl, avatarUrl, ...other }) {
   return (
     <Box
       sx={[
@@ -53,7 +53,7 @@ export function ProfileCover({ sx, name, role, coverUrl, avatarUrl, ...other }) 
 
         <ListItemText
           primary={name}
-          secondary={role}
+          secondary={designation || role}
           slotProps={{
             primary: { sx: { typography: 'h4' } },
             secondary: {
