@@ -96,10 +96,15 @@ const fetchConversations = async (userId) => {
       attachments: attachments (
         id, 
         name, 
-        path, 
+        path,
+        preview, 
         size, 
         created_at, 
         type
+      )
+      reactions: message_reactions(
+        user_id,
+        emoji
       )
     `)
     .in("conversation_id", conversationIds)
@@ -145,6 +150,7 @@ const fetchConversations = async (userId) => {
             createdAt: msg.created_at,
             parentId: msg.parent_id || null,
             attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+            reactions: msg.reactions || [],
           }))
       ),
     }))
@@ -215,7 +221,6 @@ export function useGetConversations(userId) {
       conversationsEmpty: !isLoading && !allIds.length,
     };
   }, [data, isLoading]);
-  console.log(memoizedValue)
   return memoizedValue;
 }
 
@@ -268,15 +273,21 @@ export function useGetConversation(conversationId) {
           sender_id, 
           conversation_id, 
           body, 
+          parent_id,
           content_type, 
           created_at,
-          attachments: attachments (
+          attachments (
             id, 
             name, 
-            path, 
+            path,
+            preview, 
             size, 
             created_at, 
             type
+          ),
+          message_reactions (
+            user_id,
+            emoji
           )
         `)
         .eq("conversation_id", conversationId)
@@ -319,7 +330,9 @@ export function useGetConversation(conversationId) {
             body: msg.body,
             contentType: msg.content_type,
             createdAt: msg.created_at,
+            parentId: msg.parent_id,
             attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+            reactions: msg.message_reactions || []
           }))
         ),
       };
@@ -376,17 +389,17 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
     created_at: new Date().toISOString(),
   };
 
-  //   // Insert message into Supabase
-  //   const { data: insertedMessage, error: messageError } = await supabase
-  //     .from("messages")
-  //     .insert(messageData)
-  //     .select()
-  //     .single();
+  // Insert message into Supabase
+  const { data: insertedMessage, error: messageError } = await supabase
+    .from("messages")
+    .insert(messageData)
+    .select()
+    .single();
 
-  //   if (messageError) {
-  //     console.error("sendMessage error:", messageError);
-  //     throw messageError;
-  //   }
+  if (messageError) {
+    console.error("sendMessage error:", messageError);
+    throw messageError;
+  }
 
   // Handle attachments
   if (attachments.length > 0) {
@@ -494,31 +507,6 @@ export async function createConversation({ type, participantIds }) {
 }
 
 /* ----------------------------------------------------------------------
-   6️⃣ Upload Attachment (Supabase Storage)
----------------------------------------------------------------------- */
-export async function uploadAttachment(file, messageId) {
-  const { data, error } = await supabase.storage
-    .from('chat-attachments')
-    .upload(`attachments/${Date.now()}-${file.name}`, file);
-
-  if (error) throw error;
-
-  const fileUrl = `${supabase.storageUrl}/storage/v1/object/public/chat-attachments/${data.path}`;
-
-  const { error: insertErr } = await supabase.from('attachments').insert({
-    message_id: messageId,
-    name: file.name,
-    path: data.path,
-    preview: fileUrl,
-    size: file.size,
-    type: file.type,
-  });
-
-  if (insertErr) throw insertErr;
-  return fileUrl;
-}
-
-/* ----------------------------------------------------------------------
    7️⃣ Toggle Reaction
 ---------------------------------------------------------------------- */
 export async function toggleReaction(messageId, userId, emoji) {
@@ -552,12 +540,83 @@ export async function clickConversation(conversationId) {
 }
 
 export function useDeleteMessage() {
+  return async (messageId, conversationId) => {
+    try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
+
+      if (error) {
+        console.error("Error deleting message:", error);
+        throw error;
+      }
+
+      console.log("Message deleted:", messageId);
+
+      // ✅ Re-fetch conversation messages after deletion
+      mutate(["conversation", conversationId]);
+
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+    }
+  };
 }
+
 
 //-------------------------------------------------------------------------------------
 
 export async function handleAddReaction(messageId, userId, emoji, conversationId) {
+  try {
+    // ✅ Check if the reaction already exists
+    const { data: existingReaction, error: fetchError } = await supabase
+      .from("message_reactions")
+      .select("id, emoji")
+      .eq("message_id", messageId)
+      .eq("user_id", userId)
+      .single();
 
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Error fetching reaction:", fetchError);
+      return;
+    }
 
+    if (existingReaction) {
+      if (existingReaction.emoji === emoji) {
+        // ✅ If the same user reacts with the same emoji, DELETE the reaction
+        const { error: deleteError } = await supabase
+          .from("message_reactions")
+          .delete()
+          .eq("id", existingReaction.id);
 
+        if (deleteError) throw deleteError;
+        console.log("Reaction deleted");
+      } else {
+        // ✅ If the user reacts with a different emoji, UPDATE the reaction
+        const { error: updateError } = await supabase
+          .from("message_reactions")
+          .update({ emoji })
+          .eq("id", existingReaction.id);
+
+        if (updateError) throw updateError;
+        console.log("Reaction updated");
+      }
+    } else {
+      const reactionpayload = ({
+        message_id: messageId,
+        user_id: userId,
+        emoji: emoji,
+      })
+      // ✅ If no reaction exists, INSERT a new reaction
+      const { error: insertError } = await supabase
+        .from("message_reactions")
+        .insert(reactionpayload);
+
+      if (insertError) throw insertError;
+      console.log("Reaction added");
+    }
+
+    // ✅ Trigger a real-time UI update
+    mutate(["conversation", conversationId]);
+
+  } catch (error) {
+    console.error("handleAddReaction error:", error);
+  }
 }

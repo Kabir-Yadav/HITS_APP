@@ -2,8 +2,10 @@ import { useMemo } from 'react';
 import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
 
+import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
+const enableServer = false;
 
 const swrOptions = {
   revalidateIfStale: enableServer,

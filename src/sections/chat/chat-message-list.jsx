@@ -18,9 +18,9 @@ export function ChatMessageList({ messages = [], conversationId, participants, l
       message.attachments
         ?.filter(
           (attachment) =>
-            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(attachment.type.toLowerCase())
+            attachment.type.startsWith("image/") || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(attachment.type.toLowerCase())
         )
-        .map((attachment) => ({ src: attachment.path })) || []
+        .map((attachment) => ({ src: attachment.preview ?? attachment.path })) || []
   );
 
   const lightbox = useLightBox(slides);
