@@ -25,6 +25,11 @@ const NAV_ITEMS = [
     icon: <Iconify width={24} icon="ic:round-vpn-key" />,
     href: `${paths.dashboard.user.account}/change-password`,
   },
+  {
+    label: 'Social Links',
+    icon: <Iconify width={24} icon="solar:share-bold" />,
+    href: `${paths.dashboard.user.account}/social-links`,
+  },
 ];
 
 // ----------------------------------------------------------------------

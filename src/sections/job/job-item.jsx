@@ -176,18 +176,24 @@ export function JobItem({ job, editHref, detailsHref, onDelete, sx, ...other }) 
             {job.positions} position{job.positions > 1 ? 's' : ''}
           </Box>
 
-          <Box
+          <Link
+            component={RouterLink}
+            href={`${detailsHref}?tab=applications`}
             sx={{
               gap: 0.5,
               display: 'flex',
               alignItems: 'center',
               color: 'info.main',
               typography: 'caption',
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'underline',
+              },
             }}
           >
             <Iconify width={16} icon="solar:file-text-bold" />
             {applicationCount} application{applicationCount !== 1 ? 's' : ''}
-          </Box>
+          </Link>
         </Stack>
 
         {isAdmin && (

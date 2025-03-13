@@ -52,8 +52,13 @@ export const navData = [
   {
     subheader: 'Overview',
     items: [
-      { title: 'User Dashboard', path: paths.dashboard.user.root, icon: ICONS.user },
-      { title: 'Recruitment Dashboard', path: paths.dashboard.root, icon: ICONS.dashboard },
+      { title: 'User Dashboard', path: paths.dashboard.user.dashboard, icon: ICONS.user },
+      {
+        title: 'Recruitment Dashboard',
+        path: paths.dashboard.root,
+        icon: ICONS.dashboard,
+        roles: ['ADMIN', 'HR']
+      },
     ],
   },
   /**
@@ -81,18 +86,30 @@ export const navData = [
           { title: 'Job Postings', path: paths.dashboard.job.root },
           { title: 'Job Applications', path: paths.dashboard.application.root },
           { title: 'Interview Scheduling', path: paths.dashboard.recruitment.root },
-
         ],
+        roles: ['ADMIN', 'HR']
+      },
+      {
+        title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
       },
       {
         title: 'User Management',
         path: paths.dashboard.user.root,
         icon: ICONS.userManagement,
         children: [
-          { title: 'Create', path: paths.dashboard.user.new },
-          { title: 'Account', path: paths.dashboard.user.account },
+          {
+            title: 'Create',
+            path: paths.dashboard.user.new,
+            roles: ['ADMIN', 'HR']
+          },
+          {
+            title: 'Account',
+            path: paths.dashboard.user.account
+          },
+          { title: 'Profile', path: paths.dashboard.user.profile },
+          { title: 'Card', path: paths.dashboard.user.cards }
+
         ],
-        roles: ['ADMIN', 'HR'],
       },
     ],
   },

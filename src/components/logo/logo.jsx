@@ -13,17 +13,17 @@ import { logoClasses } from './classes';
 // ----------------------------------------------------------------------
 
 export const Logo = forwardRef((props, ref) => {
-  const { className, href = '/', isSingle = true, disabled, sx, ...other } = props;
+  const { className, href = '/', isSingle = true, disabled = true, sx, ...other } = props;
 
   const logo = (
     <img
-      src="/assets/employeeos-logo.png" // Assuming the image is in the public directory
+      src="/assets/employeeos-logo.png"
       alt="EmployeeOS"
       width="100%"
       height="100%"
       style={{
         objectFit: 'contain',
-        maxHeight: 60, // Adjust this value based on your needs
+        maxHeight: 60, 
       }}
     />
   );
@@ -53,4 +53,5 @@ const LogoRoot = styled(Link)(() => ({
   alignItems: 'center',
   justifyContent: 'center',
   textDecoration: 'none',
+  cursor: 'default',
 }));

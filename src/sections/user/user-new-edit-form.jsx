@@ -30,6 +30,8 @@ import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { FormProvider, Field, schemaHelper } from 'src/components/hook-form';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 // ----------------------------------------------------------------------
 
 export const NewUserSchema = zod.object({
@@ -50,6 +52,17 @@ export const NewUserSchema = zod.object({
   }),
   phoneNumber: schemaHelper.phoneNumber({ isValid: isValidPhoneNumber }),
   role: zod.string().min(1, { message: 'Role is required!' }),
+  designation: zod.string().min(1, { message: 'Designation is required!' }),
+  dateOfJoining: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
+  dateOfLeaving: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
 });
 
 // ----------------------------------------------------------------------
@@ -57,6 +70,22 @@ export const NewUserSchema = zod.object({
 export function UserNewEditForm({ currentUser }) {
   const router = useRouter();
   const [errorMsg, setErrorMsg] = useState('');
+  const { user } = useAuthContext();
+
+  const getAvailableRoles = () => {
+    const userRole = user?.user_metadata?.role;
+    
+    if (userRole === 'ADMIN') {
+      return ['ADMIN', 'HR', 'EMPLOYEE'];
+    }
+    if (userRole === 'HR') {
+      return ['HR', 'EMPLOYEE'];
+    }
+    return [];
+  };
+
+  const availableRoles = getAvailableRoles();
+  const defaultRole = user?.user_metadata?.role === 'ADMIN' ? 'ADMIN' : '';
 
   const defaultValues = {
     firstName: '',
@@ -64,9 +93,12 @@ export function UserNewEditForm({ currentUser }) {
     email: '',
     avatarUrl: null,
     phoneNumber: '',
-    role: '',
+    role: defaultRole,
     password: '',
     dateOfBirth: dayjs(),
+    designation: '',
+    dateOfJoining: dayjs(),
+    dateOfLeaving: null,
   };
 
   const methods = useForm({
@@ -83,6 +115,17 @@ export function UserNewEditForm({ currentUser }) {
     handleSubmit,
     formState: { isSubmitting },
   } = methods;
+
+  // Check if user is an EMPLOYEE after hooks are initialized
+  if (user?.user_metadata?.role === 'EMPLOYEE') {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">
+          You do not have access to view this page
+        </Alert>
+      </Box>
+    );
+  }
 
   const values = watch();
 
@@ -119,6 +162,9 @@ export function UserNewEditForm({ currentUser }) {
             phone_number: data.phoneNumber,
             role: data.role,
             date_of_birth: data.dateOfBirth ? dayjs(data.dateOfBirth).format('YYYY-MM-DD') : null,
+            designation: data.designation,
+            date_of_joining: data.dateOfJoining ? dayjs(data.dateOfJoining).format('YYYY-MM-DD') : null,
+            date_of_leaving: data.dateOfLeaving ? dayjs(data.dateOfLeaving).format('YYYY-MM-DD') : null,
           },
         });
 
@@ -136,6 +182,9 @@ export function UserNewEditForm({ currentUser }) {
               phone_number: data.phoneNumber,
               role: data.role,
               date_of_birth: data.dateOfBirth ? dayjs(data.dateOfBirth).format('YYYY-MM-DD') : null,
+              designation: data.designation,
+              date_of_joining: data.dateOfJoining ? dayjs(data.dateOfJoining).format('YYYY-MM-DD') : null,
+              date_of_leaving: data.dateOfLeaving ? dayjs(data.dateOfLeaving).format('YYYY-MM-DD') : null,
             },
             emailRedirectTo: undefined, // Disable email verification
           },
@@ -145,7 +194,7 @@ export function UserNewEditForm({ currentUser }) {
 
         // ✅ Get newly created user from the signup response
         if (signUpData?.user?.id) {
-          await axios.post('http://127.0.0.1:8000/api/chat/create', {
+          await axios.post('https://apiemployeeos.duckdns.org:8443/api/chat/create', {
             id: signUpData.user.id,
             name: `${data.firstName}${data.lastName}`,
             email: data.email,
@@ -249,7 +298,13 @@ export function UserNewEditForm({ currentUser }) {
               <Field.Phone
                 name="phoneNumber"
                 label="Phone number"
-                country={!currentUser ? 'DE' : undefined}
+                country={!currentUser ? 'IN' : undefined}
+              />
+
+              <Field.Text 
+                name="designation" 
+                label="Designation"
+                placeholder="Enter designation"
               />
 
               <Controller
@@ -263,14 +318,52 @@ export function UserNewEditForm({ currentUser }) {
                       label="Role"
                       placeholder="Select a role"
                     >
-                      <MenuItem value="ADMIN">Admin</MenuItem>
-                      <MenuItem value="HR">HR</MenuItem>
-                      <MenuItem value="EMPLOYEE">Employee</MenuItem>
+                      {availableRoles.map((role) => (
+                        <MenuItem key={role} value={role}>
+                          {role}
+                        </MenuItem>
+                      ))}
                     </Select>
                     {error && (
                       <FormHelperText>{error.message}</FormHelperText>
                     )}
                   </FormControl>
+                )}
+              />
+
+              <Controller
+                name="dateOfJoining"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <Field.DatePicker
+                    {...field}
+                    label="Date of Joining"
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
+                )}
+              />
+
+              <Controller
+                name="dateOfLeaving"
+                control={control}
+                render={({ field, fieldState: { error } }) => (
+                  <Field.DatePicker
+                    {...field}
+                    label="Date of Relieving"
+                    format="DD/MM/YYYY"
+                    slotProps={{
+                      textField: {
+                        error: !!error,
+                        helperText: error?.message,
+                      },
+                    }}
+                  />
                 )}
               />
             </Box>

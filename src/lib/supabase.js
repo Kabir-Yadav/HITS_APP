@@ -22,8 +22,10 @@ export const signInWithGoogle = async () => {
       options: {
         redirectTo: `${window.location.origin}/auth/supabase/callback`,
         queryParams: {
-          login_hint: 'EmployeeOS',
-        }
+          hd: 'f13.tech',
+          prompt: 'consent',
+          access_type: 'offline',
+        },
       },
     });
 

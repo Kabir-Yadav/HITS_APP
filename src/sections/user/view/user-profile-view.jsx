@@ -71,6 +71,7 @@ export function UserProfileView() {
       <Card sx={{ mb: 3, height: 290 }}>
         <ProfileCover
           role={user?.user_metadata?.role}
+          designation={user?.user_metadata?.designation}
           name={fullName}
           avatarUrl={user?.user_metadata?.avatar_url}
           coverUrl={_userAbout.coverUrl}
@@ -104,7 +105,7 @@ export function UserProfileView() {
       </Card>
 
       {selectedTab === '' && (
-        <ProfileHome 
+        <ProfileHome
           info={{
             ..._userAbout,
             role: user?.user_metadata?.role,
@@ -113,8 +114,8 @@ export function UserProfileView() {
             firstName: user?.user_metadata?.first_name,
             lastName: user?.user_metadata?.last_name,
             dateOfBirth: user?.user_metadata?.date_of_birth,
-          }} 
-          posts={_userFeeds} 
+          }}
+          posts={_userFeeds}
         />
       )}
     </DashboardContent>

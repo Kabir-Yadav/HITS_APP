@@ -7,12 +7,21 @@
 //         return null;
 //       }
 
+
 //       const response = await fetch(`http://127.0.0.1:8080/api/chat/get-user?email=${encodeURIComponent(userData.email)}`, {
 //         method: 'POST',
 //         headers: {
 //           'Content-Type': 'application/json',
 //         },
 //       });
+
+      const response = await fetch(`https://apiemployeeos.duckdns.org:8443/api/chat/get-user?email=${encodeURIComponent(userData.email)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
 
 //       if (!response.ok) {
 //         throw new Error(`HTTP error! Status: ${response.status}`);

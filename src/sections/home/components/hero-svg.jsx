@@ -185,53 +185,7 @@ export function PlusIcon() {
 // ----------------------------------------------------------------------
 
 export function Texts({ sx, ...other }) {
-  return (
-    <Box
-      component={m.div}
-      variants={varFade('in')}
-      sx={[
-        () => ({
-          left: 0,
-          width: 1,
-          bottom: 0,
-          height: 200,
-          position: 'absolute',
-        }),
-        ...(Array.isArray(sx) ? sx : [sx]),
-      ]}
-      {...other}
-    >
-      <Box
-        component="svg"
-        sx={[
-          (theme) => ({
-            width: 1,
-            height: 1,
-            '& text': {
-              fill: 'none',
-              fontSize: 200,
-              fontWeight: 800,
-              strokeDasharray: 4,
-              textTransform: 'uppercase',
-              stroke: 'var(--hero-text-stroke-color)',
-              strokeWidth: 'var(--hero-text-stroke-width)',
-              fontFamily: theme.typography.fontSecondaryFamily,
-            },
-          }),
-        ]}
-      >
-        <m.text
-          x="0"
-          y="12px"
-          dominantBaseline="hanging"
-          animate={{ x: ['0%', '-50%'] }}
-          transition={{ duration: 64, ease: 'linear', repeat: Infinity }}
-        >
-          Minimal Design System Minimal Design System
-        </m.text>
-      </Box>
-    </Box>
-  );
+  return null;
 }
 
 // ----------------------------------------------------------------------

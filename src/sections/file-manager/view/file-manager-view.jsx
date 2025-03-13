@@ -1,30 +1,41 @@
+'use client';
+
 import { useState, useCallback, useEffect } from 'react';
 import { useBoolean, useSetState } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid2'
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
+import { paths } from 'src/routes/paths';
+
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
+import { CONFIG } from 'src/global-config';
 import useGetFiles from 'src/actions/filemanager';
 import { deleteFiles } from 'src/actions/filemanager';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { _allFiles, FILE_TYPE_OPTIONS } from 'src/_mock';
+import { _allFiles, FILE_TYPE_OPTIONS, _files, _folders } from 'src/_mock';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { Scrollbar } from 'src/components/scrollbar';
 import { fileFormat } from 'src/components/file-thumbnail';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { useTable, rowInPage, getComparator } from 'src/components/table';
 
+import { FileRecentItem } from '../file-recent-item';
+import { FileManagerPanel } from '../file-manager-panel';
 import { FileManagerTable } from '../file-manager-table';
 import { FileManagerFilters } from '../file-manager-filters';
+import { FileStorageOverview } from '../file-storage-overview';
 import { FileManagerGridView } from '../file-manager-grid-view';
+import { FileManagerFolderItem } from '../file-manager-folder-item';
 import { FileManagerFiltersResult } from '../file-manager-filters-result';
 import { FileManagerNewFolderDialog } from '../file-manager-new-folder-dialog';
 
@@ -42,6 +53,7 @@ export function FileManagerView() {
   const userId = 'cb7288da-aa6c-42df-a28a-86bd994296aa';
   const { data, isLoading, isError } = useGetFiles(userId);
   const [tableData, setTableData] = useState([]);
+  const GB = 1000000000 * 24;
 
   // ✅ Update tableData when data changes
   useEffect(() => {
@@ -236,6 +248,41 @@ export function FileManagerView() {
     );
   }
 
+  const renderStorageOverview = () => (
+    <FileStorageOverview
+      total={GB}
+      chart={{ series: 76 }}
+      data={[
+        {
+          name: 'Images',
+          usedStorage: GB / 2,
+          filesCount: 223,
+          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-img.svg`} />,
+        },
+        {
+          name: 'Media',
+          usedStorage: GB / 5,
+          filesCount: 223,
+          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-video.svg`} />,
+        },
+        {
+          name: 'Documents',
+          usedStorage: GB / 5,
+          filesCount: 223,
+          icon: (
+            <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-document.svg`} />
+          ),
+        },
+        {
+          name: 'Other',
+          usedStorage: GB / 10,
+          filesCount: 223,
+          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-file.svg`} />,
+        },
+      ]}
+    />
+  );
+
   return (
     <>
       <DashboardContent>
@@ -249,6 +296,65 @@ export function FileManagerView() {
             Upload
           </Button>
         </Box>
+
+        {/* {Favourite Folders and Files} */}
+        <Box sx={{ mt: 5 }}>
+          <FileManagerPanel
+            title="Folder"
+            link={paths.dashboard.fileManager}
+          />
+          <Scrollbar sx={{ mb: 3, minHeight: 186 }}>
+            <Box sx={{ gap: 3, display: 'flex' }}>
+              {_folders.map((folder) => (
+                <FileManagerFolderItem
+                  key={folder.id}
+                  folder={folder}
+                  onDelete={() => console.info('DELETE', folder.id)}
+                  sx={{
+                    ...(_folders.length > 3 && {
+                      width: 240,
+                      flexShrink: 0,
+                    }),
+                  }}
+                />
+              ))}
+            </Box>
+          </Scrollbar>
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* {Recent Files} */}
+
+          <Grid size={{ xs: 12, md: 6, lg: 8 }}>
+            <Box >
+              <FileManagerPanel
+                title="Recent files"
+                link={paths.dashboard.fileManager}
+              />
+
+              <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
+                {_files.slice(0, 5).map((file) => (
+                  <FileRecentItem
+                    key={file.id}
+                    file={file}
+                    onDelete={() => console.info('DELETE', file.id)}
+                  />
+                ))}
+              </Box>
+            </Box>
+          </Grid>
+
+          {/* {Storage} */}
+
+          <Grid size={{ xs: 12, md: 6, lg: 4 }}>
+            <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+              <FileManagerPanel
+                title="Storage"
+              />
+              {renderStorageOverview()}
+            </Box>
+          </Grid>
+        </Grid>
 
         <Stack spacing={2.5} sx={{ my: { xs: 3, md: 5 } }}>
           {renderFilters()}

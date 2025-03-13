@@ -86,7 +86,7 @@ export function HomeHighlightFeatures({ sx, ...other }) {
         </Container>
       </MotionViewport>
 
-      <ScrollableContent containerRoot={containerRoot} />
+      {/* <ScrollableContent containerRoot={containerRoot} /> */}
     </Box>
   );
 }

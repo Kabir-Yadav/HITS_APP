@@ -27,24 +27,17 @@ export function AuthGuard({ children }) {
 
   const [isChecking, setIsChecking] = useState(true);
 
-  const createRedirectPath = (currentPath) => {
-    const queryString = new URLSearchParams({ returnTo: pathname }).toString();
-    return `${currentPath}?${queryString}`;
-  };
-
   const checkPermissions = async () => {
     if (loading) {
       return;
     }
 
-    if (!authenticated) {
-      const { method } = CONFIG.auth;
-
-      const signInPath = signInPaths[method];
-      const redirectPath = createRedirectPath(signInPath);
-
-      router.replace(redirectPath);
-
+    // Only redirect to sign in if trying to access protected routes
+    const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/app');
+    
+    if (!authenticated && isProtectedRoute) {
+      // Use state parameter instead of query string for cleaner URLs
+      router.replace('/sign-in', { state: { from: pathname } });
       return;
     }
 

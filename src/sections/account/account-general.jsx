@@ -40,6 +40,17 @@ export const UpdateUserSchema = zod.object({
   }),
   phoneNumber: schemaHelper.phoneNumber({ isValid: isValidPhoneNumber }),
   role: zod.string().min(1, { message: 'Role is required!' }),
+  designation: zod.string().min(1, { message: 'Designation is required!' }),
+  dateOfJoining: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
+  dateOfLeaving: zod.any().transform((val) => {
+    if (!val) return null;
+    const date = dayjs(val);
+    return date.isValid() ? date.toDate() : null;
+  }),
 });
 
 // ----------------------------------------------------------------------
@@ -54,6 +65,37 @@ export function AccountGeneral() {
   const { user } = useAuthContext();
   const [errorMsg, setErrorMsg] = useState('');
   const [currentAvatar, setCurrentAvatar] = useState(null);
+  const [joiningDate, setJoiningDate] = useState(null);
+  const [leavingDate, setLeavingDate] = useState(null);
+
+  // Add new useEffect for periodic refresh of dates
+  useEffect(() => {
+    const fetchDates = async () => {
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser();
+      
+      if (!error && currentUser) {
+        setJoiningDate(
+          currentUser.user_metadata?.date_of_joining 
+            ? new Date(currentUser.user_metadata.date_of_joining) 
+            : null
+        );
+        setLeavingDate(
+          currentUser.user_metadata?.date_of_leaving 
+            ? new Date(currentUser.user_metadata.date_of_leaving) 
+            : null
+        );
+      }
+    };
+
+    // Initial fetch
+    fetchDates();
+
+    // Set up interval
+    const intervalId = setInterval(fetchDates, 2000); // 2 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Fetch current avatar on component mount
   useEffect(() => {
@@ -81,6 +123,9 @@ export function AccountGeneral() {
     phoneNumber: '',
     role: '',
     dateOfBirth: null,
+    designation: '',
+    dateOfJoining: null,
+    dateOfLeaving: null,
   };
 
   const methods = useForm({
@@ -95,16 +140,20 @@ export function AccountGeneral() {
       phoneNumber: user?.user_metadata?.phone_number || '',
       role: user?.user_metadata?.role || '',
       dateOfBirth: user?.user_metadata?.date_of_birth ? new Date(user.user_metadata.date_of_birth) : null,
+      designation: user?.user_metadata?.designation || '',
+      dateOfJoining: joiningDate,
+      dateOfLeaving: leavingDate,
     },
   });
 
-  // Reset form values when currentAvatar changes
+  // Add useEffect to update form when dates change
   useEffect(() => {
     methods.reset({
       ...methods.getValues(),
-      avatarUrl: currentAvatar,
+      dateOfJoining: joiningDate,
+      dateOfLeaving: leavingDate,
     });
-  }, [currentAvatar, methods]);
+  }, [joiningDate, leavingDate, methods]);
 
   const {
     handleSubmit,
@@ -143,6 +192,9 @@ export function AccountGeneral() {
           phone_number: data.phoneNumber,
           role: data.role,
           date_of_birth: data.dateOfBirth ? dayjs(data.dateOfBirth).format('YYYY-MM-DD') : null,
+          designation: data.designation,
+          date_of_joining: data.dateOfJoining ? dayjs(data.dateOfJoining).format('YYYY-MM-DD') : null,
+          date_of_leaving: data.dateOfLeaving ? dayjs(data.dateOfLeaving).format('YYYY-MM-DD') : null,
         },
       });
 
@@ -207,6 +259,7 @@ export function AccountGeneral() {
                 name="role" 
                 label="Role"
                 placeholder="Select role"
+                disabled
               >
                 {ROLE_OPTIONS.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
@@ -220,6 +273,24 @@ export function AccountGeneral() {
                 label="Date of Birth"
                 format="DD/MM/YYYY"
                 maxDate={dayjs()}
+              />
+
+              <Field.Text 
+                name="designation" 
+                label="Designation"
+                placeholder="Enter designation"
+              />
+
+              <Field.DatePicker
+                name="dateOfJoining"
+                label="Date of Joining"
+                format="DD/MM/YYYY"
+              />
+
+              <Field.DatePicker
+                name="dateOfLeaving"
+                label="Date of Relieving"
+                format="DD/MM/YYYY"
               />
             </Box>
 

@@ -5,6 +5,9 @@ import useSWR, { mutate } from 'swr';
 import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
 
+
+const BASE_URL = 'https://apiemployeeos.duckdns.org:8443/api/filemanager';
+
 const enableServer = false;
 
 const swrOptions = {

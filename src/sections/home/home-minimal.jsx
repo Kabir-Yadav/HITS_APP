@@ -20,9 +20,7 @@ import { CircleSvg, FloatLine, FloatPlusIcon } from './components/svg-elements';
 const renderLines = () => (
   <>
     <FloatPlusIcon sx={{ top: 72, left: 72 }} />
-    <FloatPlusIcon sx={{ bottom: 72, left: 72 }} />
     <FloatLine sx={{ top: 80, left: 0 }} />
-    <FloatLine sx={{ bottom: 80, left: 0 }} />
     <FloatLine vertical sx={{ top: 0, left: 80 }} />
   </>
 );
@@ -33,7 +31,7 @@ export function HomeMinimal({ sx, ...other }) {
       <SectionTitle
         caption="Visualizing Success"
         title="What's in"
-        txtGradient="Minimal?"
+        txtGradient="EmployeeOS?"
         sx={{ mb: { xs: 5, md: 8 }, textAlign: { xs: 'center', md: 'left' } }}
       />
 

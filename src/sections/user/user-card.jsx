@@ -20,26 +20,9 @@ import { Image } from 'src/components/image';
 // ----------------------------------------------------------------------
 
 export function UserCard({ user, sx, ...other }) {
-  // Generate random numbers for fallback images
-  const randomAvatar = Math.floor(Math.random() * 24) + 1;
-  const randomCover = Math.floor(Math.random() * 24) + 1;
-
   return (
-    <Card 
-      sx={[
-        { 
-          textAlign: 'center',
-          maxWidth: 600,
-          mx: 'auto',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }, 
-        ...(Array.isArray(sx) ? sx : [sx])
-      ]} 
-      {...other}
-    >
-      <Box sx={{ position: 'relative', height: 320 }}>
+    <Card sx={[{ textAlign: 'center' }, ...(Array.isArray(sx) ? sx : [sx])]} {...other}>
+      <Box sx={{ position: 'relative' }}>
         <AvatarShape
           sx={{
             left: 0,
@@ -51,72 +34,67 @@ export function UserCard({ user, sx, ...other }) {
           }}
         />
 
-        <Avatar
-          alt={user.name}
-          src={user.avatarUrl || _mock.image.avatar(randomAvatar)}
-          sx={{
-            left: 0,
-            right: 0,
-            width: 80,
-            height: 80,
-            zIndex: 11,
-            mx: 'auto',
-            bottom: -40,
-            position: 'absolute',
-            border: (theme) => `solid 4px ${theme.palette.background.paper}`,
-          }}
-        />
+        {!user.hideAvatar && (
+          <Avatar
+            alt={user.name}
+            src={user.avatarUrl}
+            sx={{
+              left: 0,
+              right: 0,
+              width: 64,
+              height: 64,
+              zIndex: 11,
+              mx: 'auto',
+              bottom: -32,
+              position: 'absolute',
+            }}
+          >
+            {user.name?.charAt(0).toUpperCase()}
+          </Avatar>
+        )}
 
         <Image
-          src={user.coverUrl || _mock.image.cover(randomCover)}
-          alt="cover"
+          src={user.coverUrl}
+          alt={user.coverUrl}
           ratio="16/9"
-          overlay={false}
-          sx={{
-            filter: 'brightness(0.8)',
-            backgroundColor: 'grey.500',
-            height: '100%',
-            width: '100%',
-            objectFit: 'cover',
+          slotProps={{
+            overlay: {
+              sx: (theme) => ({
+                bgcolor: varAlpha(theme.vars.palette.common.blackChannel, 0.48),
+              }),
+            },
           }}
         />
       </Box>
 
-      <Box sx={{ 
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        pt: 5,
-        pb: 3,
-      }}>
-        <ListItemText
-          sx={{ mb: 2 }}
-          primary={user.quoteAuthor}
-          slotProps={{
-            primary: { 
-              sx: { 
-                typography: 'h6',
-                fontSize: 24,
-              }
-            },
-          }}
-        />
+      <ListItemText
+        sx={{ mt: 7, mb: 1 }}
+        primary={user.name}
+        secondary={user.designation}
+        slotProps={{
+          primary: { sx: { typography: 'subtitle1' } },
+          secondary: { sx: { mt: 0.5 } },
+        }}
+      />
 
-        <Box sx={{ px: 3 }}>
-          <Typography 
-            variant="body1"
-            sx={{ 
-              fontStyle: 'italic', 
-              color: 'text.secondary',
-              fontSize: '1.5rem',
-              lineHeight: 1.6,
-            }}
-          >
-            &ldquo;{user.quote}&rdquo;
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          mb: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {_socials.map((social) => (
+          <IconButton key={social.label}>
+            {social.value === 'twitter' && <TwitterIcon />}
+            {social.value === 'facebook' && <FacebookIcon />}
+            {social.value === 'instagram' && <InstagramIcon />}
+            {social.value === 'linkedin' && <LinkedinIcon />}
+          </IconButton>
+        ))}
       </Box>
     </Card>
   );
 }
+

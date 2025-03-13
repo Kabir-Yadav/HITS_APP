@@ -217,7 +217,7 @@ const Supabase = {
 };
 
 const authSupabase = {
-  path: 'supabase',
+  path: '/',
   children: [
     {
       path: 'sign-in',
@@ -282,12 +282,11 @@ const authSupabase = {
 
 export const authRoutes = [
   {
-    path: 'auth',
     element: (
       <Suspense fallback={<SplashScreen />}>
         <Outlet />
       </Suspense>
     ),
-    children: [authJwt, authAmplify, authFirebase, authAuth0, authSupabase],
+    children: [authSupabase],
   },
 ];

@@ -26,7 +26,7 @@ export default function AuthCallback() {
 
         if (session) {
           await checkUserSession?.();
-          navigate(paths.dashboard.root);
+          navigate(paths.dashboard.user.dashboard);
         } else {
           navigate(paths.auth.supabase.signIn);
         }

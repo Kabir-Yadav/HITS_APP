@@ -6,12 +6,17 @@ import { supabase } from 'src/lib/supabase';
 
 // ----------------------------------------------------------------------
 
+
+const CHART_ENDPOINT = endpoints.chat;
+
 const swrOptions = {
   revalidateOnFocus: false,
   revalidateOnReconnect: false,
 };
 
+
 const CHAT_CACHE_KEY = 'chat_board';
+
 
 /* ----------------------------------------------------------------------
    1) Fetch Contacts (Users)
@@ -215,6 +220,7 @@ export function useGetConversations(userId) {
   const memoizedValue = useMemo(() => {
     const byId = data?.length ? keyBy(data, (conv) => conv.id) : {};
     const allIds = Object.keys(byId);
+    console.log({ byId, allIds })
     return {
       conversations: { byId, allIds },
       conversationsLoading: isLoading,

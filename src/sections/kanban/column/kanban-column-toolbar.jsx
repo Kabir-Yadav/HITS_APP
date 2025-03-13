@@ -4,6 +4,7 @@ import { useId, useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
@@ -148,9 +149,11 @@ export function KanbanColumnToolBar({
           sx={{ mx: 1 }}
         />
 
-        <IconButton size="small" color="inherit" onClick={onToggleAddTask}>
-          <Iconify icon="solar:add-circle-bold" />
-        </IconButton>
+        <Tooltip title="Add new task">
+          <IconButton size="small" onClick={onToggleAddTask}>
+            <Iconify icon="solar:add-circle-bold" />
+          </IconButton>
+        </Tooltip>
 
         <IconButton
           size="small"

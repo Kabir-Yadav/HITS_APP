@@ -34,10 +34,15 @@ export function AuthProvider({ children }) {
 
         setState({ user: { ...session, ...session?.user }, loading: false });
         axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+
+        // Get the redirect path from router state
+        const location = router.location;
+        const from = location?.state?.from || '/dashboard/user/dashboard';
+
+        router.replace(from);
       } else {
         setState({ user: null, loading: false });
         delete axios.defaults.headers.common.Authorization;
-        router.push(paths.home);
       }
     } catch (error) {
       console.error(error);

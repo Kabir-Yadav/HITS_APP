@@ -11,8 +11,9 @@ import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-import { useGetBoard, moveTaskBetweenColumns } from 'src/actions/kanban';
+import { useGetBoard, moveTaskBetweenColumns, deleteTask } from 'src/actions/kanban';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
@@ -36,9 +37,11 @@ export function KanbanDetailsToolbar({
   const { board } = useGetBoard();
 
   const [status, setStatus] = useState(taskStatus);
+  const [isCompleting, setIsCompleting] = useState(false);
 
   const menuActions = usePopover();
   const confirmDialog = useBoolean();
+  const completeDialog = useBoolean();
 
   useEffect(() => {
     setStatus(taskStatus);
@@ -64,6 +67,48 @@ export function KanbanDetailsToolbar({
     },
     [board.columns, status, task, onUpdateStatus, menuActions]
   );
+
+  const handleMarkComplete = useCallback(async () => {
+    try {
+      setIsCompleting(true);
+      
+      // Check if all subtasks are complete
+      const hasIncompleteSubtasks = task.subtasks?.some(subtask => !subtask.completed);
+      
+      if (hasIncompleteSubtasks) {
+        toast.error('Please complete all subtasks before marking the task as complete', {
+          position: 'top-center',
+        });
+        return;
+      }
+
+      // Find the column ID for this task
+      const column = board.columns.find(col => 
+        col.name === task.status
+      );
+
+      if (!column) {
+        throw new Error('Column not found');
+      }
+
+      // Delete the task
+      await deleteTask(column.id, task.id);
+      
+      toast.success('Task marked as complete!', {
+        position: 'top-center',
+      });
+
+      // Close the details panel
+      onCloseDetails();
+    } catch (error) {
+      console.error('Error completing task:', error);
+      toast.error('Failed to complete task', {
+        position: 'top-center',
+      });
+    } finally {
+      setIsCompleting(false);
+    }
+  }, [task, board.columns, onCloseDetails]);
 
   const renderMenuActions = () => (
     <CustomPopover
@@ -140,7 +185,17 @@ export function KanbanDetailsToolbar({
 
         <Box component="span" sx={{ flexGrow: 1 }} />
 
-        <Box sx={{ display: 'flex' }}>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="soft"
+            color="success"
+            disabled={isCompleting}
+            onClick={handleMarkComplete}
+            startIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}
+          >
+            Mark Complete
+          </Button>
+
           <Tooltip title="Delete task">
             <IconButton onClick={confirmDialog.onTrue}>
               <Iconify icon="solar:trash-bin-trash-bold" />

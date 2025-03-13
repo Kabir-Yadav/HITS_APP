@@ -7,6 +7,8 @@ import { popoverClasses } from '@mui/material/Popover';
 
 import { usePathname } from 'src/routes/hooks';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavDropdown, NavDropdownPaper } from '../components';
@@ -23,8 +25,8 @@ export function NavList({
   enabledRootRedirect,
 }) {
   const theme = useTheme();
-
   const pathname = usePathname();
+  const { user } = useAuthContext();
 
   const isActive = isActiveLink(pathname, data.path, !!data.children);
 
@@ -46,6 +48,11 @@ export function NavList({
       onOpen();
     }
   }, [data.children, onOpen]);
+
+  // Skip rendering if item has roles and user's role is not included
+  if (data.roles && !data.roles.includes(user?.role)) {
+    return null;
+  }
 
   const renderNavItem = () => (
     <NavItem
@@ -120,11 +127,6 @@ export function NavList({
         </NavDropdownPaper>
       </NavDropdown>
     );
-
-  // Hidden item by role
-  if (data.roles && currentRole && !data.roles.includes(currentRole)) {
-    return null;
-  }
 
   return (
     <NavLi disabled={data.disabled}>

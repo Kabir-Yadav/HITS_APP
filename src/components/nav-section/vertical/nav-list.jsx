@@ -4,15 +4,18 @@ import { isActiveLink, isExternalLink } from 'minimal-shared/utils';
 
 import { usePathname } from 'src/routes/hooks';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../styles';
 import { NavUl, NavLi, NavCollapse } from '../components';
 
 // ----------------------------------------------------------------------
 
-export function NavList({ data, depth, render, slotProps, currentRole, enabledRootRedirect }) {
+export function NavList({ data, depth, render, slotProps, enabledRootRedirect }) {
   const pathname = usePathname();
   const navItemRef = useRef(null);
+  const { user } = useAuthContext();
 
   const isActive = isActiveLink(pathname, data.path, !!data.children);
 
@@ -65,14 +68,13 @@ export function NavList({ data, depth, render, slotProps, currentRole, enabledRo
           render={render}
           depth={depth}
           slotProps={slotProps}
-          currentRole={currentRole}
           enabledRootRedirect={enabledRootRedirect}
         />
       </NavCollapse>
     );
 
-  // Hidden item by role
-  if (data.roles && currentRole && !data.roles.includes(currentRole)) {
+  // Skip rendering if item has roles and user's role is not included
+  if (data.roles && !data.roles.includes(user?.role)) {
     return null;
   }
 
@@ -93,7 +95,7 @@ export function NavList({ data, depth, render, slotProps, currentRole, enabledRo
 
 // ----------------------------------------------------------------------
 
-function NavSubList({ data, render, depth = 0, slotProps, currentRole, enabledRootRedirect }) {
+function NavSubList({ data, render, depth = 0, slotProps, enabledRootRedirect }) {
   return (
     <NavUl sx={{ gap: 'var(--nav-item-gap)' }}>
       {data.map((list) => (
@@ -103,7 +105,6 @@ function NavSubList({ data, render, depth = 0, slotProps, currentRole, enabledRo
           render={render}
           depth={depth + 1}
           slotProps={slotProps}
-          currentRole={currentRole}
           enabledRootRedirect={enabledRootRedirect}
         />
       ))}

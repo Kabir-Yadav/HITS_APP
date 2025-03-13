@@ -7,6 +7,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { AccountLayout } from 'src/sections/account/account-layout';
+import { AccountSocialsView } from 'src/sections/account/view/account-socials-view';
 
 import { AuthGuard } from 'src/auth/guard';
 
@@ -27,6 +28,7 @@ const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
 // User
 const UserProfilePage = lazy(() => import('src/pages/dashboard/user/profile'));
+const UserDashboardPage = lazy(() => import('src/pages/dashboard/user/dashboard'))
 const UserCardsPage = lazy(() => import('src/pages/dashboard/user/cards'));
 const UserListPage = lazy(() => import('src/pages/dashboard/user/list'));
 const UserCreatePage = lazy(() => import('src/pages/dashboard/user/new'));
@@ -102,7 +104,15 @@ const accountLayout = () => (
 export const dashboardRoutes = [
   {
     path: 'dashboard',
-    element: CONFIG.auth.skip ? dashboardLayout() : <AuthGuard>{dashboardLayout()}</AuthGuard>,
+    element: (
+      <AuthGuard>
+        <DashboardLayout>
+          <Suspense fallback={<LoadingScreen />}>
+            <Outlet />
+          </Suspense>
+        </DashboardLayout>
+      </AuthGuard>
+    ),
     children: [
       { index: true, element: <IndexPage /> },
       { path: 'ecommerce', element: <OverviewEcommercePage /> },
@@ -115,6 +125,7 @@ export const dashboardRoutes = [
         path: 'user',
         children: [
           { index: true, element: <UserProfilePage /> },
+          { path: 'dashboard', element: <UserDashboardPage /> },
           { path: 'profile', element: <UserProfilePage /> },
           { path: 'cards', element: <UserCardsPage /> },
           { path: 'list', element: <UserListPage /> },
@@ -127,8 +138,8 @@ export const dashboardRoutes = [
               { index: true, element: <AccountGeneralPage /> },
               { path: 'billing', element: <AccountBillingPage /> },
               { path: 'notifications', element: <AccountNotificationsPage /> },
-              { path: 'socials', element: <AccountSocialsPage /> },
               { path: 'change-password', element: <AccountChangePasswordPage /> },
+              { path: 'social-links', element: <AccountSocialsView /> },
             ],
           },
         ],
