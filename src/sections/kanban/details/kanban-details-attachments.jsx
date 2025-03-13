@@ -31,12 +31,12 @@ export function KanbanDetailsAttachments({ taskId, attachments = [] }) {
       try {
         loading.onTrue();
         const newFiles = [];
-        
+
         for (const file of acceptedFiles) {
           // Create a unique file name to prevent collisions
           const fileExt = file.name.split('.').pop();
           const fileName = `${taskId}/${Date.now()}.${fileExt}`;
-          
+          console.log(file)
           // Upload file to storage
           const { error: uploadError } = await supabase.storage
             .from('kanban-attachments')
@@ -84,7 +84,7 @@ export function KanbanDetailsAttachments({ taskId, attachments = [] }) {
     async (fileUrl) => {
       try {
         loading.onTrue();
-        
+
         // Get the attachment record
         const { data: attachment } = await supabase
           .from('kanban_task_attachments')
@@ -238,8 +238,8 @@ export function KanbanDetailsAttachments({ taskId, attachments = [] }) {
                   boxShadow: (theme) => theme.customShadows.z8,
                 }}
               >
-                <Iconify 
-                  icon="eva:cloud-upload-fill" 
+                <Iconify
+                  icon="eva:cloud-upload-fill"
                   width={40}
                   sx={{
                     color: (theme) => theme.palette.primary.main,

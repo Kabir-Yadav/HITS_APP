@@ -18,6 +18,7 @@ import { CollapseButton } from './styles';
 
 export function ChatRoomSingle({ participant }) {
   const collapse = useBoolean(true);
+
   const router = useRouter();
 
   const renderInfo = () => (
@@ -42,7 +43,6 @@ export function ChatRoomSingle({ participant }) {
   const renderContact = () => (
     <Stack spacing={2} sx={{ px: 2, py: 2.5 }}>
       {[
-        { icon: 'mingcute:location-fill', value: participant?.address },
         { icon: 'solar:phone-bold', value: participant?.phoneNumber },
         { icon: 'fluent:mail-24-filled', value: participant?.email },
       ].map((item) => (

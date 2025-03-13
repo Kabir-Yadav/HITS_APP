@@ -16,7 +16,7 @@ import { useRouter } from 'src/routes/hooks';
 import { today } from 'src/utils/format-time';
 import { fDateTime } from 'src/utils/format-time';
 
-import { sendMessage, createConversation, useChatState } from 'src/actions/chat';
+import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -43,7 +43,6 @@ export function ChatMessageInput({
   const fileImageRef = useRef(null); // ✅ Reference for images
   const fileDocRef = useRef(null);   // ✅ Reference for non-image files
 
-  const { loading, setLoading } = useChatState();
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
 
@@ -58,13 +57,13 @@ export function ChatMessageInput({
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
-      role: `${user?.role}`,
-      email: `${user?.email}`,
-      address: `${user?.address}`,
-      name: `${user?.name}`,
+      role: `${user.user_metadata?.role}`,
+      email: `${user.user_metadata?.email}`,
+      address: `${user.user_metadata?.address}`,
+      name: `${user.user_metadata?.first_name} ${user.user_metadata?.last_name}`,
       lastActivity: today(),
-      avatarUrl: `${user?.avatar_url}`,
-      phoneNumber: `${user?.phone_number}`,
+      avatarUrl: `${user.user_metadata?.avatar_url}`,
+      phoneNumber: `${user.user_metadata?.phone_number}`,
       status: 'online',
     }),
     [user]
@@ -107,7 +106,6 @@ export function ChatMessageInput({
           preview: e.target.result,
           size: file.size,
           createdAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
           type: file.type.split('/')[1],
         });
 
@@ -139,12 +137,12 @@ export function ChatMessageInput({
           finalMessageData.parent_id = replyTo.id;
         }
 
-        // console.log('Sending message:', finalMessageData); // ✅ Debug before sending
+        console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
-            await sendMessage(selectedConversationId, user?.id, finalMessageData, replyTo?.id || null, setLoading);
+            await sendMessage(selectedConversationId, user?.id, finalMessageData.body, replyTo?.id || null, finalMessageData.attachments);
           } else {
-            const res = await createConversation(conversationData);
+            const res = await createConversation(conversationData, user?.id);
             router.push(`${paths.dashboard.chat}?id=${res.id}`);
             onAddRecipients([]);
           }
@@ -172,21 +170,6 @@ export function ChatMessageInput({
 
   return (
     <>
-      {loading.sendingMessage && (
-        <Stack sx={{ flex: '1 1 auto', position: 'relative' }}>
-          <LinearProgress
-            color="inherit"
-            sx={{
-              top: 0,
-              left: 0,
-              width: 1,
-              height: 2,
-              borderRadius: 0,
-              position: 'absolute',
-            }}
-          />
-        </Stack>
-      )}
 
       {/* ✅ Small preview inside input like WhatsApp */}
       {replyTo && (
@@ -224,7 +207,7 @@ export function ChatMessageInput({
                   replyTo.attachments[0].type
                 ) ? (
                   <img
-                    src={replyTo.attachments[0].preview}
+                    src={replyTo.attachments[0].path}
                     alt="Attachment Preview"
                     style={{ width: 70, height: 70, borderRadius: 5, objectFit: "cover" }}
                   />
@@ -233,7 +216,7 @@ export function ChatMessageInput({
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <FileThumbnail
                       imageView
-                      file={replyTo.attachments[0].preview}
+                      file={replyTo.attachments[0].path}
                       slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
                       sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
                     />

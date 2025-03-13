@@ -1,388 +1,741 @@
 import { keyBy } from 'es-toolkit';
 import useSWR, { mutate } from 'swr';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useId } from 'react';
 
-import axios, { fetcher, endpoints } from 'src/lib/axios';
+import { supabase } from 'src/lib/supabase';
 
 // ----------------------------------------------------------------------
-const BASE_URL = 'https://apiemployeeos.duckdns.org:8443/api/chat';
 
-const enableServer = false;
 
 const CHART_ENDPOINT = endpoints.chat;
 
 const swrOptions = {
-  revalidateIfStale: enableServer,
-  revalidateOnFocus: enableServer,
-  revalidateOnReconnect: enableServer,
+  revalidateOnFocus: false,
+  revalidateOnReconnect: false,
 };
 
-// ----------------------------------------------------------------------
 
-class WebSocketManager {
-  constructor() {
-    this.ws = null;
-    this.eventHandlers = {};
-    this.setLoading = () => { }; // Default to an empty function if not provided
-
-  }
-
-  connect(userId, setLoading = () => { }) {
-    this.setLoading = setLoading;
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(`wss://apiemployeeos.duckdns.org:8443/ws/chat/${userId}`);
-
-      this.ws.onopen = () => console.log("✅ WebSocket connected!");
-
-      this.ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log("📩 Received WebSocket Event:", data);
-
-        this.setLoading((prev) => ({ ...prev, sendingMessage: false }));
-        if (data.event === "message" || data.event === "reply") {
-          this.updateConversationCache(data.conversation_id, data);
-        }
-        if (data.event === 'reaction') {
-          this.updateReactionCache(data.conversation_id, data.message_id, data.sender_id, data.reactions);
-        }
-        if (data.event === 'delete') {
-          this.deleteMessageCache(data.conversation_id, data.message_id);
-        }
-        // ✅ Set loading state
-        if (this.eventHandlers[data.event]) {
-          this.eventHandlers[data.event](data);
-        }
-      };
-
-      this.ws.onerror = (error) => {
-        console.error("❌ WebSocket Error:", error);
-      };
-
-      this.ws.onclose = () => {
-        console.warn("⚠️ WebSocket disconnected, attempting reconnection...");
-        setTimeout(() => this.connect(userId), 3000);
-      };
-    }
-  }
-
-  sendMessage(payload) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(payload));
-    } else {
-      console.warn("⚠️ WebSocket not open. Attempting to reconnect...");
-      setTimeout(() => this.sendMessage(payload), 500);
-    }
-  }
-  deleteMessageCache(conversationId, messageId) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-
-    mutate(url, (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        console.warn("deleteMessage: No cached conversation found. Skipping mutation.");
-        return currentData;
-      }
-
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: conv.messages.filter((msg) => msg.id !== messageId),
-            }
-            : conv
-        ),
-      };
-    }, false);
-
-    mutate(
-      `${BASE_URL}/conversations/`,
-      (currentData) => {
-        const currentConversations = currentData.conversations;
-
-        const conversations = currentConversations.map(
-          (conversation) =>
-            conversation.id === conversationId
-              ? { ...conversation, messages: conversation.messages.filter((msg) => msg.id !== messageId) }
-              : conversation
-        );
-
-        return { ...currentData, conversations };
-      },
-      false
-    );
-  }
-  updateReactionCache(conversationId, messageId, userId, reactions) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-
-    mutate(url, (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        console.warn("handleAddReaction: No cached conversation found. Skipping mutation.");
-        return currentData;
-      }
-
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: conv.messages.map((msg) => {
-                if (msg.id !== messageId) return msg;
-
-                return {
-                  ...msg,
-                  reactions: reactions,
-                };
-              }),
-            }
-            : conv
-        ),
-      };
-    }, false);
-  }
-
-  updateConversationCache(conversationId, newMessage) {
-    const url = conversationId
-      ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-      : '';
-    console.log(newMessage)
-    mutate(url, (currentData) => {
-      if (!currentData) {
-        console.warn("sendMessage: No cached data found for mutation. Skipping mutation.");
-        return currentData;
-      }
-      return {
-        ...currentData,
-        conversations: currentData.conversations.map((conv) =>
-          conv.id === conversationId
-            ? {
-              ...conv,
-              messages: [...conv.messages, newMessage], // ✅ Append message safely
-            }
-            : conv
-        ),
-      };
-    }, false);
-
-    mutate(
-      `${BASE_URL}/conversations/`,
-      (currentData) => {
-        const currentConversations = currentData.conversations;
-
-        const conversations = currentConversations.map(
-          (conversation) =>
-            conversation.id === conversationId
-              ? { ...conversation, messages: [...conversation.messages, newMessage] }
-              : conversation
-        );
-
-        return { ...currentData, conversations };
-      },
-      false
-    );
-
-  }
-}
-
-export const websocketManager = new WebSocketManager();
-
-const loadingState = {
-  sendingMessage: false,
-  sendingReaction: false,
-  deletingMessage: false
-};
-
-export function useChatState() {
-  const [loading, setLoading] = useState(loadingState);
-
-  return { loading, setLoading };
-}
+const CHAT_CACHE_KEY = 'chat_board';
 
 
+/* ----------------------------------------------------------------------
+   1) Fetch Contacts (Users)
+   ---------------------------------------------------------------------- */
 export function useGetContacts() {
-  // const url = [CHART_ENDPOINT, { params: { endpoint: 'contacts' } }];
+  const { data, error, isLoading, isValidating } = useSWR(
+    'contacts',
+    async () => {
+      const { data: contactsData, error: contactsError } = await supabase.from('user_info').select('*');
+      if (contactsError) throw error;
+      return {
+        contacts: contactsData,
+      };
+    },
+    swrOptions
+  );
 
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/contacts/`, fetcher, swrOptions);
   const memoizedValue = useMemo(
     () => ({
       contacts: data?.contacts || [],
       contactsLoading: isLoading,
       contactsError: error,
       contactsValidating: isValidating,
-      contactsEmpty: !isLoading && !isValidating && !data?.contacts.length,
+      contactsEmpty: !isLoading && !isValidating && !data.length,
     }),
-    [data?.contacts, error, isLoading, isValidating]
+    [data, error, isLoading, isValidating]
   );
-
   return memoizedValue;
 }
 
-// ----------------------------------------------------------------------
+/* ----------------------------------------------------------------------
+   2️⃣ Fetch Conversations for a User
+---------------------------------------------------------------------- */
+
+const fetchConversations = async (userId) => {
+  if (!userId) return [];
+
+  // 🔹 Step 1: Get conversations where the user is a participant
+  const { data: userConversations, error: convError } = await supabase
+    .from("conversation_participants")
+    .select(`
+      conversation_id, 
+      conversations ( id, name, is_group, created_at )
+    `)
+    .eq("participant_id", userId);
+
+  if (convError) throw convError;
+  if (!userConversations.length) return [];
+
+  const conversationIds = userConversations.map((c) => c.conversations.id);
+
+  // 🔹 Step 2: Fetch participants for each conversation
+  const { data: participantsData, error: participantsError } = await supabase
+    .from("conversation_participants")
+    .select(`
+      conversation_id, 
+      participant_id,
+      user_info: user_info (
+        id,
+        email,
+        full_name,
+        phone_number,
+        avatar_url,
+        role
+      )
+    `)
+    .in("conversation_id", conversationIds);
+
+  if (participantsError) throw participantsError;
+
+  // 🔹 Step 3: Fetch messages and attachments
+  const { data: messagesData, error: messagesError } = await supabase
+    .from("messages")
+    .select(`
+      id, 
+      sender_id, 
+      conversation_id, 
+      body, 
+      content_type, 
+      parent_id,
+      created_at,
+      attachments: attachments (
+        id, 
+        name, 
+        path,
+        preview, 
+        size, 
+        created_at, 
+        type
+      )
+      reactions: message_reactions(
+        user_id,
+        emoji
+      )
+    `)
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: true });
+
+  if (messagesError) throw messagesError;
+
+  // 🔹 Generate Public URLs for attachments
+  const fetchPublicUrls = async (attachments) =>
+    Promise.all(
+      attachments.map(async (attachment) => {
+        const { data } = supabase.storage.from("chat_attachment").getPublicUrl(attachment.path);
+        return { ...attachment, path: data.publicUrl };
+      })
+    );
+
+  // 🔹 Step 4: Structure the data properly
+  const formattedConversations = await Promise.all(
+    userConversations.map(async (conv) => ({
+      id: conv.conversations.id,
+      name: conv.conversations.name,
+      type: conv.conversations.is_group ? "GROUP" : "ONE_TO_ONE",
+      unreadCount: 0,
+      participants: participantsData
+        .filter((p) => p.conversation_id === conv.conversations.id)
+        .map((p) => ({
+          id: p.user_info?.id || "",
+          role: p.user_info?.role || "participant",
+          status: "offline",
+          name: `${p.user_info?.full_name}`.trim(),
+          email: p.user_info?.email || "",
+          phoneNumber: p.user_info?.phone_number || "",
+          avatarUrl: p.user_info?.avatar_url || "",
+        })),
+      messages: await Promise.all(
+        messagesData
+          .filter((msg) => msg.conversation_id === conv.conversations.id)
+          .map(async (msg) => ({
+            id: msg.id,
+            senderId: msg.sender_id,
+            body: msg.body || "",
+            contentType: msg.content_type || "text",
+            createdAt: msg.created_at,
+            parentId: msg.parent_id || null,
+            attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+            reactions: msg.reactions || [],
+          }))
+      ),
+    }))
+  );
+
+  return formattedConversations;
+};
 
 export function useGetConversations(userId) {
-  // const url = [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }];
-  const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}/conversations/`, fetcher, swrOptions);
-  const memoizedValue = useMemo(() => {
-    const userConversations = data?.conversations?.filter((conversation) =>
-      conversation.participants.some((participant) => participant.id === userId)
-    ) || [];
+  const { data, error, isLoading } = useSWR(
+    userId ? ["conversations", userId] : null,
+    () => fetchConversations(userId),
+    { revalidateOnFocus: false, revalidateOnReconnect: true }
+  );
 
-    const byId = userConversations.length ? keyBy(userConversations, (conv) => conv.id) : {};
+  useEffect(() => {
+    if (!userId) return () => { };
+
+    // ✅ Subscribe to new conversations
+    const conversationSubscription = supabase
+      .channel(`conversation_updates_${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "conversation_participants",
+          filter: `participant_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log("New conversation added:", payload);
+          mutate(["conversations", userId]); // ✅ Refresh conversation list
+        }
+      )
+      .subscribe();
+
+    // ✅ Subscribe to new messages in any conversation of this user
+    const messageSubscription = supabase
+      .channel(`message_updates_${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(",")})`,
+        },
+        (payload) => {
+          console.log("New message received 2:", payload);
+          mutate(["conversations", userId]); // ✅ Refresh conversations
+          mutate(["conversation", payload.new.conversation_id]); // ✅ Refresh individual conversation
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(conversationSubscription);
+      supabase.removeChannel(messageSubscription);
+    };
+  }, [userId, data]);
+
+  const memoizedValue = useMemo(() => {
+    const byId = data?.length ? keyBy(data, (conv) => conv.id) : {};
     const allIds = Object.keys(byId);
     console.log({ byId, allIds })
     return {
       conversations: { byId, allIds },
       conversationsLoading: isLoading,
-      conversationsError: error,
-      conversationsValidating: isValidating,
-      conversationsEmpty: !isLoading && !isValidating && !allIds.length,
+      conversationsEmpty: !isLoading && !allIds.length,
     };
-  }, [data?.conversations, userId, error, isLoading, isValidating]);
-
+  }, [data, isLoading]);
   return memoizedValue;
 }
 
-// ----------------------------------------------------------------------
-
+/* ----------------------------------------------------------------------
+   3️⃣ Fetch Single Conversation & Messages
+---------------------------------------------------------------------- */
 export function useGetConversation(conversationId) {
-  const url = conversationId
-    ? [`${BASE_URL}/conversationByID/`, { params: { conversationId, endpoint: 'conversation' } }]
-    : '';
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
-  // console.log("DEBUG: useGetConversation data →", data); // ✅ Debug to check if data updates
+  const {
+    data: conversationData,
+    error: conversationError,
+    isLoading,
+    isValidating,
+  } = useSWR(
+    conversationId ? ["conversation", conversationId] : null,
+    async () => {
+      // Fetch conversation details
+      const { data: conversation, error: convError } = await supabase
+        .from("conversations")
+        .select("id, is_group, created_at")
+        .eq("id", conversationId)
+        .single();
 
-  const memoizedValue = useMemo(
-    () => ({
-      conversation: data?.conversations?.[0] || null, // Ensure a valid conversation object
-      conversationLoading: isLoading,
-      conversationError: error,
-      conversationValidating: isValidating,
-      conversationEmpty: !isLoading && !isValidating && (!data?.conversations || data.conversations.length === 0),
-    }),
-    [data?.conversations, error, isLoading, isValidating]
+      if (convError) throw convError;
+
+      // Fetch participants
+      const { data: participants, error: participantsError } = await supabase
+        .from("conversation_participants")
+        .select(`
+          conversation_id, 
+          participant_id, 
+          user_info: user_info (
+            id,
+            email,
+            full_name,
+            phone_number,
+            avatar_url,
+            role,
+            last_activity
+          )
+        `)
+        .eq("conversation_id", conversationId);
+
+      if (participantsError) throw participantsError;
+
+      // Fetch messages
+      const { data: messages, error: messagesError } = await supabase
+        .from("messages")
+        .select(`
+          id, 
+          sender_id, 
+          conversation_id, 
+          body, 
+          parent_id,
+          content_type, 
+          created_at,
+          attachments (
+            id, 
+            name, 
+            path,
+            preview, 
+            size, 
+            created_at, 
+            type
+          ),
+          message_reactions (
+            user_id,
+            emoji
+          )
+        `)
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: true });
+
+      if (messagesError) throw messagesError;
+
+      // Generate Public URLs for attachments
+      const fetchPublicUrls = async (attachments) =>
+        Promise.all(
+          attachments.map(async (attachment) => {
+            // Ensure `attachment.path` is relative to the bucket root
+            const cleanPath = attachment.path.replace(/^storage\/public\/chat_attachments/, "");
+
+            const { data } = supabase.storage
+              .from("chat_attachment") // Correct bucket name
+              .getPublicUrl(cleanPath);
+
+            return { ...attachment, path: data.publicUrl };
+          })
+        );
+
+      return {
+        id: conversation.id,
+        type: conversation.is_group ? "GROUP" : "ONE_TO_ONE",
+        participants: participants.map((p) => ({
+          id: p.user_info?.id || "",
+          role: p.user_info?.role || "participant",
+          status: "offline",
+          name: `${p.user_info?.full_name}`.trim(),
+          email: p.user_info?.email || "",
+          phoneNumber: p.user_info?.phone_number || "",
+          avatarUrl: p.user_info?.avatar_url || "",
+          last_activity: p.user_info?.last_activity || ''
+        })),
+        messages: await Promise.all(
+          messages.map(async (msg) => ({
+            id: msg.id,
+            senderId: msg.sender_id,
+            body: msg.body,
+            contentType: msg.content_type,
+            createdAt: msg.created_at,
+            parentId: msg.parent_id,
+            attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
+            reactions: msg.message_reactions || []
+          }))
+        ),
+      };
+    }
   );
 
-  return memoizedValue;
+  useEffect(() => {
+    if (!conversationId) return () => { };
+
+    // ✅ Listen for new messages in the conversation
+    const messageSubscription = supabase
+      .channel(`conversation_${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          console.log("New message received:", payload);
+          mutate(["conversation", conversationId]); // Re-fetch messages in real-time
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          console.log(" Message Deleted:", payload);
+          mutate(["conversation", conversationId]); // Re-fetch messages in real-time
+        }
+      )
+      .subscribe();
+
+    const reactionSubscription = supabase
+      .channel(`reaction_updates_${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("New reaction received:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("Reaction updated:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("Reaction deleted:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .subscribe();
+
+
+    return () => {
+      supabase.removeChannel(messageSubscription);
+      supabase.removeChannel(reactionSubscription);
+
+    };
+  }, [conversationId]);
+
+  return {
+    conversation: conversationData || null,
+    conversationLoading: isLoading,
+    conversationError,
+    conversationValidating: isValidating,
+  };
 }
 
-// ----------------------------------------------------------------------
-
-export async function sendMessage(conversationId, userId, messageData, parentId = null, setLoading) {
-  if (!conversationId || !userId) {
-    console.error("sendMessage: Missing conversationId or userId");
+/* ----------------------------------------------------------------------
+   4️⃣ Send Message (Now Using Supabase)
+---------------------------------------------------------------------- */
+export async function sendMessage(conversationId, senderId, body, parentId = null, attachments = []) {
+  if (!conversationId || !senderId) {
+    console.error('sendMessage: Missing conversationId or senderId');
     return;
   }
-
-  const messagePayload = {
-    event: "message",
+  let messageData = {
     conversation_id: conversationId,
-    sender_id: userId,
-    parent_id: parentId,
-    ...messageData,
+    sender_id: senderId,
+    body,
+    parent_id: parentId, // If it's a reply, store parent_id
+    content_type: "text",
+    created_at: new Date().toISOString(),
   };
 
-  setLoading((prev) => ({ ...prev, sendingMessage: true })); // ✅ Set loading state to true before sending
+  // Insert message into Supabase
+  const { data: insertedMessage, error: messageError } = await supabase
+    .from("messages")
+    .insert(messageData)
+    .select()
+    .single();
 
-  console.log("DEBUG: Sending message →", messagePayload);
-  websocketManager.connect(userId, setLoading); // ✅ Ensure WebSocket is connected before sending
-  websocketManager.sendMessage(messagePayload);
-}
-
-// ----------------------------------------------------------------------
-
-export async function createConversation(conversationData) {
-
-  console.log(conversationData)
-  const response = await axios.post(`${BASE_URL}/create-conversation/`, {
-    conversationData, // Send the entire object
-  });
-
-  if (response.data) {
-    console.log("✅ New conversation created:", response.data);
-
-    // Update SWR cache with the new conversation
-    mutate(`${BASE_URL}/conversations/`, (currentData) => ({
-      ...currentData,
-      conversations: [...currentData.conversations, response.data],
-    }));
+  if (messageError) {
+    console.error("sendMessage error:", messageError);
+    throw messageError;
   }
-  return response.data;
+
+  // Handle attachments
+  if (attachments.length > 0) {
+    await Promise.all(
+      attachments.map(async (file) => {
+        // 🔹 Extract the file extension
+        const fileExt = file.type.split('/')[1] || file.name.split('.').pop();
+        const filePath = `${conversationId}/${Date.now()}.${fileExt}`;
+
+        // 🔹 Convert Base64 to Blob
+        const byteCharacters = atob(file.path.split(",")[1]); // Extract base64 string
+        const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: file.type });
+
+        // 📌 Upload file to Supabase
+        const { error: uploadError } = await supabase.storage
+          .from("chat_attachment")
+          .upload(filePath, blob, {
+            contentType: file.type, // Ensures correct MIME type
+          });
+
+        if (uploadError) {
+          console.error("Attachment upload error:", uploadError);
+          throw uploadError;
+        }
+        console.log("file-uploaded");
+
+        // 📌 Generate Public URL
+        const { data } = supabase.storage.from("chat_attachment").getPublicUrl(filePath);
+        const publicUrl = data.publicUrl;
+
+        console.log("file-path generated:", publicUrl);
+
+        // 📌 Insert attachment record in DB
+        const { error: attachmentError } = await supabase.from("attachments").insert({
+          message_id: insertedMessage.id,
+          name: file.name,
+          path: filePath, // Store the correct path, not the full URL
+          preview: publicUrl, // Store the public URL for preview
+          size: file.size,
+          type: file.type,
+          created_at: new Date().toISOString(),
+        });
+
+        if (attachmentError) {
+          console.error("Attachment DB error:", attachmentError);
+          throw attachmentError;
+        }
+      })
+    );
+  }
+
+  // Revalidate messages via SWR to update UI instantly
+  mutate(["conversation", conversationId],);
+
+  mutate(["conversations", senderId])
+
 }
 
-// ----------------------------------------------------------------------
+/* ----------------------------------------------------------------------
+   5️⃣ Create a New Conversation
+---------------------------------------------------------------------- */
+export async function createConversation(conversationData, userid) {
+  // Extract required fields from conversationData
+  const { participants, name = null, is_group, messages } = conversationData;
+  // console.log(participants, name, is_group, messages[0])
+  if (participants.length === 0) {
+    console.error("Error: participantIds are required");
+    throw new Error("participantIds cannot be empty");
+  }
+
+  // Step 1️⃣: Insert new conversation
+  const { data: newConversation, error } = await supabase
+    .from("conversations")
+    .insert({
+      name,
+      is_group: is_group // Ensure this column exists in the database
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating conversation:", error);
+    throw error;
+  }
+  console.log("conversation added", newConversation.id)
+
+  // Step 2️⃣: Insert participants into `conversation_participants`
+  const participantsData = participants.map((participant) => ({
+    conversation_id: newConversation.id,
+    participant_id: participant.id,
+  }));
+
+  const { error: partErr } = await supabase
+    .from("conversation_participants")
+    .insert(participantsData);
+
+  if (partErr) {
+    console.error("Error adding participants:", partErr);
+    throw partErr;
+  }
+  console.log("participants added")
+
+  let messageData = {
+    conversation_id: newConversation.id,
+    sender_id: messages[0].sender_id,
+    body: messages[0].body,
+    parent_id: messages[0].parent_id || null, // If it's a reply, store parent_id
+    content_type: "text",
+    created_at: messages[0].created_at,
+  };
+  const { data: insertedMessage, error: messageError } = await supabase
+    .from("messages")
+    .insert(messageData)
+    .select()
+    .single();
+
+  if (messageError) {
+    console.error("sendMessage error:", messageError);
+    throw messageError;
+  }
+
+  console.log("message added")
+
+  // Handle attachments
+  if (messages[0].attachments.length > 0) {
+    await Promise.all(
+      messages[0].attachments.map(async (file) => {
+        // 🔹 Extract the file extension
+        const fileExt = file.type.split('/')[1] || file.name.split('.').pop();
+        const filePath = `${newConversation.id}/${Date.now()}.${fileExt}`;
+
+        // 🔹 Convert Base64 to Blob
+        const byteCharacters = atob(file.path.split(",")[1]); // Extract base64 string
+        const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: file.type });
+
+        // 📌 Upload file to Supabase
+        const { error: uploadError } = await supabase.storage
+          .from("chat_attachment")
+          .upload(filePath, blob, {
+            contentType: file.type, // Ensures correct MIME type
+          });
+
+        if (uploadError) {
+          console.error("Attachment upload error:", uploadError);
+          throw uploadError;
+        }
+        console.log("file-uploaded");
+
+        // 📌 Generate Public URL
+        const { data } = supabase.storage.from("chat_attachment").getPublicUrl(filePath);
+        const publicUrl = data.publicUrl;
+
+        console.log("file-path generated:", publicUrl);
+
+        // 📌 Insert attachment record in DB
+        const { error: attachmentError } = await supabase.from("attachments").insert({
+          message_id: insertedMessage.id,
+          name: file.name,
+          path: filePath, // Store the correct path, not the full URL
+          preview: publicUrl, // Store the public URL for preview
+          size: file.size,
+          type: file.type,
+          created_at: new Date().toISOString(),
+        });
+
+        if (attachmentError) {
+          console.error("Attachment DB error:", attachmentError);
+          throw attachmentError;
+        }
+      })
+    );
+  }
+  mutate(["conversation", newConversation.id],);
+
+  mutate(["conversations", userid])
+
+  return newConversation
+}
+
+
+/* ----------------------------------------------------------------------
+   9️⃣ Mark Conversation as Read
+---------------------------------------------------------------------- */
+export async function markConversationAsRead(conversationId) {
+  await supabase.from('messages').update({ read: true }).eq('conversation_id', conversationId);
+}
 
 export async function clickConversation(conversationId) {
-  /**
-   * Work on server
-   */
-  if (enableServer) {
-    try {
-      await axios.get(`${BASE_URL}/markAsSeen/`, {
-        params: { conversationId },
-      });
-    } catch (error) {
-      console.error("Failed to mark conversation as seen:", error);
-    }
-  }
 
-  /**
-   * Work in local
-   */
-  mutate(
-    [CHART_ENDPOINT, { params: { endpoint: 'conversations' } }],
-    (currentData) => {
-      if (!currentData || !currentData.conversations) {
-        return currentData; // Ensure a consistent return value
-      }
 
-      const updatedConversations = currentData.conversations.map((conversation) =>
-        conversation.id === conversationId ? { ...conversation, unreadCount: 0 } : conversation
-      );
-
-      return { ...currentData, conversations: updatedConversations };
-    },
-    false
-  );
 }
-
-//-------------------------------------------------------------------------------------
 
 export function useDeleteMessage() {
-  return async (messageId, conversation_id, user_id) => {
+  return async (messageId, conversationId) => {
+    try {
+      const { error } = await supabase.from('messages').delete().eq('id', messageId);
 
-    websocketManager.connect(user_id); // Ensure WebSocket is connected
+      if (error) {
+        console.error("Error deleting message:", error);
+        throw error;
+      }
 
-    const deletePayload = {
-      action: "delete",
-      message_id: messageId,
-      conversation_id: conversation_id,
-    };
+      console.log("Message deleted:", messageId);
 
-    websocketManager.sendMessage(deletePayload);
+      // ✅ Re-fetch conversation messages after deletion
+      mutate(["conversation", conversationId]);
 
-    console.log("DEBUG: Sent delete request via WebSocket", deletePayload);
+    } catch (error) {
+      console.error("Failed to delete message:", error);
+    }
   };
 }
+
 
 //-------------------------------------------------------------------------------------
 
 export async function handleAddReaction(messageId, userId, emoji, conversationId) {
+  try {
+    // ✅ Check if the reaction already exists
+    const { data: existingReaction, error: fetchError } = await supabase
+      .from("message_reactions")
+      .select("id, emoji")
+      .eq("message_id", messageId)
+      .eq("user_id", userId)
+      .single();
 
-  websocketManager.connect(userId);
+    if (fetchError && fetchError.code !== "PGRST116") {
+      console.error("Error fetching reaction:", fetchError);
+      return;
+    }
 
-  const reactionPayload = {
-    event: "reaction",
-    conversation_id: conversationId,
-    message_id: messageId,
-    sender_id: userId,
-    reaction: emoji,
-  };
+    if (existingReaction) {
+      if (existingReaction.emoji === emoji) {
+        // ✅ If the same user reacts with the same emoji, DELETE the reaction
+        const { error: deleteError } = await supabase
+          .from("message_reactions")
+          .delete()
+          .eq("id", existingReaction.id);
 
-  websocketManager.sendMessage(reactionPayload);
+        if (deleteError) throw deleteError;
+        console.log("Reaction deleted");
+      } else {
+        // ✅ If the user reacts with a different emoji, UPDATE the reaction
+        const { error: updateError } = await supabase
+          .from("message_reactions")
+          .update({ emoji })
+          .eq("id", existingReaction.id);
 
+        if (updateError) throw updateError;
+        console.log("Reaction updated");
+      }
+    } else {
+      // ✅ If no reaction exists, INSERT a new reaction
+      const { error: insertError } = await supabase
+        .from("message_reactions")
+        .insert({
+          message_id: messageId,
+          user_id: userId,
+          emoji: emoji,
+        });
+
+      if (insertError) throw insertError;
+      console.log("Reaction added");
+    }
+
+    // ✅ Trigger a real-time UI update
+    mutate(["conversation", conversationId]); // Force UI refresh
+
+  } catch (error) {
+    console.error("handleAddReaction error:", error);
+  }
 }
+

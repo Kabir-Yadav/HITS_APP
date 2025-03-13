@@ -17,18 +17,17 @@ export function initialConversation({ message = "", recipients, me, attachment =
   const messageData = {
     id: uuidv4(),
     body: attachment ? "" : message, // ✅ If attachment exists, no text body
-    contentType: detectContentType(),
+    content_type: detectContentType(),
     attachments: attachment ? [attachment] : [],
-    createdAt: fSub({ minutes: 1 }),
-    senderId: me.id,
+    created_at: fSub({ minutes: 1 }),
+    sender_id: me.id,
   };
 
   const conversationData = {
     id: isGroup ? uuidv4() : recipients[0]?.id,
     messages: [messageData],
     participants: [...recipients, me],
-    type: isGroup ? "GROUP" : "ONE_TO_ONE",
-    unreadCount: 0,
+    is_group: isGroup ? true : false,
   };
 
   return { messageData, conversationData };
