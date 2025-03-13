@@ -29,6 +29,8 @@ import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { useTable, rowInPage, getComparator } from 'src/components/table';
 
+import { useMockedUser } from 'src/auth/hooks';
+
 import { FileRecentItem } from '../file-recent-item';
 import { FileManagerPanel } from '../file-manager-panel';
 import { FileManagerTable } from '../file-manager-table';
@@ -43,14 +45,14 @@ import { FileManagerNewFolderDialog } from '../file-manager-new-folder-dialog';
 
 export function FileManagerView() {
   const table = useTable({ defaultRowsPerPage: 10 });
-
+  const { user } = useMockedUser()
   const dateRange = useBoolean();
   const confirmDialog = useBoolean();
   const newFilesDialog = useBoolean();
 
   const [displayMode, setDisplayMode] = useState('list');
 
-  const userId = 'cb7288da-aa6c-42df-a28a-86bd994296aa';
+  const userId = user.id;
   const { data, isLoading, isError } = useGetFiles(userId);
   const [tableData, setTableData] = useState([]);
   const GB = 1000000000 * 24;
