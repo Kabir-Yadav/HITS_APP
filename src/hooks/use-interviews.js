@@ -88,6 +88,7 @@ export function useInterviews() {
             created_at,
             status,
             current_stage,
+            email,
             job:jobs (
               id,
               job_id,
@@ -130,6 +131,7 @@ export function useInterviews() {
               created_at,
               status,
               current_stage,
+              email,
               job:jobs (
                 id,
                 job_id,
@@ -187,6 +189,7 @@ export function useInterviews() {
           created_at,
           status,
           current_stage,
+          email,
           job:jobs (
             id,
             job_id,
@@ -218,6 +221,7 @@ export function useInterviews() {
             created_at,
             status,
             current_stage,
+            email,
             job:jobs (
               id,
               job_id,

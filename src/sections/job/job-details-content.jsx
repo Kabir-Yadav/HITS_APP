@@ -20,7 +20,7 @@ import { Markdown } from 'src/components/markdown';
 // ----------------------------------------------------------------------
 
 export function JobDetailsContent({ job, sx, ...other }) {
-  const domain = 'employeeos.tech';
+  const domain = 'https://employeeos.tech';
   const applicationLink = `${domain}${paths.public.jobApplication(job.id)}`;
 
   const handleCopyLink = () => {
