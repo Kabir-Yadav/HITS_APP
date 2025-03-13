@@ -17,7 +17,7 @@ import { FileManagerNewFolderDialog } from './file-manager-new-folder-dialog';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerGridView({ table, dataFiltered, onDeleteItem, onOpenConfirm }) {
+export function FileManagerGridView({ table, userId, dataFiltered, onDeleteItem, onOpenConfirm }) {
   const { selected, onSelectRow: onSelectItem, onSelectAllRows: onSelectAllItems } = table;
 
   const containerRef = useRef(null);
@@ -138,6 +138,7 @@ export function FileManagerGridView({ table, dataFiltered, onDeleteItem, onOpenC
             .map((file) => (
               <FileManagerFileItem
                 key={file.id}
+                userId={userId}
                 file={file}
                 selected={selected.includes(file.id)}
                 onSelect={() => onSelectItem(file.id)}

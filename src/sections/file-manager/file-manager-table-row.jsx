@@ -20,6 +20,8 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 import { fDate, fTime } from 'src/utils/format-time';
 
+import { toggleFavoriteFile } from 'src/actions/filemanager';
+
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
@@ -31,7 +33,7 @@ import { FileManagerFileDetails } from './file-manager-file-details';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerTableRow({ row, selected, onSelectRow, onDeleteRow }) {
+export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDeleteRow }) {
   const theme = useTheme();
 
   const { copy } = useCopyToClipboard();
@@ -42,12 +44,18 @@ export function FileManagerTableRow({ row, selected, onSelectRow, onDeleteRow })
   const detailsDrawer = useBoolean();
   const confirmDialog = useBoolean();
   const menuActions = usePopover();
-  const favorite = useBoolean(row.isFavorited);
+  const favorite = row.isFavorited;
 
   const handleChangeInvite = useCallback((event) => {
     setInviteEmail(event.target.value);
   }, []);
 
+  const handleToggleFavorite = async (fileId, currentValue) => {
+    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+    if (!result.success) {
+      toast.error('Failed to toggle favorite');
+    }
+  };
   const handleClick = useDoubleClick({
     click: () => {
       detailsDrawer.onTrue();
@@ -122,8 +130,8 @@ export function FileManagerTableRow({ row, selected, onSelectRow, onDeleteRow })
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
       file={row}
-      favorited={favorite.value}
-      onFavorite={favorite.onToggle}
+      favorited={favorite}
+      onFavorite={() => handleToggleFavorite(row.id, favorite)}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}
@@ -261,8 +269,8 @@ export function FileManagerTableRow({ row, selected, onSelectRow, onDeleteRow })
             color="warning"
             icon={<Iconify icon="eva:star-outline" />}
             checkedIcon={<Iconify icon="eva:star-fill" />}
-            checked={favorite.value}
-            onChange={favorite.onToggle}
+            checked={favorite}
+            onChange={() => handleToggleFavorite(row.id, favorite)}
             sx={{ p: 0.75 }}
             inputProps={{
               id: `favorite-checkbox-${row.id}`,

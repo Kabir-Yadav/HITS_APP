@@ -25,14 +25,14 @@ import { FileManagerFileDetails } from './file-manager-file-details';
 
 // ----------------------------------------------------------------------
 
-export function FileRecentItem({ file, onDelete, sx, ...other }) {
+export function FileRecentItem({ file, onDelete, showstar = false, sx, ...other }) {
   const { copy } = useCopyToClipboard();
 
   const menuActions = usePopover();
 
   const shareDialog = useBoolean();
   const detailsDrawer = useBoolean();
-  const favorite = useBoolean(file.isFavorited);
+  const favorite = file.isFavorited;
 
   const [inviteEmail, setInviteEmail] = useState('');
 
@@ -54,17 +54,19 @@ export function FileRecentItem({ file, onDelete, sx, ...other }) {
         position: { xs: 'absolute', sm: 'unset' },
       }}
     >
-      <Checkbox
-        color="warning"
-        icon={<Iconify icon="eva:star-outline" />}
-        checkedIcon={<Iconify icon="eva:star-fill" />}
-        checked={favorite.value}
-        onChange={favorite.onToggle}
-        inputProps={{
-          id: `favorite-${file.id}-checkbox`,
-          'aria-label': `Favorite ${file.id} checkbox`,
-        }}
-      />
+      {showstar && (
+        <Checkbox
+          color="warning"
+          icon={<Iconify icon="eva:star-outline" />}
+          checkedIcon={<Iconify icon="eva:star-fill" />}
+          checked={favorite}
+          onChange={favorite.onToggle}
+          inputProps={{
+            id: `favorite-${file.id}-checkbox`,
+            'aria-label': `Favorite ${file.id} checkbox`,
+          }}
+        />
+      )}
 
       <IconButton color={menuActions.open ? 'inherit' : 'default'} onClick={menuActions.onOpen}>
         <Iconify icon="eva:more-vertical-fill" />
@@ -170,7 +172,7 @@ export function FileRecentItem({ file, onDelete, sx, ...other }) {
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
       file={file}
-      favorited={favorite.value}
+      favorited={favorite}
       onFavorite={favorite.onToggle}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}

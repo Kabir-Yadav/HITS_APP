@@ -16,6 +16,8 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
 
+import { toggleFavoriteFile } from 'src/actions/filemanager';
+
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
@@ -27,14 +29,14 @@ import { FileManagerFileDetails } from './file-manager-file-details';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerFileItem({ file, selected, onSelect, onDelete, sx, ...other }) {
+export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete, sx, ...other }) {
   const shareDialog = useBoolean();
   const confirmDialog = useBoolean();
   const detailsDrawer = useBoolean();
   const menuActions = usePopover();
 
   const checkbox = useBoolean();
-  const favorite = useBoolean(file.isFavorited);
+  const favorite = file.isFavorited;
 
   const { copy } = useCopyToClipboard();
 
@@ -43,7 +45,12 @@ export function FileManagerFileItem({ file, selected, onSelect, onDelete, sx, ..
   const handleChangeInvite = useCallback((event) => {
     setInviteEmail(event.target.value);
   }, []);
-
+  const handleToggleFavorite = async (fileId, currentValue) => {
+    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+    if (!result.success) {
+      toast.error('Failed to toggle favorite');
+    }
+  };
   const handleCopy = useCallback(() => {
     toast.success('Copied!');
     copy(file.url);
@@ -84,8 +91,8 @@ export function FileManagerFileItem({ file, selected, onSelect, onDelete, sx, ..
         color="warning"
         icon={<Iconify icon="eva:star-outline" />}
         checkedIcon={<Iconify icon="eva:star-fill" />}
-        checked={favorite.value}
-        onChange={favorite.onToggle}
+        checked={favorite}
+        onChange={() => handleToggleFavorite(file.id, favorite)}
         inputProps={{
           id: `favorite-${file.id}-checkbox`,
           'aria-label': `Favorite ${file.id} checkbox`,
@@ -178,8 +185,8 @@ export function FileManagerFileItem({ file, selected, onSelect, onDelete, sx, ..
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
       file={file}
-      favorited={favorite.value}
-      onFavorite={favorite.onToggle}
+      favorited={favorite}
+      onFavorite={() => handleToggleFavorite(file.id, favorite)}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}

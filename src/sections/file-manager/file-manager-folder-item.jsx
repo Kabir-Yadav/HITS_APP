@@ -16,11 +16,13 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 
 import { CONFIG } from 'src/global-config';
+import { toggleFavoriteFile } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomPopover } from 'src/components/custom-popover';
+import { FileThumbnail } from 'src/components/file-thumbnail';
 
 import { FileManagerShareDialog } from './file-manager-share-dialog';
 import { FileManagerFileDetails } from './file-manager-file-details';
@@ -28,14 +30,14 @@ import { FileManagerNewFolderDialog } from './file-manager-new-folder-dialog';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete, ...other }) {
+export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, selected, onSelect, onDelete, ...other }) {
   const shareDialog = useBoolean();
   const confirmDialog = useBoolean();
   const detailsDrawer = useBoolean();
   const editFolderDialog = useBoolean();
 
   const checkbox = useBoolean();
-  const favorite = useBoolean(folder.isFavorited);
+  const favorite = folder.isFavorited;
 
   const menuActions = usePopover();
 
@@ -57,6 +59,12 @@ export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete
     copy(folder.url);
   }, [copy, folder.url]);
 
+  const handleToggleFavorite = async (fileId, currentValue) => {
+    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+    if (!result.success) {
+      toast.error('Failed to toggle favorite');
+    }
+  };
   const renderActions = () => (
     <Box
       sx={{
@@ -71,8 +79,8 @@ export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete
         color="warning"
         icon={<Iconify icon="eva:star-outline" />}
         checkedIcon={<Iconify icon="eva:star-fill" />}
-        checked={favorite.value}
-        onChange={favorite.onToggle}
+        checked={favorite}
+        onChange={() => handleToggleFavorite(folder.id, favorite)}
         inputProps={{
           id: `favorite-${folder.id}-checkbox`,
           'aria-label': `Favorite ${folder.id} checkbox`,
@@ -99,13 +107,15 @@ export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete
           checkedIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}
           sx={{ width: 1, height: 1 }}
         />
-      ) : (
+      ) : isFolder ? (
         <Box
           component="img"
           src={`${CONFIG.assetsDir}/assets/icons/files/ic-folder.svg`}
           sx={{ width: 1, height: 1 }}
         />
-      )}
+      ) : <FileThumbnail file={folder.type} />
+
+      }
     </Box>
   );
   const renderText = () => (
@@ -129,7 +139,7 @@ export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete
         </>
       }
       slotProps={{
-        primary: { noWrap: true, sx: { typography: 'subtitle1' } },
+        primary: { noWrap: false, maxWidth: 300, minWidth: 200, sx: { typography: 'subtitle1' } },
         secondary: {
           sx: {
             mt: 0.5,
@@ -217,8 +227,8 @@ export function FileManagerFolderItem({ sx, folder, selected, onSelect, onDelete
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
       file={folder}
-      favorited={favorite.value}
-      onFavorite={favorite.onToggle}
+      favorited={favorite}
+      onFavorite={() => handleToggleFavorite(folder.id, favorite)}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}

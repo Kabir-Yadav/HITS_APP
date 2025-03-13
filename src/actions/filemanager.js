@@ -81,11 +81,10 @@ function formatFileSize(bytes) {
 // This hook fetches both files and folders from Supabase, then formats them
 // to match the structure of your mock data used in the File Manager view.
 export default function useGetFiles(user_id) {
-  console.log("Debug: Getting Files")
   const { data, error, isLoading } = useSWR(
     ['get_files', user_id],
     async () => {
-      // 1. Query files for the user
+      // 1) Query files
       const { data: filesData, error: filesError } = await supabase
         .from('files')
         .select('id, file_name, file_size, file_type, storage_url, created_at, is_favorite')
@@ -94,7 +93,7 @@ export default function useGetFiles(user_id) {
 
       if (filesError) throw filesError;
 
-      // 2. Query folders for the user
+      // 2) Query folders
       const { data: foldersData, error: foldersError } = await supabase
         .from('folders')
         .select('id, folder_name, created_at')
@@ -103,38 +102,47 @@ export default function useGetFiles(user_id) {
 
       if (foldersError) throw foldersError;
 
-      // 3. Map files to match your mock structure:
-      //    - id, name, url, type, size, createdAt, modifiedAt, isFavorited, shared
-      const files = filesData.map((file) => ({
-        id: file.id,
-        name: file.file_name,
-        url: file.storage_url,
-        type: file.file_type,
-        size: file.file_size,
-        createdAt: file.created_at,
-        modifiedAt: file.created_at, // Adjust if you store a separate modifiedAt
-        isFavorited: file.is_favorite,
-        tags: [],
-        shared: [] // Extend as needed (for now, empty array)
-      }));
+      // 3) Convert each file's storage_url to a public URL
+      const files = filesData.map((file) => {
+        // "getPublicUrl" does not require a round trip – it returns a URL if the bucket/object is public
+        const { data: publicData } = supabase
+          .storage
+          .from('file_attachments')
+          .getPublicUrl(file.storage_url);
 
-      // 4. Map folders to match your mock structure:
-      //    - id, name, url (could be an icon URL), type: 'folder', size: null, totalFiles, createdAt, modifiedAt, isFavorited, shared
+        // If your bucket is private, see the "Signed URL" example below.
+
+        return {
+          id: file.id,
+          name: file.file_name,
+          // The line below is the big change: we use publicData.publicUrl
+          url: publicData?.publicUrl || '', // fallback to empty string if something's missing
+          type: file.file_type,
+          size: file.file_size,
+          createdAt: file.created_at,
+          modifiedAt: file.created_at,
+          isFavorited: file.is_favorite,
+          tags: [],
+          shared: [],
+        };
+      });
+
+      // 4) Map folders to match your mock structure
       const folders = foldersData.map((folder) => ({
         id: folder.id,
         name: folder.folder_name,
-        url: '', // For folders you might show an icon instead
+        url: '', // we don't have an actual folder icon by default
         type: 'folder',
         size: null,
-        totalFiles: 0, // Adjust if you wish to compute the number of files in the folder
+        totalFiles: 0,
         createdAt: folder.created_at,
         modifiedAt: folder.created_at,
         isFavorited: false,
         tags: [],
-        shared: [] // Extend as needed
+        shared: [],
       }));
-      console.log([...folders, ...files])
-      // 5. Combine folders and files into one array.
+
+      // 5) Combine
       return [...folders, ...files];
     }
   );
@@ -145,7 +153,6 @@ export default function useGetFiles(user_id) {
     isError: error,
   };
 }
-
 // ----------------------------------------------------------------------------
 
 export async function uploadFiles(user_id, files, folder_name = null) {
@@ -200,6 +207,8 @@ export async function uploadFiles(user_id, files, folder_name = null) {
 // Delete files using Supabase Storage and remove metadata from the database.
 // This function loops through fileIds, removes the file from storage, then deletes the record.
 export async function deleteFiles(user_id, fileIds) {
+  console.log("DEBUG deleting files", fileIds)
+
   try {
     if (!fileIds.length) throw new Error('No files selected for deletion.');
 
@@ -233,4 +242,27 @@ export async function deleteFiles(user_id, fileIds) {
     console.error('Error deleting files:', error);
     return { success: false, error };
   }
+}
+
+export async function toggleFavoriteFile(fileId, userId, currentValue) {
+  // currentValue = the file's current is_favorite boolean
+  // We'll flip it to the opposite
+  const newValue = !currentValue;
+
+  const { data, error } = await supabase
+    .from('files')
+    .update({ is_favorite: newValue })
+    .eq('id', fileId)
+    .eq('user_id', userId)
+    .select(); // returns updated rows
+
+  if (error) {
+    console.error('toggleFavorite error:', error.message);
+    return { success: false, error };
+  }
+
+  // Refresh SWR so UI updates
+  mutate(['get_files', userId]);
+
+  return { success: true, data };
 }

@@ -55,7 +55,8 @@ export function FileManagerView() {
   const userId = user.id;
   const { data, isLoading, isError } = useGetFiles(userId);
   const [tableData, setTableData] = useState([]);
-  const GB = 1000000000 * 24;
+  const GB = 1000000000 * 1;
+  const totalGB = GB; // 24 GB
 
   // ✅ Update tableData when data changes
   useEffect(() => {
@@ -148,6 +149,30 @@ export function FileManagerView() {
     }
   }, [userId, table.selected,]);
 
+  const IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+  const MEDIA_TYPES = ['mp4', 'mp3', 'wav', 'm4v', 'avi']; // etc.
+  const DOC_TYPES = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt']; // etc.
+
+  // 2) Sum total usage
+  const totalUsedBytes = tableData
+    .filter((item) => item.type !== 'folder')
+    .reduce((acc, file) => acc + (file.size || 0), 0);
+  console.log(tableData)
+  // 3) Sum usage by category
+  const imageUsedBytes = tableData
+    .filter((f) => IMAGE_TYPES.includes(f.type?.toLowerCase()))
+    .reduce((acc, file) => acc + (file.size || 0), 0);
+
+  const mediaUsedBytes = tableData
+    .filter((f) => MEDIA_TYPES.includes(f.type?.toLowerCase()))
+    .reduce((acc, file) => acc + (file.size || 0), 0);
+
+  const docUsedBytes = tableData
+    .filter((f) => DOC_TYPES.includes(f.type?.toLowerCase()))
+    .reduce((acc, file) => acc + (file.size || 0), 0);
+
+  const otherUsedBytes = totalUsedBytes - (imageUsedBytes + mediaUsedBytes + docUsedBytes);
+
   const renderFilters = () => (
     <Box
       sx={{
@@ -219,6 +244,7 @@ export function FileManagerView() {
   const renderList = () =>
     displayMode === 'list' ? (
       <FileManagerTable
+        userId={user.id}
         table={table}
         dataFiltered={dataFiltered}
         onDeleteRow={handleDeleteItem}
@@ -228,6 +254,7 @@ export function FileManagerView() {
     ) : (
       <FileManagerGridView
         table={table}
+        userId={userId}
         dataFiltered={dataFiltered}
         onDeleteItem={handleDeleteItem}
         onOpenConfirm={confirmDialog.onTrue}
@@ -250,40 +277,75 @@ export function FileManagerView() {
     );
   }
 
-  const renderStorageOverview = () => (
-    <FileStorageOverview
-      total={GB}
-      chart={{ series: 76 }}
-      data={[
-        {
-          name: 'Images',
-          usedStorage: GB / 2,
-          filesCount: 223,
-          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-img.svg`} />,
-        },
-        {
-          name: 'Media',
-          usedStorage: GB / 5,
-          filesCount: 223,
-          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-video.svg`} />,
-        },
-        {
-          name: 'Documents',
-          usedStorage: GB / 5,
-          filesCount: 223,
-          icon: (
-            <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-document.svg`} />
-          ),
-        },
-        {
-          name: 'Other',
-          usedStorage: GB / 10,
-          filesCount: 223,
-          icon: <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-file.svg`} />,
-        },
-      ]}
-    />
-  );
+  const renderStorageOverview = () => {
+    // We'll pass a "series" for how full the radial chart is
+    const usedPercent = (totalUsedBytes / totalGB) * 100;
+
+    return (
+      <FileStorageOverview
+        // The "total" is your total capacity
+        total={totalGB}
+        // The radial bar will show the % used
+        chart={{ series: usedPercent }}
+        data={[
+          {
+            name: 'Images',
+            usedStorage: imageUsedBytes,
+            filesCount: tableData.filter((f) =>
+              IMAGE_TYPES.includes(f.type?.toLowerCase())
+            ).length,
+            icon: (
+              <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-img.svg`} />
+            ),
+          },
+          {
+            name: 'Media',
+            usedStorage: mediaUsedBytes,
+            filesCount: tableData.filter((f) =>
+              MEDIA_TYPES.includes(f.type?.toLowerCase())
+            ).length,
+            icon: (
+              <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-video.svg`} />
+            ),
+          },
+          {
+            name: 'Documents',
+            usedStorage: docUsedBytes,
+            filesCount: tableData.filter((f) =>
+              DOC_TYPES.includes(f.type?.toLowerCase())
+            ).length,
+            icon: (
+              <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-document.svg`} />
+            ),
+          },
+          {
+            name: 'Other',
+            usedStorage: otherUsedBytes,
+            filesCount: tableData.filter((f) => {
+              const lowerType = f.type?.toLowerCase();
+              return (
+                !IMAGE_TYPES.includes(lowerType) &&
+                !MEDIA_TYPES.includes(lowerType) &&
+                !DOC_TYPES.includes(lowerType) &&
+                f.type !== 'folder'
+              );
+            }).length,
+            icon: (
+              <Box component="img" src={`${CONFIG.assetsDir}/assets/icons/files/ic-file.svg`} />
+            ),
+          },
+        ]}
+      />
+    );
+  };
+  const favoriteItems = tableData
+    .filter((item) => item.isFavorited)
+    .slice(0, 5);
+
+  const recentFiles = [...tableData]
+    .filter((item) => item.type !== 'folder')
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
 
   return (
     <>
@@ -300,28 +362,49 @@ export function FileManagerView() {
         </Box>
 
         {/* {Favourite Folders and Files} */}
-        <Box sx={{ mt: 5 }}>
+        <Box sx={{ mt: 5, mb: 5 }}>
           <FileManagerPanel
             title="Folder"
             link={paths.dashboard.fileManager}
           />
-          <Scrollbar sx={{ mb: 3, minHeight: 186 }}>
-            <Box sx={{ gap: 3, display: 'flex' }}>
-              {_folders.map((folder) => (
-                <FileManagerFolderItem
-                  key={folder.id}
-                  folder={folder}
-                  onDelete={() => console.info('DELETE', folder.id)}
-                  sx={{
-                    ...(_folders.length > 3 && {
-                      width: 240,
-                      flexShrink: 0,
-                    }),
-                  }}
-                />
-              ))}
-            </Box>
-          </Scrollbar>
+          {favoriteItems.length === 0 ?
+            <EmptyContent title="No Favorite Files or Folder" />
+            :
+            <Scrollbar sx={{ mb: 3, minHeight: 186 }}>
+              <Box sx={{ gap: 3, display: 'flex' }}>
+                {favoriteItems.map((item) =>
+                  item.type === 'folder' ? (
+                    <FileManagerFolderItem
+                      userId={userId}
+                      key={item.id}
+                      folder={item}
+                      onDelete={() => handleDeleteItem(item.id)}
+                      sx={{
+                        ...(favoriteItems.length > 3 && {
+                          width: 240,
+                          flexShrink: 0,
+                        }),
+                      }}
+                    />
+                  ) : (
+                    <FileManagerFolderItem
+                      key={item.id}
+                      userId={userId}
+                      folder={item}
+                      isFolder={false}
+                      onDelete={() => handleDeleteItem(item.id)}
+                      sx={{
+                        ...(favoriteItems.length > 3 && {
+                          width: 240,
+                          flexShrink: 0,
+                        }),
+                      }}
+                    />
+                  )
+                )}
+              </Box>
+            </Scrollbar>
+          }
         </Box>
 
         <Grid container spacing={3}>
@@ -331,18 +414,21 @@ export function FileManagerView() {
             <Box >
               <FileManagerPanel
                 title="Recent files"
-                link={paths.dashboard.fileManager}
               />
 
-              <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
-                {_files.slice(0, 5).map((file) => (
-                  <FileRecentItem
-                    key={file.id}
-                    file={file}
-                    onDelete={() => console.info('DELETE', file.id)}
-                  />
-                ))}
-              </Box>
+              {recentFiles.length === 0 ?
+                <EmptyContent title="No Recent Files" />
+                :
+                <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
+                  {recentFiles.map((file) => (
+                    <FileRecentItem
+                      key={file.id}
+                      file={file}
+                      onDelete={() => handleDeleteItem(file.id)}
+                    />
+                  ))}
+                </Box>
+              }
             </Box>
           </Grid>
 

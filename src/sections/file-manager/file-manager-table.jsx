@@ -31,6 +31,7 @@ const TABLE_HEAD = [
 // ----------------------------------------------------------------------
 
 export function FileManagerTable({
+  userId,
   sx,
   table,
   notFound,
@@ -132,6 +133,7 @@ export function FileManagerTable({
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((row) => (
                   <FileManagerTableRow
+                    userId={userId}
                     key={row.id}
                     row={row}
                     selected={selected.includes(row.id)}
