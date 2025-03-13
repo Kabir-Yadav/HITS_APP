@@ -199,7 +199,7 @@ export function useGetConversations(userId) {
           filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(",")})`,
         },
         (payload) => {
-          console.log("New message received:", payload);
+          console.log("New message received 2:", payload);
           mutate(["conversations", userId]); // ✅ Refresh conversations
           mutate(["conversation", payload.new.conversation_id]); // ✅ Refresh individual conversation
         }
@@ -342,12 +342,13 @@ export function useGetConversation(conversationId) {
   useEffect(() => {
     if (!conversationId) return () => { };
 
-    const subscription = supabase
+    // ✅ Listen for new messages in the conversation
+    const messageSubscription = supabase
       .channel(`conversation_${conversationId}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT", // Listen for new messages
+          event: "INSERT",
           schema: "public",
           table: "messages",
           filter: `conversation_id=eq.${conversationId}`,
@@ -357,13 +358,68 @@ export function useGetConversation(conversationId) {
           mutate(["conversation", conversationId]); // Re-fetch messages in real-time
         }
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+        },
+        (payload) => {
+          console.log(" Message Deleted:", payload);
+          mutate(["conversation", conversationId]); // Re-fetch messages in real-time
+        }
+      )
       .subscribe();
 
+    const reactionSubscription = supabase
+      .channel(`reaction_updates_${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("New reaction received:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("Reaction updated:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "message_reactions",
+        },
+        (payload) => {
+          console.log("Reaction deleted:", payload);
+          mutate(["conversation", conversationId]);
+        }
+      )
+      .subscribe();
+
+
     return () => {
-      supabase.removeChannel(subscription); // Cleanup on unmount
+      supabase.removeChannel(messageSubscription);
+      supabase.removeChannel(reactionSubscription);
+
     };
   }, [conversationId]);
-  console.log(conversationData)
+
   return {
     conversation: conversationData || null,
     conversationLoading: isLoading,
@@ -405,8 +461,6 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
   if (attachments.length > 0) {
     await Promise.all(
       attachments.map(async (file) => {
-        console.log(file);
-
         // 🔹 Extract the file extension
         const fileExt = file.type.split('/')[1] || file.name.split('.').pop();
         const filePath = `${conversationId}/${Date.now()}.${fileExt}`;
@@ -456,31 +510,7 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
   }
 
   // Revalidate messages via SWR to update UI instantly
-  mutate(["conversation", conversationId], async (existingData) => {
-    if (!existingData) return () => { };
-    return {
-      ...existingData,
-      messages: [
-        ...existingData.messages,
-        {
-          id: insertedMessage.id,
-          senderId: senderId,
-          body: body,
-          contentType: attachments.length > 0 ? "file" : "text",
-          createdAt: new Date().toISOString(),
-          parentId: parentId,
-          attachments: attachments.map((file) => ({
-            id: file.name, // Temporary ID
-            name: file.name,
-            path: file.path || "",
-            preview: file.preview || "",
-            size: file.size,
-            type: file.type,
-          })),
-        },
-      ],
-    };
-  }, false);
+  mutate(["conversation", conversationId],);
 
   mutate(["conversations", senderId])
 
@@ -489,43 +519,126 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
 /* ----------------------------------------------------------------------
    5️⃣ Create a New Conversation
 ---------------------------------------------------------------------- */
-export async function createConversation({ type, participantIds }) {
-  const { data: newConversation, error } = await supabase.from('conversations').insert({ type }).single();
-
-  if (error) throw error;
-
-  if (participantIds?.length) {
-    const participantsData = participantIds.map((pid) => ({
-      conversation_id: newConversation.id,
-      participant_id: pid,
-    }));
-    const { error: partErr } = await supabase.from('conversation_participants').insert(participantsData);
-    if (partErr) throw partErr;
+export async function createConversation(conversationData, userid) {
+  // Extract required fields from conversationData
+  const { participants, name = null, is_group, messages } = conversationData;
+  // console.log(participants, name, is_group, messages[0])
+  if (participants.length === 0) {
+    console.error("Error: participantIds are required");
+    throw new Error("participantIds cannot be empty");
   }
 
-  return newConversation;
+  // Step 1️⃣: Insert new conversation
+  const { data: newConversation, error } = await supabase
+    .from("conversations")
+    .insert({
+      name,
+      is_group: is_group // Ensure this column exists in the database
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error creating conversation:", error);
+    throw error;
+  }
+  console.log("conversation added", newConversation.id)
+
+  // Step 2️⃣: Insert participants into `conversation_participants`
+  const participantsData = participants.map((participant) => ({
+    conversation_id: newConversation.id,
+    participant_id: participant.id,
+  }));
+
+  const { error: partErr } = await supabase
+    .from("conversation_participants")
+    .insert(participantsData);
+
+  if (partErr) {
+    console.error("Error adding participants:", partErr);
+    throw partErr;
+  }
+  console.log("participants added")
+
+  let messageData = {
+    conversation_id: newConversation.id,
+    sender_id: messages[0].sender_id,
+    body: messages[0].body,
+    parent_id: messages[0].parent_id || null, // If it's a reply, store parent_id
+    content_type: "text",
+    created_at: messages[0].created_at,
+  };
+  const { data: insertedMessage, error: messageError } = await supabase
+    .from("messages")
+    .insert(messageData)
+    .select()
+    .single();
+
+  if (messageError) {
+    console.error("sendMessage error:", messageError);
+    throw messageError;
+  }
+
+  console.log("message added")
+
+  // Handle attachments
+  if (messages[0].attachments.length > 0) {
+    await Promise.all(
+      messages[0].attachments.map(async (file) => {
+        // 🔹 Extract the file extension
+        const fileExt = file.type.split('/')[1] || file.name.split('.').pop();
+        const filePath = `${newConversation.id}/${Date.now()}.${fileExt}`;
+
+        // 🔹 Convert Base64 to Blob
+        const byteCharacters = atob(file.path.split(",")[1]); // Extract base64 string
+        const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: file.type });
+
+        // 📌 Upload file to Supabase
+        const { error: uploadError } = await supabase.storage
+          .from("chat_attachment")
+          .upload(filePath, blob, {
+            contentType: file.type, // Ensures correct MIME type
+          });
+
+        if (uploadError) {
+          console.error("Attachment upload error:", uploadError);
+          throw uploadError;
+        }
+        console.log("file-uploaded");
+
+        // 📌 Generate Public URL
+        const { data } = supabase.storage.from("chat_attachment").getPublicUrl(filePath);
+        const publicUrl = data.publicUrl;
+
+        console.log("file-path generated:", publicUrl);
+
+        // 📌 Insert attachment record in DB
+        const { error: attachmentError } = await supabase.from("attachments").insert({
+          message_id: insertedMessage.id,
+          name: file.name,
+          path: filePath, // Store the correct path, not the full URL
+          preview: publicUrl, // Store the public URL for preview
+          size: file.size,
+          type: file.type,
+          created_at: new Date().toISOString(),
+        });
+
+        if (attachmentError) {
+          console.error("Attachment DB error:", attachmentError);
+          throw attachmentError;
+        }
+      })
+    );
+  }
+  mutate(["conversation", newConversation.id],);
+
+  mutate(["conversations", userid])
+
+  return newConversation
 }
 
-/* ----------------------------------------------------------------------
-   7️⃣ Toggle Reaction
----------------------------------------------------------------------- */
-export async function toggleReaction(messageId, userId, emoji) {
-  const { error } = await supabase.from('message_reactions').upsert({
-    message_id: messageId,
-    user_id: userId,
-    emoji,
-  });
-
-  if (error) throw error;
-}
-
-/* ----------------------------------------------------------------------
-   8️⃣ Delete Message
----------------------------------------------------------------------- */
-export async function deleteMessage(messageId) {
-  const { error } = await supabase.from('messages').delete().eq('id', messageId);
-  if (error) throw error;
-}
 
 /* ----------------------------------------------------------------------
    9️⃣ Mark Conversation as Read
@@ -599,24 +712,24 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
         console.log("Reaction updated");
       }
     } else {
-      const reactionpayload = ({
-        message_id: messageId,
-        user_id: userId,
-        emoji: emoji,
-      })
       // ✅ If no reaction exists, INSERT a new reaction
       const { error: insertError } = await supabase
         .from("message_reactions")
-        .insert(reactionpayload);
+        .insert({
+          message_id: messageId,
+          user_id: userId,
+          emoji: emoji,
+        });
 
       if (insertError) throw insertError;
       console.log("Reaction added");
     }
 
     // ✅ Trigger a real-time UI update
-    mutate(["conversation", conversationId]);
+    mutate(["conversation", conversationId]); // Force UI refresh
 
   } catch (error) {
     console.error("handleAddReaction error:", error);
   }
 }
+

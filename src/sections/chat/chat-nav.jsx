@@ -134,7 +134,7 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
         });
 
         // Create a new conversation
-        const res = await createConversation(conversationData);
+        const res = await createConversation(conversationData, user?.id);
 
         if (!res || !res.conversation) {
           console.error('Failed to create conversation');
