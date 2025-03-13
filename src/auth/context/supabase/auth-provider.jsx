@@ -35,16 +35,11 @@ export function AuthProvider({ children }) {
         setState({ user: { ...session, ...session?.user }, loading: false });
         axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-        // Get returnTo from URL if it exists
-        const params = new URLSearchParams(window.location.search);
-        const returnTo = params.get('returnTo');
+        // Get the redirect path from router state
+        const location = router.location;
+        const from = location?.state?.from || '/dashboard/user/dashboard';
 
-        // If there's a returnTo parameter, use it, otherwise go to /dashboard/user
-        if (returnTo) {
-          router.push(returnTo);
-        } else {
-          router.push('/dashboard/user');
-        }
+        router.replace(from);
       } else {
         setState({ user: null, loading: false });
         delete axios.defaults.headers.common.Authorization;

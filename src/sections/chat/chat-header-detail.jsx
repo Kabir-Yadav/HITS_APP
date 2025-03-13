@@ -31,7 +31,6 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
   const isGroup = participants.length > 1;
 
   const singleParticipant = participants[0];
-
   const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
 
   const handleToggleNav = useCallback(() => {
@@ -61,7 +60,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
         primary={singleParticipant?.name}
         secondary={
           singleParticipant?.status === 'offline'
-            ? fToNow(singleParticipant?.lastActivity)
+            ? fToNow(singleParticipant?.last_activity)
             : singleParticipant?.status
         }
       />

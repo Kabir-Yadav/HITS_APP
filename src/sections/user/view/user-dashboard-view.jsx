@@ -166,7 +166,7 @@ export function UserDashboardView() {
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 6, lg: 8 }}>
-                    <AnalyticsTasks title="Tasks" list={_analyticTasks} />
+                    <AnalyticsTasks title="Today's Tasks" />
                 </Grid>
             </Grid>
         </DashboardContent>

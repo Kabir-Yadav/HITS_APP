@@ -55,13 +55,13 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
-      role: `${user?.role}`,
-      email: `${user?.email}`,
-      address: `${user?.address}`,
-      name: `${user?.name}`,
+      role: `${user.user_metadata?.role}`,
+      email: `${user.user_metadata?.email}`,
+      address: `${user.user_metadata?.address}`,
+      name: `${user.user_metadata?.first_name} ${user.user_metadata?.last_name}`,
       lastActivity: today(),
-      avatarUrl: `${user?.avatar_url}`,
-      phoneNumber: `${user?.phone_number}`,
+      avatarUrl: `${user.user_metadata?.avatar_url}`,
+      phoneNumber: `${user.user_metadata?.phone_number}`,
       status: 'online',
     }),
     [user]
@@ -94,7 +94,7 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
 
       if (inputValue) {
         const results = contacts.filter((contact) =>
-          contact.name.toLowerCase().includes(inputValue.toLowerCase())
+          `${contact.full_name}`.toLowerCase().includes(inputValue.toLowerCase())
         );
 
         setSearchContacts((prevState) => ({ ...prevState, results }));
@@ -134,7 +134,7 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
         });
 
         // Create a new conversation
-        const res = await createConversation(conversationData);
+        const res = await createConversation(conversationData, user?.id);
 
         if (!res || !res.conversation) {
           console.error('Failed to create conversation');

@@ -21,12 +21,12 @@ export function getNavItem({ currentUserId, conversation }) {
 
   if (lastMessage) {
     const lastAttachment = lastMessage.attachments && lastMessage.attachments.length > 0
-    ? lastMessage.attachments[lastMessage.attachments.length - 1]
-    : null; 
-   
+      ? lastMessage.attachments[lastMessage.attachments.length - 1]
+      : null;
+
     const sender = lastMessage.senderId === currentUserId ? 'You: ' : '';
 
-    const message = lastMessage.body===''?lastAttachment?`Sent a ${lastAttachment.type}`:'Sent a file':lastMessage.body;
+    const message = lastMessage.body === '' ? lastAttachment ? `Sent a ${lastAttachment.type}` : 'Sent a file' : lastMessage.body;
 
     displayText = `${sender}${message}`;
   }
@@ -36,7 +36,7 @@ export function getNavItem({ currentUserId, conversation }) {
     displayName,
     displayText,
     participants: participantsInConversation,
-    lastActivity: lastMessage.createdAt,
+    lastActivity: lastMessage?.createdAt,
     hasOnlineInGroup,
   };
 }

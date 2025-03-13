@@ -289,7 +289,7 @@ export function AccountGeneral() {
 
               <Field.DatePicker
                 name="dateOfLeaving"
-                label="Date of Leaving"
+                label="Date of Relieving"
                 format="DD/MM/YYYY"
               />
             </Box>

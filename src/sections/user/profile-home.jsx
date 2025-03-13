@@ -267,15 +267,17 @@ export function ProfileHome({ info }) {
 
   const userCardData = {
     name: `${info.firstName} ${info.lastName}`,
+    designation: user?.user_metadata?.designation || '',
     role: info.role,
     coverUrl: '/assets/F13-logo-new.png',
+    avatarUrl: user?.user_metadata?.avatar_url || '',
     quote: quote,
     quoteAuthor: quoteAuthor,
     totalFollowers: 0,
     totalFollowing: 0,
     totalPosts: 0,
-    socialLinks, // Use the social links from metadata
-    hideAvatar: true, 
+    socialLinks,
+    hideAvatar: !user?.user_metadata?.avatar_url,
   };
 
   const renderSocialLinks = () => (

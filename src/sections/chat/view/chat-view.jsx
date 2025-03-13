@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetContacts, useGetConversation, useGetConversations, websocketManager } from 'src/actions/chat';
+import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -29,8 +29,9 @@ import { useCollapseNav } from '../hooks/use-collapse-nav';
 export function ChatView() {
   const router = useRouter();
 
+  // ✅ **Use Supabase-authenticated user**
   const { user } = useMockedUser();
-
+  // ✅ **Fetch contacts & conversations via Supabase**
   const { contacts } = useGetContacts();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
@@ -41,12 +42,10 @@ export function ChatView() {
 
   const roomNav = useCollapseNav();
   const conversationsNav = useCollapseNav();
-
   const [replyTo, setReplyTo] = useState(null); // ✅ Store reply message
-
   const [recipients, setRecipients] = useState([]);
 
-
+  // ✅ Redirect to base chat page if no conversation is selected
   useEffect(() => {
     if (!selectedConversationId) {
       startTransition(() => {
@@ -55,31 +54,28 @@ export function ChatView() {
     }
   }, [conversationError, router, selectedConversationId]);
 
+  // ✅ **Handle adding recipients for a new chat**
   const handleAddRecipients = useCallback((selected) => {
     setRecipients(selected);
   }, []);
 
+  // ✅ **Filter out the current user from conversation participants**
   const filteredParticipants = conversation
     ? conversation.participants.filter((participant) => participant.id !== `${user?.id}`)
     : [];
-
+  // ✅ **Handle replying to a message**
   const handleReply = (message) => {
     const sender = filteredParticipants.find((participant) => participant.id === message.senderId);
 
-    // ✅ Set the reply state with sender's name
     setReplyTo({
       id: message.id,
       body: message.body,
       senderName: message.senderId === user.id ? 'You' : sender ? sender.name : "Unknown",
       attachments: message.attachments
     });
-
   };
 
   const hasConversation = selectedConversationId && conversation;
-  useEffect(() => {
-    websocketManager.connect(user?.id)
-  }, [user?.id]);
 
   return (
     <DashboardContent
@@ -133,7 +129,7 @@ export function ChatView() {
                     messages={conversation?.messages ?? []}
                     participants={filteredParticipants}
                     loading={conversationLoading}
-                    onReply={handleReply} // ✅ Pass handleReply to ChatMessageList
+                    onReply={handleReply} // ✅ Keep passing reply handler
                   />
                 )
               ) : (
@@ -149,8 +145,8 @@ export function ChatView() {
                 onAddRecipients={handleAddRecipients}
                 selectedConversationId={selectedConversationId}
                 disabled={!recipients.length && !selectedConversationId}
-                replyTo={replyTo} // ✅ Pass replyTo to ChatMessageInput
-                setReplyTo={setReplyTo} // ✅ Pass function to clear reply
+                replyTo={replyTo} // ✅ Keep reply functionality
+                setReplyTo={setReplyTo} // ✅ Allow clearing reply
               />
             </>
           ),

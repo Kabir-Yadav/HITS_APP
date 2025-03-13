@@ -355,7 +355,7 @@ export function UserNewEditForm({ currentUser }) {
                 render={({ field, fieldState: { error } }) => (
                   <Field.DatePicker
                     {...field}
-                    label="Date of Leaving"
+                    label="Date of Relieving"
                     format="DD/MM/YYYY"
                     slotProps={{
                       textField: {
