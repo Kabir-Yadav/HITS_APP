@@ -7,7 +7,6 @@ import { supabase } from 'src/lib/supabase';
 // ----------------------------------------------------------------------
 
 
-const CHART_ENDPOINT = endpoints.chat;
 
 const swrOptions = {
   revalidateOnFocus: false,
