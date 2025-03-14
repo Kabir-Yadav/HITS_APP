@@ -71,19 +71,6 @@ export function OverviewAppView() {
   return (
     <DashboardContent maxWidth="xl">
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 12 }}>
-          <AppWelcome
-            title={
-              <>
-                Welcome back 👋{' '} 
-                {user?.user_metadata?.first_name || ''}
-              </>
-            }
-            description="Let's see How is the recruitment process going at F13 Technologies today."
-            img={<SeoIllustration hideBackground />}
-          />
-        </Grid>
-
         {/* Filters Section */}
         <Grid size={{ xs: 12, md: 12 }} sx={{ mb: 2 }}>
           <Box 

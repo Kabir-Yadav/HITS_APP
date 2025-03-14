@@ -1,18 +1,59 @@
+import { format } from 'date-fns';
+
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
-import ListItemAvatar from '@mui/material/ListItemAvatar';
 import ListItemButton from '@mui/material/ListItemButton';
 
-import { fToNow } from 'src/utils/format-time';
-
-import { CONFIG } from 'src/global-config';
+import { useRouter } from 'src/routes/hooks';
 
 import { Label } from 'src/components/label';
 import { FileThumbnail } from 'src/components/file-thumbnail';
 
 // ----------------------------------------------------------------------
+
+const isValidDate = (dateString) => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return date instanceof Date && !isNaN(date);
+};
+
+const formatDueDate = (startDate, endDate) => {
+  try {
+    if (!isValidDate(startDate) && !isValidDate(endDate)) return '';
+
+    const start = isValidDate(startDate) ? format(new Date(startDate), 'MMM d, yyyy') : '';
+    const end = isValidDate(endDate) ? format(new Date(endDate), 'MMM d, yyyy') : '';
+    
+    if (start && end) {
+      return `Due: ${start} - ${end}`;
+    }
+    if (start) {
+      return `Due: ${start}`;
+    }
+    return '';
+  } catch (error) {
+    console.error('Error formatting due date:', error);
+    return '';
+  }
+};
+
+const getTimeString = (dateString) => {
+  try {
+    if (!isValidDate(dateString)) {
+      console.warn('Invalid date string:', dateString);
+      return '';
+    }
+    const date = new Date(dateString);
+    return format(date, 'MMM d, yyyy h:mm a');
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return '';
+  }
+};
 
 const readerContent = (data) => (
   <Box
@@ -25,74 +66,96 @@ const readerContent = (data) => (
   />
 );
 
-export function NotificationItem({ notification }) {
-  const renderAvatar = () => (
-    <ListItemAvatar>
-      {notification.avatarUrl ? (
-        <Avatar src={notification.avatarUrl} sx={{ bgcolor: 'background.neutral' }} />
-      ) : (
-        <Box
-          sx={{
-            width: 40,
-            height: 40,
-            display: 'flex',
-            borderRadius: '50%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: 'background.neutral',
-          }}
-        >
-          <Box
-            component="img"
-            src={`${CONFIG.assetsDir}/assets/icons/notification/${(notification.type === 'order' && 'ic-order') || (notification.type === 'chat' && 'ic-chat') || (notification.type === 'mail' && 'ic-mail') || (notification.type === 'delivery' && 'ic-delivery')}.svg`}
-            sx={{ width: 24, height: 24 }}
-          />
-        </Box>
-      )}
-    </ListItemAvatar>
+export function NotificationItem({ notification, onDelete }) {
+  const router = useRouter();
+
+  const renderAvatar = (
+    <Avatar 
+      src={notification.task?.reporter?.avatar_url} 
+      sx={{ width: 40, height: 40 }}
+    >
+      {notification.task?.reporter?.name?.charAt(0) || 'U'}
+    </Avatar>
   );
 
-  const renderText = () => (
-    <ListItemText
-      primary={readerContent(notification.title)}
-      secondary={
-        <>
-          {fToNow(notification.createdAt)}
-          <Box
-            component="span"
-            sx={{ width: 2, height: 2, borderRadius: '50%', bgcolor: 'currentColor' }}
-          />
-          {notification.category}
-        </>
+  const handleClick = async () => {
+    if (notification.task_id) {
+      try {
+        // Delete the notification first and wait for it to complete
+        if (onDelete) {
+          await onDelete(notification.id);
+        }
+        
+        // Then navigate to kanban with the task ID
+        router.push({
+          pathname: '/dashboard/kanban',
+          search: `?taskId=${notification.task_id}`,
+        });
+      } catch (error) {
+        console.error('Error handling notification click:', error);
       }
-      slotProps={{
-        primary: {
-          sx: { mb: 0.5 },
-        },
-        secondary: {
-          sx: {
-            gap: 0.5,
-            display: 'flex',
-            alignItems: 'center',
-            typography: 'caption',
-            color: 'text.disabled',
+    }
+  };
+
+  const renderText = () => {
+    const assignerName = notification.task?.reporter?.name || 'Someone';
+    const taskName = notification.task?.name || '';
+    const dueDate = formatDueDate(notification.task?.due_start, notification.task?.due_end);
+    const createdTime = getTimeString(notification.created_at);
+
+    return (
+      <ListItemText
+        primary={
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="subtitle2" sx={{ color: 'text.primary' }}>
+              {`${assignerName} assigned you a task`}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {taskName}
+            </Typography>
+            {dueDate && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {dueDate}
+              </Typography>
+            )}
+          </Box>
+        }
+        secondary={
+          createdTime ? (
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                {createdTime}
+              </Typography>
+            </Stack>
+          ) : null
+        }
+        slotProps={{
+          primary: {
+            sx: { mb: 0.5 },
           },
-        },
-      }}
-    />
-  );
+          secondary: {
+            sx: {
+              display: 'flex',
+              alignItems: 'center',
+            },
+          },
+        }}
+      />
+    );
+  };
 
   const renderUnReadBadge = () =>
     notification.isUnRead && (
       <Box
         sx={{
-          top: 26,
+          top: '50%',
           width: 8,
           height: 8,
-          right: 20,
+          right: 8,
+          position: 'absolute',
+          transform: 'translateY(-50%)',
           borderRadius: '50%',
           bgcolor: 'info.main',
-          position: 'absolute',
         }}
       />
     );
@@ -202,26 +265,33 @@ export function NotificationItem({ notification }) {
 
   return (
     <ListItemButton
-      disableRipple
-      sx={[
-        (theme) => ({
-          p: 2.5,
-          alignItems: 'flex-start',
-          borderBottom: `dashed 1px ${theme.vars.palette.divider}`,
+      onClick={handleClick}
+      sx={{
+        py: 1.5,
+        px: 2.5,
+        position: 'relative',
+        borderBottom: (theme) => `dashed 1px ${theme.palette.divider}`,
+        ...(notification.read && {
+          bgcolor: 'action.selected',
         }),
-      ]}
+        '&:hover': {
+          bgcolor: 'action.hover',
+        },
+      }}
     >
-      {renderUnReadBadge()}
-      {renderAvatar()}
+      <Stack direction="row" alignItems="center" spacing={2} sx={{ width: 1 }}>
+        {renderUnReadBadge()}
+        {renderAvatar}
 
-      <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
-        {renderText()}
-        {notification.type === 'friend' && renderFriendAction()}
-        {notification.type === 'project' && renderProjectAction()}
-        {notification.type === 'file' && renderFileAction()}
-        {notification.type === 'tags' && renderTagsAction()}
-        {notification.type === 'payment' && renderPaymentAction()}
-      </Box>
+        <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
+          {renderText()}
+          {notification.type === 'friend' && renderFriendAction()}
+          {notification.type === 'project' && renderProjectAction()}
+          {notification.type === 'file' && renderFileAction()}
+          {notification.type === 'tags' && renderTagsAction()}
+          {notification.type === 'payment' && renderPaymentAction()}
+        </Box>
+      </Stack>
     </ListItemButton>
   );
 }

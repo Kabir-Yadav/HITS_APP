@@ -37,15 +37,23 @@ export function useNavData() {
   const { user } = useAuthContext();
   const { board } = useGetBoard();
 
-  // Calculate total tasks assigned to user across all columns
+  // Calculate total tasks assigned to user across all columns (except Archive)
   const totalAssignedTasks = useMemo(() => {
     if (!board || !user) return 0;
 
-    return Object.values(board.tasks).reduce((total, columnTasks) => {
+    return Object.entries(board.tasks).reduce((total, [columnId, columnTasks]) => {
+      // Find the column name for this columnId
+      const column = board.columns.find(col => col.id === columnId);
+      
+      // Skip if column is Archive
+      if (column?.name === 'Archive') return total;
+
+      // Count tasks assigned to user in this column
       const assignedTasks = columnTasks.filter(task => 
         task.assignee?.some(assignee => assignee.id === user.id) || 
         task.reporter?.id === user.id
       );
+      
       return total + assignedTasks.length;
     }, 0);
   }, [board, user]);

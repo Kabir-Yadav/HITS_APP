@@ -52,9 +52,9 @@ export const navData = [
   {
     subheader: 'Overview',
     items: [
-      { title: 'User Dashboard', path: paths.dashboard.user.dashboard, icon: ICONS.user },
+      { title: 'User', path: paths.dashboard.user.dashboard, icon: ICONS.user },
       {
-        title: 'Recruitment Dashboard',
+        title: 'Hirings',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
         roles: ['ADMIN', 'HR']

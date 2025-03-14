@@ -65,7 +65,7 @@ export function UserDashboardView() {
     return (
         <DashboardContent maxWidth="xl">
             <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 8 }}>
+                <Grid size={{ xs: 12, md: 9 }}>
                     <AppWelcome
                         title={`Welcome back 👋 \n ${fullName}`}
                         description="If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything."
@@ -78,7 +78,7 @@ export function UserDashboardView() {
                     />
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 3 }}>
                     <AppFeatured list={_appFeatured} />
                 </Grid>
 
@@ -158,6 +158,10 @@ export function UserDashboardView() {
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 6, lg: 12 }}>
+                    <AnalyticsTasks title="Today's Tasks" />
+                </Grid>
+
+                <Grid size={{ xs: 12, md: 6, lg: 12 }}>
                     <AnalyticsNews title="News" list={_analyticPosts} />
                 </Grid>
 
@@ -165,9 +169,6 @@ export function UserDashboardView() {
                     <AppUpcomingBirthdays title="UpComing Birthdays" list={_appAuthors} />
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 6, lg: 8 }}>
-                    <AnalyticsTasks title="Today's Tasks" />
-                </Grid>
             </Grid>
         </DashboardContent>
     );

@@ -13,7 +13,7 @@ import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { useGetBoard, deleteTask } from 'src/actions/kanban';
+import { useGetBoard, moveTaskBetweenColumns } from 'src/actions/kanban';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -40,29 +40,33 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
     const isAssignee = task.assignee?.some(assignee => assignee.id === user?.id);
     const isReporter = task.reporter?.id === user?.id;
 
-    // Check if task is due today or overdue
-    const dueDate = task.due?.[1] ? dayjs(task.due[1]) : null;
-    const isOverdueOrToday = dueDate && (
-      dueDate.isSame(dayjs(), 'day') || // Due today
-      dueDate.isBefore(dayjs(), 'day')   // Overdue
-    );
+    // Check if task is in Archive column
+    const isArchived = task.status === 'Archive';
 
-    return (isAssignee || isReporter) && isOverdueOrToday;
+    // Include task if:
+    // 1. User is assignee or reporter
+    // 2. Task is not in Archive column
+    return (isAssignee || isReporter) && !isArchived;
   });
 
-  // Sort tasks: overdue first, then by priority
+  // Sort tasks by priority and due date
   const sortedTasks = userTasks.sort((a, b) => {
+    // First sort by priority
+    const priorityOrder = { high: 1, medium: 2, low: 3 };
+    const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+    if (priorityDiff !== 0) return priorityDiff;
+
+    // Then sort by due date
     const aDate = dayjs(a.due?.[1]);
     const bDate = dayjs(b.due?.[1]);
     
-    // If one is overdue and other isn't
-    const aOverdue = aDate.isBefore(dayjs(), 'day');
-    const bOverdue = bDate.isBefore(dayjs(), 'day');
-    if (aOverdue !== bOverdue) return bOverdue ? 1 : -1;
+    // If one has no due date, put it last
+    if (!aDate.isValid() && bDate.isValid()) return 1;
+    if (aDate.isValid() && !bDate.isValid()) return -1;
+    if (!aDate.isValid() && !bDate.isValid()) return 0;
     
-    // If both overdue/due today, sort by priority
-    const priorityOrder = { high: 1, medium: 2, low: 3 };
-    return priorityOrder[a.priority] - priorityOrder[b.priority];
+    // Sort by due date (earlier dates first)
+    return aDate.diff(bDate);
   });
 
   const handleClickComplete = async (taskId) => {
@@ -93,22 +97,31 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
         return;
       }
 
-      // Find the column ID for this task
-      const column = board.columns.find(col => 
-        col.name === task.status
-      );
-
-      if (!column) {
-        throw new Error('Column not found');
+      // Find the Archive column
+      const archiveColumn = board.columns.find(col => col.name === 'Archive');
+      if (!archiveColumn) {
+        toast.error('Archive column not found', {
+          position: 'top-center',
+        });
+        return;
       }
 
-      // Add to selected before deletion to show checkbox as checked
+      // Find the current column
+      const currentColumn = board.columns.find(col => col.name === task.status);
+      if (!currentColumn) {
+        toast.error('Current column not found', {
+          position: 'top-center',
+        });
+        return;
+      }
+
+      // Add to selected before moving to show checkbox as checked
       setSelected([...selected, taskId]);
 
-      // Delete the task
-      await deleteTask(column.id, task.id);
+      // Move the task to Archive column
+      await moveTaskBetweenColumns(task, currentColumn.id, archiveColumn.id);
       
-      toast.success('Task marked as complete!', {
+      toast.success('Task marked as complete and moved to Archive!', {
         position: 'top-center',
       });
 
@@ -129,15 +142,22 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
   };
 
   return (
-    <Card sx={sx} {...other}>
+    <Card sx={{ width: '100%', ...sx }} {...other}>
       <CardHeader 
         title={title} 
         subheader={subheader || `${sortedTasks.length} tasks pending`}
         sx={{ mb: 1 }} 
       />
 
-      <Scrollbar sx={{ minHeight: 304 }}>
-        <Stack divider={<Divider sx={{ borderStyle: 'dashed' }} />} sx={{ minWidth: 560 }}>
+      <Scrollbar sx={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <Stack 
+          spacing={2}
+          divider={<Divider sx={{ borderStyle: 'dashed' }} />}
+          sx={{ 
+            p: 2,
+            width: '100%'
+          }}
+        >
           {sortedTasks.map((task) => (
             <TaskItem
               key={task.id}
@@ -178,19 +198,28 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
         return;
       }
 
-      // Find the column ID for this task
-      const column = board.columns.find(col => 
-        col.name === task.status
-      );
-
-      if (!column) {
-        throw new Error('Column not found');
+      // Find the Archive column
+      const archiveColumn = board.columns.find(col => col.name === 'Archive');
+      if (!archiveColumn) {
+        toast.error('Archive column not found', {
+          position: 'top-center',
+        });
+        return;
       }
 
-      // Delete the task
-      await deleteTask(column.id, task.id);
+      // Find the current column
+      const currentColumn = board.columns.find(col => col.name === task.status);
+      if (!currentColumn) {
+        toast.error('Current column not found', {
+          position: 'top-center',
+        });
+        return;
+      }
+
+      // Move the task to Archive column
+      await moveTaskBetweenColumns(task, currentColumn.id, archiveColumn.id);
       
-      toast.success('Task marked as complete!', {
+      toast.success('Task marked as complete and moved to Archive!', {
         position: 'top-center',
       });
 
@@ -224,10 +253,13 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
       <Box
         sx={[
           () => ({
-            pl: 2,
-            pr: 1,
-            py: 1.5,
+            p: 2,
             display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: (theme) => theme.palette.background.neutral,
+            borderRadius: 1,
+            width: '100%',
             ...(selected && {
               color: 'text.disabled',
               textDecoration: 'line-through',
@@ -239,7 +271,12 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
       >
         <FormControlLabel
           label={
-            <Box sx={{ typography: 'body2' }}>
+            <Box sx={{ 
+              typography: 'body2',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
               {task.name}
               {isOverdue && (
                 <Box
@@ -264,10 +301,21 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
               inputProps={{ 'aria-label': `${task.name}-checkbox` }}
             />
           }
-          sx={{ flexGrow: 1, m: 0 }}
+          sx={{ 
+            m: 0,
+            flexGrow: 1,
+            '& .MuiFormControlLabel-label': {
+              flex: 1,
+              width: '100%'
+            }
+          }}
         />
 
-        <IconButton color={menuActions.open ? 'inherit' : 'default'} onClick={menuActions.onOpen}>
+        <IconButton 
+          color={menuActions.open ? 'inherit' : 'default'} 
+          onClick={menuActions.onOpen}
+          sx={{ ml: 1 }}
+        >
           <Iconify icon="eva:more-vertical-fill" />
         </IconButton>
       </Box>

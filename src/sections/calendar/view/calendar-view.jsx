@@ -1,11 +1,12 @@
 import Calendar from '@fullcalendar/react';
 import listPlugin from '@fullcalendar/list';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import { useEffect, startTransition } from 'react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import timelinePlugin from '@fullcalendar/timeline';
 import interactionPlugin from '@fullcalendar/interaction';
+import { useEffect, useState, startTransition } from 'react';
 import { useBoolean, useSetState } from 'minimal-shared/hooks';
+import googleCalendarPlugin from '@fullcalendar/google-calendar';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -16,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 
 import { fDate, fIsAfter, fIsBetween } from 'src/utils/format-time';
+import { initGoogleCalendarApi, authenticateGoogleCalendar, isAuthorizedDomain } from 'src/utils/google-calendar';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { CALENDAR_COLOR_OPTIONS } from 'src/_mock/_calendar';
@@ -31,12 +33,15 @@ import { CalendarToolbar } from '../calendar-toolbar';
 import { CalendarFilters } from '../calendar-filters';
 import { CalendarFiltersResult } from '../calendar-filters-result';
 
+
 // ----------------------------------------------------------------------
 
 export function CalendarView() {
   const theme = useTheme();
 
   const openFilters = useBoolean();
+  const [isGoogleCalendarInitialized, setIsGoogleCalendarInitialized] = useState(false);
+  const [googleEvents, setGoogleEvents] = useState([]);
 
   const { events, eventsLoading } = useGetEvents();
 
@@ -77,11 +82,66 @@ export function CalendarView() {
     onInitialView();
   }, [onInitialView]);
 
+  useEffect(() => {
+    const initGoogleCalendar = async () => {
+      if (!isAuthorizedDomain()) {
+        console.error('Current domain is not authorized for Google Calendar API');
+        return;
+      }
+
+      try {
+        const gapi = await initGoogleCalendarApi();
+        const token = await authenticateGoogleCalendar();
+        
+        if (!token) {
+          console.error('Failed to get access token');
+          return;
+        }
+
+        // Load events from Google Calendar
+        const response = await gapi.client.calendar.events.list({
+          calendarId: 'primary',
+          timeMin: new Date().toISOString(),
+          showDeleted: false,
+          singleEvents: true,
+          maxResults: 100,
+          orderBy: 'startTime',
+        });
+
+        if (!response.result) {
+          console.error('No response from Google Calendar API');
+          return;
+        }
+
+        const googleEventsList = response.result.items || [];
+        const formattedEvents = googleEventsList.map(event => ({
+          id: event.id,
+          title: event.summary,
+          start: event.start.dateTime || event.start.date,
+          end: event.end.dateTime || event.end.date,
+          color: theme.vars.palette.primary.main,
+          textColor: theme.vars.palette.common.white,
+          source: 'google',
+        }));
+
+        setGoogleEvents(formattedEvents);
+        setIsGoogleCalendarInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize Google Calendar:', error);
+        // Reset state on error
+        setGoogleEvents([]);
+        setIsGoogleCalendarInitialized(false);
+      }
+    };
+
+    initGoogleCalendar();
+  }, [theme.vars.palette.primary.main, theme.vars.palette.common.white]);
+
   const canReset =
     currentFilters.colors.length > 0 || (!!currentFilters.startDate && !!currentFilters.endDate);
 
   const dataFiltered = applyFilter({
-    inputData: events,
+    inputData: [...events, ...googleEvents],
     filters: currentFilters,
     dateError,
   });
@@ -160,17 +220,27 @@ export function CalendarView() {
               initialView={view}
               dayMaxEventRows={3}
               eventDisplay="block"
-              events={dataFiltered}
               headerToolbar={false}
               select={onSelectRange}
               eventClick={onClickEvent}
               aspectRatio={3}
+              events={dataFiltered}
               eventDrop={(arg) => {
+                if (arg.event.extendedProps.source === 'google') {
+                  // Don't allow editing Google Calendar events
+                  arg.revert();
+                  return;
+                }
                 startTransition(() => {
                   onDropEvent(arg, updateEvent);
                 });
               }}
               eventResize={(arg) => {
+                if (arg.event.extendedProps.source === 'google') {
+                  // Don't allow editing Google Calendar events
+                  arg.revert();
+                  return;
+                }
                 startTransition(() => {
                   onResizeEvent(arg, updateEvent);
                 });
@@ -181,6 +251,7 @@ export function CalendarView() {
                 timelinePlugin,
                 timeGridPlugin,
                 interactionPlugin,
+                googleCalendarPlugin,
               ]}
             />
           </CalendarRoot>
