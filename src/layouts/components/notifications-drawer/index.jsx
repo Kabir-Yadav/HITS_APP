@@ -2,15 +2,20 @@ import { m } from 'framer-motion';
 import { useState, useCallback } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 
-import Tab from '@mui/material/Tab';
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
+import Menu from '@mui/material/Menu';
 import Badge from '@mui/material/Badge';
 import Drawer from '@mui/material/Drawer';
 import Button from '@mui/material/Button';
 import SvgIcon from '@mui/material/SvgIcon';
 import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import ListItemText from '@mui/material/ListItemText';
+
+import { useKanbanNotifications } from 'src/actions/kanban';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -18,33 +23,60 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
 import { varTap, varHover, transitionTap } from 'src/components/animate';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { NotificationItem } from './notification-item';
 
 // ----------------------------------------------------------------------
 
 const TABS = [
-  { value: 'all', label: 'All', count: 22 },
   { value: 'unread', label: 'Unread', count: 12 },
-  { value: 'archived', label: 'Archived', count: 10 },
+];
+
+const DROPDOWN_OPTIONS = [
+  { value: 'kanban', label: 'Kanban' },
+  { value: 'chat', label: 'Chat' },
+  { value: 'file-manager', label: 'File Manager' },
 ];
 
 // ----------------------------------------------------------------------
 
-export function NotificationsDrawer({ data = [], sx, ...other }) {
+export function NotificationsDrawer({ sx, ...other }) {
+  const { user } = useAuthContext();
+  const { notifications, deleteNotification } = useKanbanNotifications(user?.id);
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
-
-  const [currentTab, setCurrentTab] = useState('all');
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedOption, setSelectedOption] = useState('kanban');
+  const [currentTab, setCurrentTab] = useState('unread');
 
   const handleChangeTab = useCallback((event, newValue) => {
     setCurrentTab(newValue);
   }, []);
 
-  const [notifications, setNotifications] = useState(data);
+  const handleDropdownClick = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
 
-  const totalUnRead = notifications.filter((item) => item.isUnRead === true).length;
+  const handleDropdownClose = () => {
+    setAnchorEl(null);
+  };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((notification) => ({ ...notification, isUnRead: false })));
+  const handleOptionSelect = (option) => {
+    setSelectedOption(option);
+    handleDropdownClose();
+  };
+
+  const totalUnRead = notifications.length;
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      // Delete all notifications for the current user
+      await Promise.all(
+        notifications.map(notification => deleteNotification(notification.id))
+      );
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
   };
 
   const renderHead = () => (
@@ -81,38 +113,127 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
   );
 
   const renderTabs = () => (
-    <CustomTabs variant="fullWidth" value={currentTab} onChange={handleChangeTab}>
-      {TABS.map((tab) => (
-        <Tab
-          key={tab.value}
-          iconPosition="end"
-          value={tab.value}
-          label={tab.label}
-          icon={
-            <Label
-              variant={((tab.value === 'all' || tab.value === currentTab) && 'filled') || 'soft'}
-              color={
-                (tab.value === 'unread' && 'info') ||
-                (tab.value === 'archived' && 'success') ||
-                'default'
-              }
-            >
-              {tab.count}
-            </Label>
+    <Box 
+      sx={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        borderBottom: 1, 
+        borderColor: 'divider',
+        '& > *': {
+          flex: 1,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: 48,
+        }
+      }}
+    >
+      <Button
+        onClick={handleDropdownClick}
+        endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
+        sx={{ 
+          borderRadius: 0,
+          borderRight: 1,
+          borderColor: 'divider',
+          '&:hover': {
+            backgroundColor: 'action.hover',
           }
-        />
-      ))}
-    </CustomTabs>
+        }}
+      >
+        {DROPDOWN_OPTIONS.find(option => option.value === selectedOption)?.label}
+      </Button>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleDropdownClose}
+        PaperProps={{
+          sx: {
+            mt: 1.5,
+            minWidth: 180,
+            boxShadow: (theme) => theme.customShadows.z20,
+          }
+        }}
+      >
+        {DROPDOWN_OPTIONS.map((option) => (
+          <MenuItem 
+            key={option.value} 
+            onClick={() => handleOptionSelect(option.value)}
+            selected={option.value === selectedOption}
+            sx={{
+              py: 1,
+              px: 2.5,
+            }}
+          >
+            <ListItemText 
+              primary={option.label}
+              primaryTypographyProps={{
+                typography: 'body2',
+                sx: { 
+                  fontWeight: option.value === selectedOption ? 600 : 400,
+                }
+              }}
+            />
+          </MenuItem>
+        ))}
+      </Menu>
+
+      <CustomTabs 
+        variant="fullWidth" 
+        value={currentTab} 
+        onChange={handleChangeTab}
+        sx={{
+          '& .MuiTabs-flexContainer': {
+            justifyContent: 'center',
+          }
+        }}
+      >
+        {TABS.map((tab) => (
+          <Tab
+            key={tab.value}
+            iconPosition="end"
+            value={tab.value}
+            label={tab.label}
+            sx={{
+              minWidth: 'auto',
+              px: 2,
+            }}
+            icon={
+              <Label
+                variant={((tab.value === currentTab) && 'filled') || 'soft'}
+                color="info"
+                sx={{
+                  ml: 1,
+                  px: 1,
+                  py: 0.25,
+                }}
+              >
+                {totalUnRead}
+              </Label>
+            }
+          />
+        ))}
+      </CustomTabs>
+    </Box>
   );
 
   const renderList = () => (
     <Scrollbar>
-      <Box component="ul">
-        {notifications?.map((notification) => (
-          <Box component="li" key={notification.id} sx={{ display: 'flex' }}>
-            <NotificationItem notification={notification} />
+      <Box component="ul" sx={{ p: 0, m: 0 }}>
+        {notifications.map((notification) => (
+          <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
+            <NotificationItem 
+              notification={notification} 
+              onDelete={deleteNotification}
+            />
           </Box>
         ))}
+
+        {notifications.length === 0 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="subtitle2">No notifications</Typography>
+          </Box>
+        )}
       </Box>
     </Scrollbar>
   );
@@ -131,7 +252,6 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
       >
         <Badge badgeContent={totalUnRead} color="error">
           <SvgIcon>
-            {/* https://icon-sets.iconify.design/solar/bell-bing-bold-duotone/ */}
             <path
               fill="currentColor"
               d="M18.75 9v.704c0 .845.24 1.671.692 2.374l1.108 1.723c1.011 1.574.239 3.713-1.52 4.21a25.794 25.794 0 0 1-14.06 0c-1.759-.497-2.531-2.636-1.52-4.21l1.108-1.723a4.393 4.393 0 0 0 .693-2.374V9c0-3.866 3.022-7 6.749-7s6.75 3.134 6.75 7"
@@ -155,12 +275,6 @@ export function NotificationsDrawer({ data = [], sx, ...other }) {
         {renderHead()}
         {renderTabs()}
         {renderList()}
-
-        <Box sx={{ p: 1 }}>
-          <Button fullWidth size="large">
-            View all
-          </Button>
-        </Box>
       </Drawer>
     </>
   );

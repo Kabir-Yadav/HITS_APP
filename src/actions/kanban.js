@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
-import { useMemo, startTransition } from 'react';
+import { useMemo, startTransition, useEffect } from 'react';
 
 import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
@@ -946,6 +947,13 @@ export async function updateTaskAssignees(taskId, assignees) {
         );
 
       if (insertError) throw insertError;
+
+      // Create notifications for new assignees
+      await createTaskAssignmentNotification(
+        taskId,
+        assignees[0].name, // We already have the task name from the first assignee
+        assignees.map(a => a.id)
+      );
     }
 
     // Update local state
@@ -955,7 +963,6 @@ export async function updateTaskAssignees(taskId, assignees) {
         const { board } = currentData;
         const updatedTasks = {};
 
-        // Update assignees in all columns
         Object.keys(board.tasks).forEach((columnId) => {
           updatedTasks[columnId] = board.tasks[columnId].map((task) =>
             task.id === taskId
@@ -1105,4 +1112,188 @@ export async function testSupabaseConnection() {
     console.error('Connection test error:', error);
     return false;
   }
+}
+
+export async function createTaskAssignmentNotification(taskId, taskName, assigneeIds) {
+  try {
+    // First get the task details to ensure we have the latest information
+    const { data: taskData, error: taskError } = await supabase
+      .from('kanban_tasks')
+      .select(`
+        *,
+        reporter:user_profiles!kanban_tasks_reporter_id_fkey(*)
+      `)
+      .eq('id', taskId)
+      .single();
+
+    if (taskError) throw taskError;
+
+    const notifications = assigneeIds.map(userId => ({
+      user_id: userId,
+      task_id: taskId,
+      task_name: taskData.name,
+      notification_type: 'task_assigned',
+      message: `New task assigned: ${taskData.name}`,
+      created_at: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('kanban_notifications')
+      .insert(notifications);
+
+    if (error) throw error;
+
+    return notifications;
+  } catch (error) {
+    console.error('Error creating task assignment notification:', error);
+    throw error;
+  }
+}
+
+export function useKanbanNotifications(userId) {
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    // If no userId, return cleanup function early
+    if (!userId) {
+      return () => {}; // Return empty cleanup function
+    }
+
+    let mounted = true; // Add mounted flag for cleanup
+
+    // Initial fetch of notifications
+    const fetchNotifications = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('kanban_notifications')
+          .select(`
+            *,
+            task:kanban_tasks!inner(
+              id,
+              name,
+              description,
+              priority,
+              column_id,
+              reporter:user_profiles!kanban_tasks_reporter_id_fkey(
+                id,
+                email,
+                name,
+                avatar_url
+              ),
+              assignees:kanban_task_assignees(
+                user:user_profiles(
+                  id,
+                  email,
+                  name,
+                  avatar_url
+                )
+              )
+            )
+          `)
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching notifications:', error);
+          return;
+        }
+
+        if (mounted) {
+          setNotifications(data || []);
+        }
+      } catch (error) {
+        console.error('Error in fetchNotifications:', error);
+      }
+    };
+
+    fetchNotifications();
+
+    // Subscribe to realtime notifications
+    const subscription = supabase
+      .channel('kanban_notifications')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'kanban_notifications',
+        filter: `user_id=eq.${userId}`,
+      }, async (payload) => {
+        if (!mounted) return;
+
+        if (payload.eventType === 'INSERT') {
+          // Fetch the complete notification data with task details
+          const { data, error } = await supabase
+            .from('kanban_notifications')
+            .select(`
+              *,
+              task:kanban_tasks!inner(
+                id,
+                name,
+                description,
+                priority,
+                column_id,
+                reporter:user_profiles!kanban_tasks_reporter_id_fkey(
+                  id,
+                  email,
+                  name,
+                  avatar_url
+                ),
+                assignees:kanban_task_assignees(
+                  user:user_profiles(
+                    id,
+                    email,
+                    name,
+                    avatar_url
+                  )
+                )
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single();
+
+          if (!error && mounted) {
+            setNotifications(prev => [data, ...prev]);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setNotifications(prev => prev.filter(n => n.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    // Return cleanup function
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [userId]);
+
+  const deleteNotification = async (notificationId) => {
+    try {
+      // Update local state immediately before the API call
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
+      const { error } = await supabase
+        .from('kanban_notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) {
+        // If there's an error, revert the state change
+        const { data } = await supabase
+          .from('kanban_notifications')
+          .select('*')
+          .eq('id', notificationId)
+          .single();
+          
+        if (data) {
+          setNotifications(prev => [data, ...prev]);
+        }
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      throw error;
+    }
+  };
+
+  return { notifications, deleteNotification };
 }

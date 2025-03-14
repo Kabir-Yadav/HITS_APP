@@ -11,7 +11,7 @@ import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-import { useGetBoard, moveTaskBetweenColumns, deleteTask } from 'src/actions/kanban';
+import { useGetBoard, moveTaskBetweenColumns } from 'src/actions/kanban';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -41,7 +41,6 @@ export function KanbanDetailsToolbar({
 
   const menuActions = usePopover();
   const confirmDialog = useBoolean();
-  const completeDialog = useBoolean();
 
   useEffect(() => {
     setStatus(taskStatus);
@@ -82,19 +81,28 @@ export function KanbanDetailsToolbar({
         return;
       }
 
-      // Find the column ID for this task
-      const column = board.columns.find(col => 
-        col.name === task.status
-      );
-
-      if (!column) {
-        throw new Error('Column not found');
+      // Find the Archive column
+      const archiveColumn = board.columns.find(col => col.name === 'Archive');
+      if (!archiveColumn) {
+        toast.error('Archive column not found', {
+          position: 'top-center',
+        });
+        return;
       }
 
-      // Delete the task
-      await deleteTask(column.id, task.id);
+      // Find the current column
+      const currentColumn = board.columns.find(col => col.name === status);
+      if (!currentColumn) {
+        toast.error('Current column not found', {
+          position: 'top-center',
+        });
+        return;
+      }
+
+      // Move the task to Archive column
+      await moveTaskBetweenColumns(task, currentColumn.id, archiveColumn.id);
       
-      toast.success('Task marked as complete!', {
+      toast.success('Task marked as complete and moved to Archive!', {
         position: 'top-center',
       });
 
@@ -108,7 +116,7 @@ export function KanbanDetailsToolbar({
     } finally {
       setIsCompleting(false);
     }
-  }, [task, board.columns, onCloseDetails]);
+  }, [task, board.columns, status, onCloseDetails]);
 
   const renderMenuActions = () => (
     <CustomPopover
@@ -186,21 +194,25 @@ export function KanbanDetailsToolbar({
         <Box component="span" sx={{ flexGrow: 1 }} />
 
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="soft"
-            color="success"
-            disabled={isCompleting}
-            onClick={handleMarkComplete}
-            startIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}
-          >
-            Mark Complete
-          </Button>
+          {status !== 'Archive' && (
+            <Button
+              variant="soft"
+              color="success"
+              disabled={isCompleting}
+              onClick={handleMarkComplete}
+              startIcon={<Iconify icon="eva:checkmark-circle-2-fill" />}
+            >
+              Mark Complete
+            </Button>
+          )}
 
-          <Tooltip title="Delete task">
-            <IconButton onClick={confirmDialog.onTrue}>
-              <Iconify icon="solar:trash-bin-trash-bold" />
-            </IconButton>
-          </Tooltip>
+          {status !== 'Archive' && (
+            <Tooltip title="Delete task">
+              <IconButton onClick={confirmDialog.onTrue}>
+                <Iconify icon="solar:trash-bin-trash-bold" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </Box>
 

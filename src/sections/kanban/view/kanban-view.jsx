@@ -27,7 +27,7 @@ import Typography from '@mui/material/Typography';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { moveTask, moveColumn, useGetBoard, testKanbanQueries, testColumnQuery, testSupabaseConnection } from 'src/actions/kanban';
+import { moveTask, moveColumn, useGetBoard, testKanbanQueries, testColumnQuery, testSupabaseConnection, moveTaskBetweenColumns } from 'src/actions/kanban';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -103,65 +103,60 @@ export function KanbanView() {
     useSensor(KeyboardSensor, { coordinateGetter })
   );
 
+  const findColumn = (id) => {
+    // First check if the id is a column id
+    if (sortedBoard.columns.some(col => col.id === id)) {
+      return id;
+    }
+
+    // Then check which column contains the task
+    return Object.keys(sortedBoard.tasks).find((columnId) =>
+      sortedBoard.tasks[columnId].some(task => task.id === id)
+    );
+  };
+
   const collisionDetectionStrategy = useCallback(
     (args) => {
-      if (activeId && activeId in sortedBoard.tasks) {
+      // If dragging a column
+      if (activeId && sortedBoard.columns.some(col => col.id === activeId)) {
         return closestCenter({
           ...args,
-          droppableContainers: args.droppableContainers.filter(
-            (column) => column.id in sortedBoard.tasks
+          droppableContainers: args.droppableContainers.filter(container => 
+            sortedBoard.columns.some(col => col.id === container.id)
           ),
         });
       }
 
-      const pointerIntersections = pointerWithin(args);
-      const cornersCollisions = closestCorners(args);
-      const centerCollisions = closestCenter(args);
+      // If dragging a task
+      if (activeId) {
+        const activeColumn = findColumn(activeId);
+        if (activeColumn) {
+          const intersections = pointerWithin(args);
+          const overId = getFirstCollision(intersections, 'id');
 
-      const intersections =
-        !!pointerIntersections.length && !!centerCollisions.length && !!cornersCollisions.length
-          ? pointerIntersections
-          : null;
+          if (overId) {
+            // If hovering over a column directly
+            if (sortedBoard.columns.some(col => col.id === overId)) {
+              return [{ id: overId }];
+            }
 
-      let overId = getFirstCollision(intersections, 'id');
-
-      if (overId != null) {
-        if (overId in sortedBoard.tasks) {
-          const columnItems = sortedBoard.tasks[overId].map((task) => task.id);
-
-          if (columnItems.length > 0) {
-            overId = closestCenter({
-              ...args,
-              droppableContainers: args.droppableContainers.filter(
-                (column) => column.id !== overId && columnItems.includes(column.id)
-              ),
-            })[0]?.id;
+            // If hovering over another task, find its column
+            const overColumn = findColumn(overId);
+            if (overColumn) {
+              return [{ id: overId }];
+            }
           }
         }
-
-        lastOverId.current = overId;
-
-        return [{ id: overId }];
       }
 
-      if (recentlyMovedToNewContainer.current) {
-        lastOverId.current = activeId;
-      }
-
-      return lastOverId.current ? [{ id: lastOverId.current }] : [];
+      // Default collision detection
+      const pointerIntersections = pointerWithin(args);
+      const centerCollisions = closestCenter(args);
+      
+      return pointerIntersections.length > 0 ? pointerIntersections : centerCollisions;
     },
-    [activeId, sortedBoard.tasks]
+    [activeId, sortedBoard.columns, sortedBoard.tasks]
   );
-
-  const findColumn = (id) => {
-    if (id in sortedBoard.tasks) {
-      return id;
-    }
-
-    return Object.keys(sortedBoard.tasks).find((key) =>
-      sortedBoard.tasks[key].map((task) => task.id).includes(id)
-    );
-  };
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -196,52 +191,51 @@ export function KanbanView() {
    * onDragOver
    */
   const onDragOver = ({ active, over }) => {
-    const overId = over?.id;
+    if (!over) return;
 
-    if (overId == null || active.id in sortedBoard.tasks) {
+    const draggedItemId = active.id;
+    const overId = over.id;
+
+    // Return if dragging a column
+    if (sortedBoard.columns.some(col => col.id === draggedItemId)) {
       return;
     }
 
+    const activeColumn = findColumn(draggedItemId);
     const overColumn = findColumn(overId);
-    const activeColumn = findColumn(active.id);
 
-    if (!overColumn || !activeColumn) {
+    if (!activeColumn || !overColumn) {
       return;
     }
 
     if (activeColumn !== overColumn) {
-      const activeItems = sortedBoard.tasks[activeColumn].map((task) => task.id);
-      const overItems = sortedBoard.tasks[overColumn].map((task) => task.id);
-      const overIndex = overItems.indexOf(overId);
-      const activeIndex = activeItems.indexOf(active.id);
+      const activeItems = sortedBoard.tasks[activeColumn];
+      const overItems = sortedBoard.tasks[overColumn];
+      
+      const activeIndex = activeItems.findIndex(task => task.id === draggedItemId);
+      const overIndex = overItems.findIndex(task => task.id === overId);
 
       let newIndex;
 
-      if (overId in sortedBoard.tasks) {
-        newIndex = overItems.length + 1;
+      if (sortedBoard.columns.some(col => col.id === overId)) {
+        // If dropping directly onto a column, add to the end
+        newIndex = overItems.length;
       } else {
-        const isBelowOverItem =
-          over &&
-          active.rect.current.translated &&
-          active.rect.current.translated.top > over.rect.top + over.rect.height;
-
-        const modifier = isBelowOverItem ? 1 : 0;
-
-        newIndex = overIndex >= 0 ? overIndex + modifier : overItems.length + 1;
+        // If dropping onto another task, insert at that position
+        newIndex = overIndex >= 0 ? overIndex : overItems.length;
       }
-
-      recentlyMovedToNewContainer.current = true;
 
       const updatedTasks = {
         ...sortedBoard.tasks,
-        [activeColumn]: sortedBoard.tasks[activeColumn].filter((task) => task.id !== active.id),
+        [activeColumn]: activeItems.filter(task => task.id !== draggedItemId),
         [overColumn]: [
-          ...sortedBoard.tasks[overColumn].slice(0, newIndex),
-          sortedBoard.tasks[activeColumn][activeIndex],
-          ...sortedBoard.tasks[overColumn].slice(newIndex, sortedBoard.tasks[overColumn].length),
+          ...overItems.slice(0, newIndex),
+          activeItems[activeIndex],
+          ...overItems.slice(newIndex),
         ],
       };
 
+      // Sort tasks in the target column
       updatedTasks[overColumn] = sortTasks(updatedTasks[overColumn]);
 
       moveTask(updatedTasks);
@@ -251,37 +245,48 @@ export function KanbanView() {
   /**
    * onDragEnd
    */
-  const onDragEnd = ({ active, over }) => {
+  const onDragEnd = async ({ active, over }) => {
+    if (!over) {
+      setActiveId(null);
+      return;
+    }
+
     if (active.id in sortedBoard.tasks && over?.id) {
       const activeIndex = columnIds.indexOf(active.id);
       const overIndex = columnIds.indexOf(over.id);
       const updateColumns = arrayMove(sortedBoard.columns, activeIndex, overIndex);
 
       moveColumn(updateColumns);
+      setActiveId(null);
+      return;
     }
 
     const activeColumn = findColumn(active.id);
+    const overColumn = findColumn(over.id);
 
-    if (!activeColumn) {
+    if (!activeColumn || !overColumn) {
       setActiveId(null);
       return;
     }
 
-    const overId = over?.id;
-
-    if (overId == null) {
-      setActiveId(null);
-      return;
-    }
-
-    const overColumn = findColumn(overId);
-
-    if (overColumn) {
+    // If dropping in a different column
+    if (activeColumn !== overColumn) {
+      const activeTask = sortedBoard.tasks[activeColumn].find(task => task.id === active.id);
+      if (activeTask) {
+        try {
+          // Move the task to the new column
+          await moveTaskBetweenColumns(activeTask, activeColumn, overColumn);
+        } catch (error) {
+          console.error('Error moving task between columns:', error);
+        }
+      }
+    } else {
+      // If dropping in the same column, just reorder
       const activeContainerTaskIds = sortedBoard.tasks[activeColumn].map((task) => task.id);
       const overContainerTaskIds = sortedBoard.tasks[overColumn].map((task) => task.id);
 
       const activeIndex = activeContainerTaskIds.indexOf(active.id);
-      const overIndex = overContainerTaskIds.indexOf(overId);
+      const overIndex = overContainerTaskIds.indexOf(over.id);
 
       if (activeIndex !== overIndex) {
         const updateTasks = {
@@ -290,7 +295,6 @@ export function KanbanView() {
         };
 
         updateTasks[overColumn] = sortTasks(updateTasks[overColumn]);
-
         moveTask(updateTasks);
       }
     }
