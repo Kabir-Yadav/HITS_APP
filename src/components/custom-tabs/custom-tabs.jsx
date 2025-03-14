@@ -13,7 +13,7 @@ export function CustomTabs({ children, slotProps, sx, ...other }) {
           flexShrink: 0,
           alignItems: 'center',
           bgcolor: 'background.neutral',
-          [`& .${tabsClasses.scroller}`]: { p: 1, ...slotProps?.scroller },
+          [`& .${tabsClasses.scroller}`]: { py: 1, ...slotProps?.scroller },
           [`& .${tabsClasses.flexContainer}`]: { gap: 0, ...slotProps?.flexContainer },
           [`& .${tabsClasses.scrollButtons}`]: {
             borderRadius: 1,

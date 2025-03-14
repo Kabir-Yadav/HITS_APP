@@ -109,11 +109,11 @@ export function NotificationsDrawer({ sx, ...other }) {
   );
 
   const renderTabs = () => (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        borderBottom: 1, 
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: 1,
         borderColor: 'divider',
         '& > *': {
           flex: 1,
@@ -127,9 +127,8 @@ export function NotificationsDrawer({ sx, ...other }) {
       <Button
         onClick={handleDropdownClick}
         endIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
-        sx={{ 
+        sx={{
           borderRadius: 0,
-          borderRight: 1,
           borderColor: 'divider',
           '&:hover': {
             backgroundColor: 'action.hover',
@@ -145,15 +144,15 @@ export function NotificationsDrawer({ sx, ...other }) {
         onClose={handleDropdownClose}
         PaperProps={{
           sx: {
-            mt: 1.5,
+            mt: 1,
             minWidth: 180,
             boxShadow: (theme) => theme.customShadows.z20,
           }
         }}
       >
         {DROPDOWN_OPTIONS.map((option) => (
-          <MenuItem 
-            key={option.value} 
+          <MenuItem
+            key={option.value}
             onClick={() => handleOptionSelect(option.value)}
             selected={option.value === selectedOption}
             sx={{
@@ -161,27 +160,31 @@ export function NotificationsDrawer({ sx, ...other }) {
               px: 2.5,
             }}
           >
-            <ListItemText 
+            <ListItemText
               primary={option.label}
-              primaryTypographyProps={{
-                typography: 'body2',
-                sx: { 
-                  fontWeight: option.value === selectedOption ? 600 : 400,
+              slotProps={{
+                primary: {
+                  sx: {
+                    fontWeight: option.value === selectedOption ? 600 : 400,
+                  }
                 }
-              }}
+              }
+              }
             />
           </MenuItem>
         ))}
       </Menu>
 
-      <CustomTabs 
-        variant="fullWidth" 
-        value={currentTab} 
+      <CustomTabs
+        variant="fullWidth"
+        value={currentTab}
         onChange={handleChangeTab}
         sx={{
+          backgroundColor: 'transparent',
           '& .MuiTabs-flexContainer': {
             justifyContent: 'center',
           }
+
         }}
       >
         {TABS.map((tab) => (
@@ -190,19 +193,12 @@ export function NotificationsDrawer({ sx, ...other }) {
             iconPosition="end"
             value={tab.value}
             label={tab.label}
-            sx={{
-              minWidth: 'auto',
-              px: 2,
-            }}
+
             icon={
               <Label
                 variant={((tab.value === currentTab) && 'filled') || 'soft'}
                 color="info"
-                sx={{
-                  ml: 1,
-                  px: 1,
-                  py: 0.25,
-                }}
+
               >
                 {totalUnRead}
               </Label>
@@ -218,8 +214,8 @@ export function NotificationsDrawer({ sx, ...other }) {
       <Box component="ul" sx={{ p: 0, m: 0 }}>
         {notifications.map((notification) => (
           <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
-            <NotificationItem 
-              notification={notification} 
+            <NotificationItem
+              notification={notification}
               onDelete={deleteNotification}
             />
           </Box>
