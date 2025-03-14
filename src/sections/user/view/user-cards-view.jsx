@@ -1,19 +1,43 @@
-import Button from '@mui/material/Button';
+import { useState, useEffect } from 'react';
 
 import { paths } from 'src/routes/paths';
-import { RouterLink } from 'src/routes/components';
 
-import { _userCards } from 'src/_mock';
+import { supabase } from 'src/lib/supabase';
 import { DashboardContent } from 'src/layouts/dashboard';
 
-import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
 import { UserCardList } from '../user-card-list';
 
 // ----------------------------------------------------------------------
+async function fetchUsers() {
+  const { data, error } = await supabase
+    .from('user_info')
+    .select('*')
+
+  if (error) throw error;
+  return data;
+}
 
 export function UserCardsView() {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function getUsers() {
+      try {
+        const userData = await fetchUsers();
+        setUsers(userData);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    getUsers();
+  }, []);
+
+  if (loading) return <p>Loading users...</p>;
   return (
     <DashboardContent>
       <CustomBreadcrumbs
@@ -27,7 +51,7 @@ export function UserCardsView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <UserCardList users={_userCards} />
+      <UserCardList users={users} />
     </DashboardContent>
   );
 }

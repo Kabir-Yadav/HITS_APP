@@ -36,8 +36,8 @@ export function UserCard({ user, sx, ...other }) {
 
         {!user.hideAvatar && (
           <Avatar
-            alt={user.name}
-            src={user.avatarUrl}
+            alt={user.full_name}
+            src={user.avatar_url}
             sx={{
               left: 0,
               right: 0,
@@ -49,13 +49,13 @@ export function UserCard({ user, sx, ...other }) {
               position: 'absolute',
             }}
           >
-            {user.name?.charAt(0).toUpperCase()}
+            {user.full_name?.charAt(0).toUpperCase()}
           </Avatar>
         )}
 
         <Image
-          src={user.coverUrl}
-          alt={user.coverUrl}
+          src={user.avatar_url}
+          alt={user.avatar_url}
           ratio="16/9"
           slotProps={{
             overlay: {
@@ -69,8 +69,8 @@ export function UserCard({ user, sx, ...other }) {
 
       <ListItemText
         sx={{ mt: 7, mb: 1 }}
-        primary={user.name}
-        secondary={user.designation}
+        primary={user.full_name}
+        secondary={user.role}
         slotProps={{
           primary: { sx: { typography: 'subtitle1' } },
           secondary: { sx: { mt: 0.5 } },

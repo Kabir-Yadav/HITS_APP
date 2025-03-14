@@ -114,34 +114,44 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
       const linkTo = (id) => router.push(`${paths.dashboard.chat}?id=${id}`);
 
       try {
-        // Check if the conversation already exists
-        if (conversations.allIds.includes(result.id)) {
-          linkTo(result.id);
+
+        // 🔹 Check if a conversation already exists with the recipient
+        const existingConversation = Object.values(conversations.byId).find(
+          (conversation) =>
+            conversation.type === 'ONE_TO_ONE' && // ✅ Check only personal chats
+            conversation.participants.some((participant) => participant.id === result.id)
+        );
+
+        if (existingConversation) {
+          console.log(existingConversation)
+          // ✅ If a conversation exists, navigate to it
+          linkTo(existingConversation.id);
           return;
         }
 
-        // Find the recipient in contacts
+        // 🔹 Find the recipient in contacts
         const recipient = contacts.find((contact) => contact.id === result.id);
         if (!recipient) {
           console.error('Recipient not found');
           return;
         }
 
-        // Prepare conversation data
+        // 🔹 Prepare conversation data
         const { conversationData } = initialConversation({
           recipients: [recipient],
           me: myContact,
         });
+        console.log("create converssation")
+        // 🔹 Create a new conversation
+        // const res = await createConversation(conversationData, user?.id);
 
-        // Create a new conversation
-        const res = await createConversation(conversationData, user?.id);
+        // if (!res || !res.conversation) {
+        //   console.error('Failed to create conversation');
+        //   return;
+        // }
 
-        if (!res || !res.conversation) {
-          console.error('Failed to create conversation');
-        }
-
-        // Navigate to the new conversation
-        linkTo(res.conversation.id);
+        // // ✅ Navigate to the newly created conversation
+        // linkTo(res.conversation.id);
       } catch (error) {
         console.error('Error handling click result:', error);
       }
