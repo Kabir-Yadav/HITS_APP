@@ -9,9 +9,9 @@ import { Chart, useChart } from 'src/components/chart';
 
 // ----------------------------------------------------------------------
 
-export function FileStorageOverview({ data, total, chart, sx, ...other }) {
+export function FileStorageOverview({ data, used, total, chart, sx, ...other }) {
   const theme = useTheme();
-
+  // Colors for the radial bar gradient fill
   const chartColors = chart.colors ?? [theme.palette.secondary.main, theme.palette.secondary.light];
 
   const chartOptions = useChart({
@@ -34,13 +34,26 @@ export function FileStorageOverview({ data, total, chart, sx, ...other }) {
         hollow: { margin: -24 },
         track: { margin: -24 },
         dataLabels: {
+          // The "name" is the label under the numeric value
           name: { offsetY: 8 },
-          value: { offsetY: -36 },
+          // The "value" is the numeric (0–100) in the center
+          value: {
+            offsetY: -36,
+            // Display "57.3%" format with 1 decimal place
+            formatter: (val) => val.toFixed(1) + '%',
+          },
+          // The "total" is the bottom label under the chart
           total: {
-            label: `Used of ${fData(total)} / ${fData(total * 2)}`,
+            // e.g. "Used of 1 GB"
+            label: `Used ${fData(used)} / ${fData(total)}`,
+            show: true,
             color: theme.vars.palette.text.disabled,
             fontSize: theme.typography.caption.fontSize,
             fontWeight: theme.typography.caption.fontWeight,
+
+            formatter: (w) =>
+              w.globals.seriesTotals[0].toFixed(1) + '%'
+
           },
         },
       },
@@ -52,6 +65,7 @@ export function FileStorageOverview({ data, total, chart, sx, ...other }) {
     <Card sx={sx} {...other}>
       <Chart
         type="radialBar"
+        // The radial chart expects a single numeric (0–100)
         series={[chart.series]}
         options={chartOptions}
         slotProps={{ loading: { p: 3 } }}
@@ -86,7 +100,9 @@ export function FileStorageOverview({ data, total, chart, sx, ...other }) {
               <Box
                 component="span"
                 sx={{ typography: 'caption', color: 'text.disabled' }}
-              >{`${category.filesCount} files`}</Box>
+              >
+                {`${category.filesCount} files`}
+              </Box>
             </Stack>
 
             <Box component="span"> {fData(category.usedStorage)} </Box>

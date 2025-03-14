@@ -226,6 +226,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
 
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
+      userId={userId}
       file={folder}
       favorited={favorite}
       onFavorite={() => handleToggleFavorite(folder.id, favorite)}
@@ -241,6 +242,8 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
 
   const renderShareDialog = () => (
     <FileManagerShareDialog
+      ownerId={userId}
+      fileId={folder.id}
       open={shareDialog.value}
       shared={folder.shared}
       inviteEmail={inviteEmail}

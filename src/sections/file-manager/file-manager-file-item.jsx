@@ -170,6 +170,8 @@ export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete
 
   const renderShareDialog = () => (
     <FileManagerShareDialog
+      ownerId={userId}
+      fileId={file.id}
       open={shareDialog.value}
       shared={file.shared}
       inviteEmail={inviteEmail}
@@ -184,6 +186,7 @@ export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete
 
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
+      userId={userId}
       file={file}
       favorited={favorite}
       onFavorite={() => handleToggleFavorite(file.id, favorite)}

@@ -129,6 +129,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
 
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
+      userId={userId}
       file={row}
       favorited={favorite}
       onFavorite={() => handleToggleFavorite(row.id, favorite)}
@@ -141,6 +142,8 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
 
   const renderShareDialog = () => (
     <FileManagerShareDialog
+      ownerId={userId}
+      fileId={row.id}
       open={shareDialog.value}
       shared={row.shared}
       inviteEmail={inviteEmail}

@@ -26,6 +26,7 @@ import { FileManagerInvitedItem } from './file-manager-invited-item';
 // ----------------------------------------------------------------------
 
 export function FileManagerFileDetails({
+  userId,
   file,
   open,
   onClose,
@@ -210,7 +211,7 @@ export function FileManagerFileDetails({
       {hasShared && (
         <Box component="ul" sx={{ pl: 2, pr: 1 }}>
           {file?.shared?.map((person) => (
-            <FileManagerInvitedItem key={person.id} person={person} />
+            <FileManagerInvitedItem key={person.id} person={person} isOwner={file.accessType === 'owner'} />
           ))}
         </Box>
       )}
@@ -263,6 +264,7 @@ export function FileManagerFileDetails({
             variant="soft"
             color="error"
             size="large"
+            disabled={file.accessType !== 'owner'}
             startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
             onClick={onDelete}
           >
@@ -272,6 +274,8 @@ export function FileManagerFileDetails({
       </Drawer>
 
       <FileManagerShareDialog
+        ownerId={userId}
+        fileId={file.id}
         open={shareDialog.value}
         shared={file?.shared}
         inviteEmail={inviteEmail}

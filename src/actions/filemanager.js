@@ -1,99 +1,132 @@
-import { useMemo } from 'react';
-import { keyBy } from 'es-toolkit';
+import { useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 
 import { supabase } from 'src/lib/supabase';
-import axios, { fetcher, endpoints } from 'src/lib/axios';
 
-const enableServer = false;
+export function useGetAllUsers() {
+  return useSWR('all_users', async () => {
+    const { data, error } = await supabase
+      .from('user_info') // or 'auth.users' if that’s where you store user data
+      .select('id, full_name, email, avatar_url');
 
-const swrOptions = {
-  revalidateIfStale: enableServer,
-  revalidateOnFocus: enableServer,
-  revalidateOnReconnect: enableServer,
-};
-
-// export default function useGetFiles(user_id) {
-//   const { data, isLoading, error, isValidating } = useSWR(`${BASE_URL}?user_id=${user_id}`, fetcher, swrOptions);
-
-//   return {
-//     data: data || [], // ✅ Ensure `data` is always an array
-//     isLoading,
-//     isError: error,
-//   };
-// }
-
-// export async function uploadFiles(user_id, files, folder_name = null) {
-//   try {
-//     const payload = {
-//       user_id,
-//       files,
-//       folder_name,
-//     };
-
-//     // Send the request
-//     await axios.post(`${BASE_URL}/upload`, payload);
-
-//     // ✅ Refresh files list after successful upload
-//     mutate(`${BASE_URL}?user_id=${user_id}`);
-
-//     return { success: true };
-//   } catch (error) {
-//     console.error('Error uploading files:', error);
-//     return { success: false, error };
-//   }
-// }
-
-// export async function deleteFiles(user_id, fileIds,) {
-//   try {
-//     if (!fileIds.length) {
-//       throw new Error('No files selected for deletion.');
-//     }
-
-//     // Perform API delete requests for each file
-//     await Promise.all(
-//       fileIds.map((fileId) =>
-//         axios.delete(`${BASE_URL}/${fileId}`, {
-//           data: { user_id }, // Backend expects user_id in request body
-//         })
-//       )
-//     );
-
-//     // ✅ Refresh file list after deletion
-//     mutate(`${BASE_URL}?user_id=${user_id}`);
-
-
-//     return { success: true };
-//   } catch (error) {
-//     console.error('Error deleting files:', error);
-//     return { success: false, error };
-//   }
-// }
-
-// Helper: Format file size from bytes to a human‐readable string.
-function formatFileSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
-  return (bytes / 1048576).toFixed(2) + ' MB';
+    if (error) throw error;
+    return data; // e.g. [{id, full_name, email, avatar_url}, ...]
+  });
 }
-
 // ----------------------------------------------------------------------------
 // This hook fetches both files and folders from Supabase, then formats them
 // to match the structure of your mock data used in the File Manager view.
+async function fetchUsersByIds(userIds) {
+  if (userIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('user_info') // Ensure this table exists
+    .select('id, full_name, email, avatar_url')
+    .in('id', userIds);
+
+  if (error) throw error;
+  return data;
+}
+
 export default function useGetFiles(user_id) {
   const { data, error, isLoading } = useSWR(
     ['get_files', user_id],
     async () => {
-      // 1) Query files
-      const { data: filesData, error: filesError } = await supabase
+      // 1) Fetch owned files
+      const { data: ownedFiles, error: ownedFilesError } = await supabase
         .from('files')
-        .select('id, file_name, file_size, file_type, storage_url, created_at, is_favorite')
+        .select('id, user_id, file_name, file_size, file_type, storage_url, created_at, is_favorite')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false });
 
-      if (filesError) throw filesError;
+      if (ownedFilesError) throw ownedFilesError;
 
-      // 2) Query folders
+      // 2) Fetch shared files (files shared **with** the user)
+      const { data: sharedFilesData, error: sharedFilesError } = await supabase
+        .from('file_sharing')
+        .select(`
+          file_id, access_type, 
+          files (id, user_id, file_name, file_size, file_type, storage_url, created_at)
+        `)
+        .eq('shared_with', user_id);
+
+      if (sharedFilesError) throw sharedFilesError;
+
+      // 3) Fetch file-sharing records (who has access to each file)
+      const fileIds = [...ownedFiles.map(f => f.id), ...sharedFilesData.map(s => s.file_id)];
+      let sharingData = [];
+      if (fileIds.length) {
+        const { data: sharingRows, error: sharingError } = await supabase
+          .from('file_sharing')
+          .select('file_id, shared_with, access_type')
+          .in('file_id', fileIds);
+
+        if (sharingError) throw sharingError;
+        sharingData = sharingRows;
+      }
+
+      // 4) Fetch user details for shared users
+      const sharedUserIds = [...new Set(sharingData.map(s => s.shared_with))];
+      let sharedUsers = [];
+      if (sharedUserIds.length) {
+        sharedUsers = await fetchUsersByIds(sharedUserIds);
+      }
+
+      // 5) Create a map: file_id -> shared users array
+      const sharedMap = {};
+      for (const share of sharingData) {
+        const user = sharedUsers.find((u) => u.id === share.shared_with);
+        if (!sharedMap[share.file_id]) {
+          sharedMap[share.file_id] = [];
+        }
+        sharedMap[share.file_id].push({
+          id: user?.id,
+          name: user?.full_name || 'Unknown',
+          email: user?.email || '',
+          avatarUrl: user?.avatar_url || '',
+          permission: share.access_type, // 'view' or 'edit'
+        });
+      }
+
+      // 6) Format owned files
+      const ownedFilesFormatted = ownedFiles.map((file) => ({
+        id: file.id,
+        name: file.file_name,
+        url: supabase.storage.from('file_attachments').getPublicUrl(file.storage_url)?.data.publicUrl || '',
+        type: file.file_type,
+        size: file.file_size,
+        createdAt: file.created_at,
+        modifiedAt: file.created_at,
+        isFavorited: file.is_favorite,
+        tags: [],
+        shared: sharedMap[file.id] || [], // Attach shared user details
+        isShared: false,
+        accessType: 'owner',
+      }));
+
+      // 7) Format shared files (files shared **with** the user)
+      const sharedFilesFormatted = sharedFilesData.map((record) => {
+        const file = record.files;
+        if (!file) return null; // Skip if the file doesn't exist
+
+        return {
+          id: file.id,
+          name: file.file_name,
+          url: supabase.storage.from('file_attachments').getPublicUrl(file.storage_url)?.data.publicUrl || '',
+          type: file.file_type,
+          size: file.file_size,
+          createdAt: file.created_at,
+          modifiedAt: file.created_at,
+          isFavorited: false, // Favoriting logic applies only to owned files
+          tags: [],
+          shared: sharedMap[file.id] || [], // Attach shared user details
+          isShared: true,
+          accessType: record.access_type,
+          ownerId: file.user_id, // Who originally uploaded the file
+        };
+      }).filter(Boolean); // Remove null values
+
+      // 8) Fetch folders
       const { data: foldersData, error: foldersError } = await supabase
         .from('folders')
         .select('id, folder_name, created_at')
@@ -102,36 +135,10 @@ export default function useGetFiles(user_id) {
 
       if (foldersError) throw foldersError;
 
-      // 3) Convert each file's storage_url to a public URL
-      const files = filesData.map((file) => {
-        // "getPublicUrl" does not require a round trip – it returns a URL if the bucket/object is public
-        const { data: publicData } = supabase
-          .storage
-          .from('file_attachments')
-          .getPublicUrl(file.storage_url);
-
-        // If your bucket is private, see the "Signed URL" example below.
-
-        return {
-          id: file.id,
-          name: file.file_name,
-          // The line below is the big change: we use publicData.publicUrl
-          url: publicData?.publicUrl || '', // fallback to empty string if something's missing
-          type: file.file_type,
-          size: file.file_size,
-          createdAt: file.created_at,
-          modifiedAt: file.created_at,
-          isFavorited: file.is_favorite,
-          tags: [],
-          shared: [],
-        };
-      });
-
-      // 4) Map folders to match your mock structure
       const folders = foldersData.map((folder) => ({
         id: folder.id,
         name: folder.folder_name,
-        url: '', // we don't have an actual folder icon by default
+        url: '',
         type: 'folder',
         size: null,
         totalFiles: 0,
@@ -142,10 +149,24 @@ export default function useGetFiles(user_id) {
         shared: [],
       }));
 
-      // 5) Combine
-      return [...folders, ...files];
+      // 9) Merge everything and return
+      return [...folders, ...ownedFilesFormatted, ...sharedFilesFormatted];
     }
   );
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('file_sharing_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'file_sharing' }, (payload) => {
+        console.log("🔄 Realtime update in file_sharing:", payload);
+        mutate(['get_files', user_id]); // Refresh file list in real-time
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel); // Cleanup when component unmounts
+    };
+  }, [user_id]);
 
   return {
     data: data || [],
@@ -153,6 +174,8 @@ export default function useGetFiles(user_id) {
     isError: error,
   };
 }
+
+
 // ----------------------------------------------------------------------------
 
 export async function uploadFiles(user_id, files, folder_name = null) {
@@ -265,4 +288,41 @@ export async function toggleFavoriteFile(fileId, userId, currentValue) {
   mutate(['get_files', userId]);
 
   return { success: true, data };
+}
+
+export async function shareFile(ownerId, fileId, recipientId, accessType = 'view') {
+  try {
+    // 1) Check that the file belongs to the owner
+    const { data: fileData, error: fileError } = await supabase
+      .from('files')
+      .select('user_id')
+      .eq('id', fileId)
+      .single();
+
+    if (fileError) throw fileError;
+    if (!fileData || fileData.user_id !== ownerId) {
+      throw new Error('You do not own this file and cannot share it.');
+    }
+
+    // 2) Insert/Update the `file_sharing` table
+    const { error: shareError } = await supabase
+      .from('file_sharing')
+      .upsert([
+        {
+          file_id: fileId,
+          shared_with: recipientId,
+          access_type: accessType, // 'view' or 'edit'
+        }
+      ]);
+
+    if (shareError) throw shareError;
+
+    // Optionally re-fetch the file list if you want immediate UI update
+    mutate(['get_files', ownerId]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error sharing file:', error);
+    return { success: false, error };
+  }
 }

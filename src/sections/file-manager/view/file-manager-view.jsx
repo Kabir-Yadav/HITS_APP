@@ -55,7 +55,7 @@ export function FileManagerView() {
   const userId = user.id;
   const { data, isLoading, isError } = useGetFiles(userId);
   const [tableData, setTableData] = useState([]);
-  const GB = 1000000000 * 1;
+  const GB = 100000000 * 1;
   const totalGB = GB; // 24 GB
 
   // ✅ Update tableData when data changes
@@ -157,7 +157,6 @@ export function FileManagerView() {
   const totalUsedBytes = tableData
     .filter((item) => item.type !== 'folder')
     .reduce((acc, file) => acc + (file.size || 0), 0);
-  console.log(tableData)
   // 3) Sum usage by category
   const imageUsedBytes = tableData
     .filter((f) => IMAGE_TYPES.includes(f.type?.toLowerCase()))
@@ -240,7 +239,7 @@ export function FileManagerView() {
       }
     />
   );
-
+  console.log(tableData)
   const renderList = () =>
     displayMode === 'list' ? (
       <FileManagerTable
@@ -285,6 +284,7 @@ export function FileManagerView() {
       <FileStorageOverview
         // The "total" is your total capacity
         total={totalGB}
+        used={totalUsedBytes}
         // The radial bar will show the % used
         chart={{ series: usedPercent }}
         data={[
@@ -362,13 +362,13 @@ export function FileManagerView() {
         </Box>
 
         {/* {Favourite Folders and Files} */}
-        <Box sx={{ mt: 5, mb: 5 }}>
+        <Box sx={{ mt: 5, mb: 4 }}>
           <FileManagerPanel
-            title="Folder"
+            title="Favorites"
             link={paths.dashboard.fileManager}
           />
           {favoriteItems.length === 0 ?
-            <EmptyContent title="No Favorite Files or Folder" />
+            <EmptyContent title="No Favourite Files or Folder" />
             :
             <Scrollbar sx={{ mb: 3, minHeight: 186 }}>
               <Box sx={{ gap: 3, display: 'flex' }}>
@@ -422,6 +422,7 @@ export function FileManagerView() {
                 <Box sx={{ gap: 2, display: 'flex', flexDirection: 'column' }}>
                   {recentFiles.map((file) => (
                     <FileRecentItem
+                      userId={userId}
                       key={file.id}
                       file={file}
                       onDelete={() => handleDeleteItem(file.id)}

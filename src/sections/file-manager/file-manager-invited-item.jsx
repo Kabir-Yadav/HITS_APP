@@ -15,53 +15,56 @@ import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerInvitedItem({ person }) {
+export function FileManagerInvitedItem({ person, isOwner }) {
   const menuActions = usePopover();
 
   const [permission, setPermission] = useState(person.permission);
 
   const handleChangePermission = useCallback((newPermission) => {
-    setPermission(newPermission);
-  }, []);
+    if (isOwner) {
+      setPermission(newPermission);
+    }
+  }, [isOwner]);
 
-  const renderMenuActions = () => (
-    <CustomPopover
-      open={menuActions.open}
-      anchorEl={menuActions.anchorEl}
-      onClose={menuActions.onClose}
-    >
-      <MenuList>
-        <MenuItem
-          selected={permission === 'view'}
-          onClick={() => {
-            menuActions.onClose();
-            handleChangePermission('view');
-          }}
-        >
-          <Iconify icon="solar:eye-bold" />
-          Can view
-        </MenuItem>
+  const renderMenuActions = () =>
+    isOwner && (
+      <CustomPopover
+        open={menuActions.open}
+        anchorEl={menuActions.anchorEl}
+        onClose={menuActions.onClose}
+      >
+        <MenuList>
+          <MenuItem
+            selected={permission === 'view'}
+            onClick={() => {
+              menuActions.onClose();
+              handleChangePermission('view');
+            }}
+          >
+            <Iconify icon="solar:eye-bold" />
+            Can view
+          </MenuItem>
 
-        <MenuItem
-          selected={permission === 'edit'}
-          onClick={() => {
-            menuActions.onClose();
-            handleChangePermission('edit');
-          }}
-        >
-          <Iconify icon="solar:pen-bold" />
-          Can edit
-        </MenuItem>
+          <MenuItem
+            selected={permission === 'edit'}
+            onClick={() => {
+              menuActions.onClose();
+              handleChangePermission('edit');
+            }}
+          >
+            <Iconify icon="solar:pen-bold" />
+            Can edit
+          </MenuItem>
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+          <Divider sx={{ borderStyle: 'dashed' }} />
 
-        <MenuItem onClick={() => menuActions.onClose()} sx={{ color: 'error.main' }}>
-          <Iconify icon="solar:trash-bin-trash-bold" />
-          Remove
-        </MenuItem>
-      </MenuList>
-    </CustomPopover>
-  );
+          <MenuItem onClick={() => menuActions.onClose()} sx={{ color: 'error.main' }}>
+            <Iconify icon="solar:trash-bin-trash-bold" />
+            Remove
+          </MenuItem>
+        </MenuList>
+      </CustomPopover>
+    );
 
   return (
     <>
@@ -85,19 +88,24 @@ export function FileManagerInvitedItem({ person }) {
         <Button
           size="small"
           color="inherit"
+          disabled={!isOwner} // 🔹 Disable if not owner
           endIcon={
             <Iconify
               width={16}
-              icon={menuActions.open ? 'eva:arrow-ios-upward-fill' : 'eva:arrow-ios-downward-fill'}
+              icon={
+                isOwner && menuActions.open
+                  ? 'eva:arrow-ios-upward-fill'
+                  : 'eva:arrow-ios-downward-fill'
+              }
               sx={{ ml: -0.5 }}
             />
           }
-          onClick={menuActions.onOpen}
+          onClick={isOwner ? menuActions.onOpen : null} // 🔹 Prevent opening menu if not owner
           sx={[
             (theme) => ({
               flexShrink: 0,
               fontSize: theme.typography.pxToRem(12),
-              ...(menuActions.open && { bgcolor: 'action.selected' }),
+              ...(menuActions.open && isOwner && { bgcolor: 'action.selected' }), // Apply bg color only if owner
             }),
           ]}
         >
@@ -105,7 +113,7 @@ export function FileManagerInvitedItem({ person }) {
         </Button>
       </Box>
 
-      {renderMenuActions()}
+      {isOwner && renderMenuActions()}
     </>
   );
 }

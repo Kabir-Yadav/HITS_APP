@@ -25,7 +25,7 @@ import { FileManagerFileDetails } from './file-manager-file-details';
 
 // ----------------------------------------------------------------------
 
-export function FileRecentItem({ file, onDelete, showstar = false, sx, ...other }) {
+export function FileRecentItem({ userId, file, onDelete, showstar = false, sx, ...other }) {
   const { copy } = useCopyToClipboard();
 
   const menuActions = usePopover();
@@ -171,6 +171,7 @@ export function FileRecentItem({ file, onDelete, showstar = false, sx, ...other 
 
   const renderFileDetailsDrawer = () => (
     <FileManagerFileDetails
+      userId={userId}
       file={file}
       favorited={favorite}
       onFavorite={favorite.onToggle}
@@ -186,6 +187,8 @@ export function FileRecentItem({ file, onDelete, showstar = false, sx, ...other 
 
   const renderShareDialog = () => (
     <FileManagerShareDialog
+      ownerId={userId}
+      fileId={file.id}
       open={shareDialog.value}
       shared={file.shared}
       inviteEmail={inviteEmail}

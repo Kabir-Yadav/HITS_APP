@@ -1,11 +1,17 @@
+import { useState, useEffect } from 'react';
+
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import TextField from '@mui/material/TextField';
 import DialogTitle from '@mui/material/DialogTitle';
+import { Autocomplete, MenuItem } from '@mui/material';
 import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { useGetAllUsers, shareFile } from 'src/actions/filemanager';
+
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 
@@ -15,49 +21,93 @@ import { FileManagerInvitedItem } from './file-manager-invited-item';
 
 export function FileManagerShareDialog({
   open,
-  shared,
+  shared = [],
   onClose,
   onCopyLink,
   inviteEmail,
   onChangeInvite,
+  fileId,
+  ownerId,
   ...other
 }) {
   const hasShared = shared && !!shared.length;
+  const { data: allUsers = [] } = useGetAllUsers();
+  // State for the "selected user" from the autocomplete
+  const [selectedUser, setSelectedUser] = useState(null);
 
+  // State for the chosen permission e.g. 'view' or 'edit'
+  const [accessType, setAccessType] = useState('view');
+  useEffect(() => {
+    if (!open) {
+      setSelectedUser(null);
+      setAccessType('view');
+    }
+  }, [open]);
+
+  const handleShare = async () => {
+    if (!selectedUser) {
+      toast.error('No user selected');
+      return;
+    }
+    try {
+      console.log(ownerId, fileId)
+      const result = await shareFile(ownerId, fileId, selectedUser.id, accessType);
+      if (!result.success) {
+        toast.error('Failed to share file');
+      } else {
+        toast.success('File shared successfully!');
+        // Optionally re-fetch the file list or data
+        // mutate(['get_files', ownerId]);
+        onClose();
+      }
+    } catch (error) {
+      toast.error('Error sharing file');
+      console.error(error);
+    }
+  };
+
+  const handleChangeAccessType = (e) => {
+    setAccessType(e.target.value);
+  };
   return (
     <Dialog fullWidth maxWidth="xs" open={open} onClose={onClose} {...other}>
-      <DialogTitle> Invite </DialogTitle>
+      <DialogTitle> Share File </DialogTitle>
 
-      <Box sx={{ px: 3 }}>
-        {onChangeInvite && (
-          <TextField
-            fullWidth
-            value={inviteEmail}
-            placeholder="Email"
-            onChange={onChangeInvite}
-            slotProps={{
-              input: {
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <Button
-                      color="inherit"
-                      variant="contained"
-                      disabled={!inviteEmail}
-                      sx={{ mr: -0.75 }}
-                    >
-                      Send Invite
-                    </Button>
-                  </InputAdornment>
-                ),
-              },
-            }}
-            sx={{ mb: 2 }}
-          />
-        )}
+      <Box sx={{ px: 3, py: 2 }}>
+        <Autocomplete
+          options={allUsers}
+          getOptionLabel={(option) => option.email || 'Unnamed'}
+          value={selectedUser}
+          onChange={(event, newValue) => {
+            setSelectedUser(newValue);
+          }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              label="Search user by email"
+              placeholder="Select user"
+              fullWidth
+              sx={{ mb: 2 }}
+            />
+          )}
+        />
+
+        <TextField
+          select
+          label="Permission"
+          value={accessType}
+          onChange={handleChangeAccessType}
+          fullWidth
+          sx={{ mb: 2 }}
+        >
+          <MenuItem value="view">View</MenuItem>
+          <MenuItem value="edit">Edit</MenuItem>
+        </TextField>
       </Box>
 
-      {hasShared && (
-        <Scrollbar sx={{ height: 60 * 5, px: 3 }}>
+      {/* Currently Shared */}
+      {shared.length > 0 && (
+        <Scrollbar sx={{ height: 240, px: 3 }}>
           <Box component="ul">
             {shared.map((person) => (
               <FileManagerInvitedItem key={person.id} person={person} />
@@ -67,17 +117,25 @@ export function FileManagerShareDialog({
       )}
 
       <DialogActions sx={{ justifyContent: 'space-between' }}>
-        {onCopyLink && (
-          <Button startIcon={<Iconify icon="eva:link-2-fill" />} onClick={onCopyLink}>
-            Copy link
-          </Button>
-        )}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {/* If you want to implement Copy Link */}
+          {/* <Button startIcon={<Iconify icon="eva:link-2-fill" />} onClick={onCopyLink}>
+            Copy Link
+          </Button> */}
+        </Box>
 
-        {onClose && (
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Button variant="outlined" color="inherit" onClick={onClose}>
             Close
           </Button>
-        )}
+          <Button
+            variant="contained"
+            disabled={!selectedUser}
+            onClick={handleShare}
+          >
+            Share
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
