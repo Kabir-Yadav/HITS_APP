@@ -32,16 +32,16 @@ export default function useGetFiles(user_id) {
   const { data, error, isLoading } = useSWR(
     ['get_files', user_id],
     async () => {
-      // 1) Fetch owned files
+      // 1) Fetch Owned Files
       const { data: ownedFiles, error: ownedFilesError } = await supabase
         .from('files')
-        .select('id, user_id, file_name, file_size, file_type, storage_url, created_at, is_favorite')
+        .select('id, user_id, file_name, file_size, file_type, storage_url, created_at')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false });
 
       if (ownedFilesError) throw ownedFilesError;
 
-      // 2) Fetch shared files (files shared **with** the user)
+      // 2) Fetch Shared Files (files shared **with** the user)
       const { data: sharedFilesData, error: sharedFilesError } = await supabase
         .from('file_sharing')
         .select(`
@@ -87,8 +87,16 @@ export default function useGetFiles(user_id) {
           permission: share.access_type, // 'view' or 'edit'
         });
       }
+      // 6) Fetch User's Favorites
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .from('file_favorites')
+        .select('file_id, folder_id')
+        .eq('user_id', user_id);
 
-      // 6) Format owned files
+      if (favoritesError) throw favoritesError;
+      const favoriteIds = new Set(favoritesData.map(fav => fav.file_id));
+
+      // 7) Format Owned Files
       const ownedFilesFormatted = ownedFiles.map((file) => ({
         id: file.id,
         name: file.file_name,
@@ -97,14 +105,14 @@ export default function useGetFiles(user_id) {
         size: file.file_size,
         createdAt: file.created_at,
         modifiedAt: file.created_at,
-        isFavorited: file.is_favorite,
+        isFavorited: favoriteIds.has(file.id), // Check if the file is favorited
         tags: [],
-        shared: sharedMap[file.id] || [], // Attach shared user details
+        shared: sharedMap[file.id] || [],
         isShared: false,
         accessType: 'owner',
       }));
 
-      // 7) Format shared files (files shared **with** the user)
+      // 8) Format Shared Files (files shared **with** the user)
       const sharedFilesFormatted = sharedFilesData.map((record) => {
         const file = record.files;
         if (!file) return null; // Skip if the file doesn't exist
@@ -117,16 +125,16 @@ export default function useGetFiles(user_id) {
           size: file.file_size,
           createdAt: file.created_at,
           modifiedAt: file.created_at,
-          isFavorited: false, // Favoriting logic applies only to owned files
+          isFavorited: favoriteIds.has(file.id), // Check if favorited
           tags: [],
-          shared: sharedMap[file.id] || [], // Attach shared user details
+          shared: sharedMap[file.id] || [],
           isShared: true,
           accessType: record.access_type,
-          ownerId: file.user_id, // Who originally uploaded the file
+          ownerId: file.user_id,
         };
       }).filter(Boolean); // Remove null values
 
-      // 8) Fetch folders
+      // 9) Fetch Folders
       const { data: foldersData, error: foldersError } = await supabase
         .from('folders')
         .select('id, folder_name, created_at')
@@ -144,16 +152,15 @@ export default function useGetFiles(user_id) {
         totalFiles: 0,
         createdAt: folder.created_at,
         modifiedAt: folder.created_at,
-        isFavorited: false,
+        isFavorited: favoriteIds.has(folder.id), // Check if favorited
         tags: [],
         shared: [],
       }));
 
-      // 9) Merge everything and return
+      // 10) Merge Everything
       return [...folders, ...ownedFilesFormatted, ...sharedFilesFormatted];
     }
   );
-
   useEffect(() => {
     const channel = supabase
       .channel('file_sharing_realtime')
@@ -174,6 +181,7 @@ export default function useGetFiles(user_id) {
     isError: error,
   };
 }
+
 
 
 // ----------------------------------------------------------------------------
@@ -267,28 +275,36 @@ export async function deleteFiles(user_id, fileIds) {
   }
 }
 
-export async function toggleFavoriteFile(fileId, userId, currentValue) {
-  // currentValue = the file's current is_favorite boolean
-  // We'll flip it to the opposite
-  const newValue = !currentValue;
+export async function toggleFavoriteFile(fileId, userId, isCurrentlyFavorited) {
+  try {
+    if (isCurrentlyFavorited) {
+      // Remove from favorites
+      const { error } = await supabase
+        .from('file_favorites')
+        .delete()
+        .eq('user_id', userId)
+        .eq('file_id', fileId);
 
-  const { data, error } = await supabase
-    .from('files')
-    .update({ is_favorite: newValue })
-    .eq('id', fileId)
-    .eq('user_id', userId)
-    .select(); // returns updated rows
+      if (error) throw error;
+    } else {
+      // Add to favorites
+      const { error } = await supabase
+        .from('file_favorites')
+        .insert([{ user_id: userId, file_id: fileId }]);
 
-  if (error) {
-    console.error('toggleFavorite error:', error.message);
+      if (error) throw error;
+    }
+
+    // Refresh UI for all users
+    mutate(['get_files', userId]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
     return { success: false, error };
   }
-
-  // Refresh SWR so UI updates
-  mutate(['get_files', userId]);
-
-  return { success: true, data };
 }
+
 
 export async function shareFile(ownerId, fileId, recipientId, accessType = 'view') {
   try {

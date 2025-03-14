@@ -5,9 +5,9 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import TextField from '@mui/material/TextField';
 import DialogTitle from '@mui/material/DialogTitle';
-import { Autocomplete, MenuItem } from '@mui/material';
 import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
+import { Autocomplete, Avatar, MenuItem } from '@mui/material';
 
 import { useGetAllUsers, shareFile } from 'src/actions/filemanager';
 
@@ -81,10 +81,41 @@ export function FileManagerShareDialog({
           onChange={(event, newValue) => {
             setSelectedUser(newValue);
           }}
+          renderOption={(props, option) => {
+            const { key, ...optionProps } = props;
+            return (
+              <Box
+                key={key}
+                component="li"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  p: 1,
+                  width: '100%',
+                }}
+                {...optionProps}
+              >
+                {/* Avatar */}
+                <Avatar
+                  src={option.avatar_url}
+                  alt={option.full_name}
+                  sx={{ width: 40, height: 40 }}
+                />
+
+                {/* Name & Email */}
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <Box sx={{ fontWeight: 'bold', fontSize: '1rem' }}>{option.full_name}</Box>
+                  <Box sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{option.email}</Box>
+                </Box>
+              </Box>
+            );
+          }}
+
           renderInput={(params) => (
             <TextField
               {...params}
-              label="Search user by email"
+              label="Search user by name"
               placeholder="Select user"
               fullWidth
               sx={{ mb: 2 }}
@@ -119,9 +150,9 @@ export function FileManagerShareDialog({
       <DialogActions sx={{ justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
           {/* If you want to implement Copy Link */}
-          {/* <Button startIcon={<Iconify icon="eva:link-2-fill" />} onClick={onCopyLink}>
+          <Button startIcon={<Iconify icon="eva:link-2-fill" />} onClick={onCopyLink}>
             Copy Link
-          </Button> */}
+          </Button>
         </Box>
 
         <Box sx={{ display: 'flex', gap: 1 }}>

@@ -69,11 +69,13 @@ export function FileManagerTable({
         <TableSelectedAction
           dense={dense}
           numSelected={selected.length}
-          rowCount={dataFiltered.length}
+          rowCount={dataFiltered.filter((row) => row.accessType === 'owner').length} // ✅ Count only owner rows
           onSelectAllRows={(checked) =>
             onSelectAllRows(
               checked,
-              dataFiltered.map((row) => row.id)
+              dataFiltered
+                .filter((row) => row.accessType === 'owner') // ✅ Select only owner items
+                .map((row) => row.id)
             )
           }
           action={
@@ -111,13 +113,15 @@ export function FileManagerTable({
               order={order}
               orderBy={orderBy}
               headCells={TABLE_HEAD}
-              rowCount={dataFiltered.length}
+              rowCount={dataFiltered.filter((row) => row.accessType === 'owner').length} // ✅ Count only owner rows
               numSelected={selected.length}
               onSort={onSort}
               onSelectAllRows={(checked) =>
                 onSelectAllRows(
                   checked,
-                  dataFiltered.map((row) => row.id)
+                  dataFiltered
+                    .filter((row) => row.accessType === 'owner') // ✅ Select only owner items
+                    .map((row) => row.id)
                 )
               }
               sx={{

@@ -208,9 +208,9 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
           Edit
         </MenuItem>
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+        {folder.accessType === 'owner' && (<Divider sx={{ borderStyle: 'dashed' }} />)}
 
-        <MenuItem
+        {folder.accessType === 'owner' && (<MenuItem
           onClick={() => {
             confirmDialog.onTrue();
             menuActions.onClose();
@@ -219,7 +219,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
         >
           <Iconify icon="solar:trash-bin-trash-bold" />
           Delete
-        </MenuItem>
+        </MenuItem>)}
       </MenuList>
     </CustomPopover>
   );

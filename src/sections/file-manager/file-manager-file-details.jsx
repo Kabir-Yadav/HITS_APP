@@ -238,6 +238,7 @@ export function FileManagerFileDetails({
             <FileThumbnail
               imageView
               file={file?.type === 'folder' ? file?.type : file?.url}
+              onDownload={() => window.open(file.url, '_blank')}
               sx={{ width: 'auto', height: 'auto', alignSelf: 'flex-start' }}
               slotProps={{
                 img: { sx: { width: 320, height: 'auto', aspectRatio: '4/3', objectFit: 'cover' } },

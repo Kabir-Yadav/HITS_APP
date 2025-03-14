@@ -26,7 +26,7 @@ export function ChatRoomAttachments({ attachments }) {
         <FileThumbnail
           imageView
           file={attachment.path}
-          onDownload={() => console.info('DOWNLOAD')}
+          onDownload={() => window.open(attachment.path, '_blank')}
           slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
           sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
         />

@@ -153,18 +153,24 @@ export function FileRecentItem({ userId, file, onDelete, showstar = false, sx, .
           Share
         </MenuItem>
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+        {file.accessType === 'owner' && (
+          <Divider sx={{ borderStyle: 'dashed' }} />
+        )}
 
-        <MenuItem
-          onClick={() => {
-            menuActions.onClose();
-            onDelete();
-          }}
-          sx={{ color: 'error.main' }}
-        >
-          <Iconify icon="solar:trash-bin-trash-bold" />
-          Delete
-        </MenuItem>
+        {file.accessType === 'owner' &&
+          (
+            <MenuItem
+              onClick={() => {
+                menuActions.onClose();
+                onDelete();
+              }}
+              sx={{ color: 'error.main' }}
+            >
+              <Iconify icon="solar:trash-bin-trash-bold" />
+              Delete
+            </MenuItem>
+          )
+        }
       </MenuList>
     </CustomPopover>
   );

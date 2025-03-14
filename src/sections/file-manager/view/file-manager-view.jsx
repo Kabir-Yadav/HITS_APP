@@ -129,6 +129,7 @@ export function FileManagerView() {
     }
 
     try {
+      console.log(table.selected)
       const result = await deleteFiles(userId, table.selected);
 
       if (result.success) {

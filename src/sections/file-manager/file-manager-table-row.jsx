@@ -111,9 +111,9 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
           Share
         </MenuItem>
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+        {row.accessType === 'owner' && (<Divider sx={{ borderStyle: 'dashed' }} />)}
 
-        <MenuItem
+        {row.accessType === 'owner' && (<MenuItem
           onClick={() => {
             confirmDialog.onTrue();
             menuActions.onClose();
@@ -122,7 +122,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
         >
           <Iconify icon="solar:trash-bin-trash-bold" />
           Delete
-        </MenuItem>
+        </MenuItem>)}
       </MenuList>
     </CustomPopover>
   );
@@ -198,7 +198,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
         }}
       >
         <TableCell padding="checkbox">
-          <Checkbox
+          {row.accessType === 'owner' && (<Checkbox
             checked={selected}
             onClick={onSelectRow}
             onDoubleClick={() => console.info('ON DOUBLE CLICK')}
@@ -206,7 +206,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
               id: `${row.id}-checkbox`,
               'aria-label': `${row.id} checkbox`,
             }}
-          />
+          />)}
         </TableCell>
 
         <TableCell onClick={handleClick}>
