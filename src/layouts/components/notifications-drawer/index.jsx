@@ -105,10 +105,6 @@ export function NotificationsDrawer({ sx, ...other }) {
       <IconButton onClick={onClose} sx={{ display: { xs: 'inline-flex', sm: 'none' } }}>
         <Iconify icon="mingcute:close-line" />
       </IconButton>
-
-      <IconButton>
-        <Iconify icon="solar:settings-bold-duotone" />
-      </IconButton>
     </Box>
   );
 

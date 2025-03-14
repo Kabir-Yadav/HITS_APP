@@ -142,15 +142,22 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
   };
 
   return (
-    <Card sx={sx} {...other}>
+    <Card sx={{ width: '100%', ...sx }} {...other}>
       <CardHeader 
         title={title} 
         subheader={subheader || `${sortedTasks.length} tasks pending`}
         sx={{ mb: 1 }} 
       />
 
-      <Scrollbar sx={{ minHeight: 304 }}>
-        <Stack divider={<Divider sx={{ borderStyle: 'dashed' }} />} sx={{ minWidth: 560 }}>
+      <Scrollbar sx={{ maxHeight: 'calc(100vh - 300px)' }}>
+        <Stack 
+          spacing={2}
+          divider={<Divider sx={{ borderStyle: 'dashed' }} />}
+          sx={{ 
+            p: 2,
+            width: '100%'
+          }}
+        >
           {sortedTasks.map((task) => (
             <TaskItem
               key={task.id}
@@ -246,10 +253,13 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
       <Box
         sx={[
           () => ({
-            pl: 2,
-            pr: 1,
-            py: 1.5,
+            p: 2,
             display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: (theme) => theme.palette.background.neutral,
+            borderRadius: 1,
+            width: '100%',
             ...(selected && {
               color: 'text.disabled',
               textDecoration: 'line-through',
@@ -261,7 +271,12 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
       >
         <FormControlLabel
           label={
-            <Box sx={{ typography: 'body2' }}>
+            <Box sx={{ 
+              typography: 'body2',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
               {task.name}
               {isOverdue && (
                 <Box
@@ -286,10 +301,21 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
               inputProps={{ 'aria-label': `${task.name}-checkbox` }}
             />
           }
-          sx={{ flexGrow: 1, m: 0 }}
+          sx={{ 
+            m: 0,
+            flexGrow: 1,
+            '& .MuiFormControlLabel-label': {
+              flex: 1,
+              width: '100%'
+            }
+          }}
         />
 
-        <IconButton color={menuActions.open ? 'inherit' : 'default'} onClick={menuActions.onOpen}>
+        <IconButton 
+          color={menuActions.open ? 'inherit' : 'default'} 
+          onClick={menuActions.onOpen}
+          sx={{ ml: 1 }}
+        >
           <Iconify icon="eva:more-vertical-fill" />
         </IconButton>
       </Box>
