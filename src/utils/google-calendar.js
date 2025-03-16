@@ -8,6 +8,8 @@ export const initGoogleCalendarApi = async () => {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://apis.google.com/js/api.js';
+        script.async = true;
+        script.defer = true;
         script.onload = resolve;
         script.onerror = reject;
         document.body.appendChild(script);
@@ -17,6 +19,19 @@ export const initGoogleCalendarApi = async () => {
     // Load the gapi client
     await new Promise((resolve) => window.gapi.load('client:auth2', resolve));
 
+    // Load the new Google Identity Services library
+    if (!window.google?.accounts) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.body.appendChild(script);
+      });
+    }
+
     // Initialize the client
     await window.gapi.client.init({
       apiKey: GOOGLE_CALENDAR_CONFIG.API_KEY,
@@ -25,14 +40,19 @@ export const initGoogleCalendarApi = async () => {
       scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
     });
 
-    // Initialize auth2
-    const authInstance = window.gapi.auth2.getAuthInstance();
+    // Initialize auth2 with proper configuration
+    const authInstance = await window.gapi.auth2.init({
+      client_id: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
+      scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
+      ux_mode: 'popup',
+      plugin_name: 'calendar',
+    });
 
     // If user is not signed in, trigger the sign-in flow
     if (!authInstance.isSignedIn.get()) {
       await authInstance.signIn({
-        prompt: 'consent',  // Force consent prompt
-        ux_mode: 'popup',   // Use popup mode
+        prompt: 'consent',
+        ux_mode: 'popup',
       });
     }
 
@@ -48,6 +68,7 @@ export const ensureGoogleCalendarAuth = async () => {
   try {
     if (!window.gapi?.client?.calendar) {
       await initGoogleCalendarApi();
+      return true;
     }
 
     const authInstance = window.gapi.auth2.getAuthInstance();
@@ -76,5 +97,6 @@ export const ensureGoogleCalendarAuth = async () => {
 // Get authorized domains
 export const isAuthorizedDomain = () => {
   const currentDomain = window.location.host;
-  return GOOGLE_CALENDAR_CONFIG.AUTHORIZED_DOMAINS.includes(currentDomain);
+  return GOOGLE_CALENDAR_CONFIG.AUTHORIZED_DOMAINS.includes(currentDomain) || 
+         currentDomain.includes('localhost'); // Allow localhost for development
 }; 
