@@ -101,10 +101,10 @@ export function CalendarView() {
         // Load events from Google Calendar
         const response = await gapi.client.calendar.events.list({
           calendarId: 'primary',
-          timeMin: new Date().toISOString(),
+          timeMin: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString(),
           showDeleted: false,
           singleEvents: true,
-          maxResults: 100,
+          maxResults: 2500,
           orderBy: 'startTime',
         });
 
@@ -141,7 +141,7 @@ export function CalendarView() {
     currentFilters.colors.length > 0 || (!!currentFilters.startDate && !!currentFilters.endDate);
 
   const dataFiltered = applyFilter({
-    inputData: [...events, ...googleEvents],
+    inputData: googleEvents,
     filters: currentFilters,
     dateError,
   });
