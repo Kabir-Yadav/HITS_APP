@@ -10,7 +10,6 @@ export const GOOGLE_CALENDAR_CONFIG = {
   // Add your authorized domains here
   AUTHORIZED_DOMAINS: [
     'localhost:8000', // Development
-    'localhost:3000', // Development
     'employeeos.tech', // Production
     'www.employeeos.tech' // Production with www
   ]

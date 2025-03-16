@@ -10,51 +10,60 @@ export const initGoogleCalendarApi = async () => {
         script.src = 'https://apis.google.com/js/api.js';
         script.async = true;
         script.defer = true;
+        script.crossOrigin = "anonymous";
+        script.nonce = document.querySelector('meta[name="csp-nonce"]')?.content;
         script.onload = resolve;
         script.onerror = reject;
-        document.body.appendChild(script);
+        document.head.appendChild(script);
       });
     }
 
     // Load the gapi client
-    await new Promise((resolve) => window.gapi.load('client:auth2', resolve));
+    await new Promise((resolve) => window.gapi.load('client', resolve));
 
-    // Load the new Google Identity Services library
+    // Initialize the client first
+    await window.gapi.client.init({
+      apiKey: GOOGLE_CALENDAR_CONFIG.API_KEY,
+      discoveryDocs: GOOGLE_CALENDAR_CONFIG.DISCOVERY_DOCS,
+    });
+
+    // Now load the identity platform script
     if (!window.google?.accounts) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
         script.src = 'https://accounts.google.com/gsi/client';
         script.async = true;
         script.defer = true;
+        script.crossOrigin = "anonymous";
+        script.nonce = document.querySelector('meta[name="csp-nonce"]')?.content;
         script.onload = resolve;
         script.onerror = reject;
-        document.body.appendChild(script);
+        document.head.appendChild(script);
       });
     }
 
-    // Initialize the client
-    await window.gapi.client.init({
-      apiKey: GOOGLE_CALENDAR_CONFIG.API_KEY,
-      clientId: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
-      discoveryDocs: GOOGLE_CALENDAR_CONFIG.DISCOVERY_DOCS,
-      scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
-    });
-
-    // Initialize auth2 with proper configuration
-    const authInstance = await window.gapi.auth2.init({
+    // Initialize Google Identity Services
+    const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
       scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
-      ux_mode: 'popup',
-      plugin_name: 'calendar',
+      callback: (response) => {
+        if (response.error) {
+          throw new Error(response.error);
+        }
+        // Set the access token
+        window.gapi.client.setToken(response);
+      },
     });
 
-    // If user is not signed in, trigger the sign-in flow
-    if (!authInstance.isSignedIn.get()) {
-      await authInstance.signIn({
-        prompt: 'consent',
-        ux_mode: 'popup',
-      });
-    }
+    // Request the token
+    await new Promise((resolve, reject) => {
+      try {
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
 
     return window.gapi;
   } catch (error) {
@@ -71,20 +80,17 @@ export const ensureGoogleCalendarAuth = async () => {
       return true;
     }
 
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    if (!authInstance.isSignedIn.get()) {
-      await authInstance.signIn({
-        prompt: 'consent',
-        ux_mode: 'popup',
-      });
+    // Check if we have a valid token
+    const token = window.gapi.client.getToken();
+    if (!token) {
+      await initGoogleCalendarApi();
+      return true;
     }
 
-    // Verify token and refresh if needed
-    const currentUser = authInstance.currentUser.get();
-    const token = currentUser.getAuthResponse();
-    
-    if (token.expires_at < Date.now()) {
-      await currentUser.reloadAuthResponse();
+    // Check if token is expired
+    if (token.expires_at && token.expires_at < Date.now()) {
+      await initGoogleCalendarApi();
+      return true;
     }
 
     return true;
