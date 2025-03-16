@@ -2,6 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 
 import axios, { fetcher, endpoints } from 'src/lib/axios';
+import { ensureGoogleCalendarAuth } from 'src/utils/google-calendar';
 
 // ----------------------------------------------------------------------
 
@@ -27,20 +28,10 @@ export function useGetEvents() {
 
 export const getEventDetails = async (eventId) => {
   try {
-    // First ensure we have a valid token
-    if (!window.gapi?.client?.calendar) {
-      throw new Error('Google Calendar API not initialized');
-    }
+    // Ensure we have proper authentication
+    await ensureGoogleCalendarAuth();
 
-    // Get the current access token
-    const token = window.gapi.client.getToken();
-    if (!token) {
-      // If no token, trigger auth flow
-      const authInstance = await window.gapi.auth2.getAuthInstance();
-      await authInstance.signIn();
-    }
-
-    // Now make the API call
+    // Make the API call
     const response = await window.gapi.client.calendar.events.get({
       calendarId: 'primary',
       eventId,
@@ -63,45 +54,58 @@ export const getEventDetails = async (eventId) => {
     };
   } catch (error) {
     console.error('Failed to fetch event details:', error);
-    // Re-initialize Google API if needed
-    try {
-      await window.gapi.client.init({
-        apiKey: process.env.GOOGLE_CALENDAR_API_KEY,
-        clientId: process.env.GOOGLE_CLIENT_ID,
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-        scope: 'https://www.googleapis.com/auth/calendar',
-      });
-      // Retry the event fetch after re-initialization
-      const response = await window.gapi.client.calendar.events.get({
-        calendarId: 'primary',
-        eventId,
-      });
-      const event = response.result;
-      return {
-        id: event.id,
-        title: event.summary || '',
-        description: event.description || '',
-        start: event.start?.dateTime || event.start?.date || new Date().toISOString(),
-        end: event.end?.dateTime || event.end?.date || new Date().toISOString(),
-        allDay: !event.start?.dateTime,
-        attendees: event.attendees ? event.attendees.map(a => a.email).join(', ') : '',
-        color: event.colorId === '1' ? 'primary.main' : 'secondary.main',
-      };
-    } catch (retryError) {
-      console.error('Failed to re-initialize and fetch:', retryError);
-      throw retryError;
-    }
+    throw error;
   }
 };
 
 // ----------------------------------------------------------------------
 
-export const createEvent = () => null;
+export const createEvent = async (eventData) => {
+  try {
+    await ensureGoogleCalendarAuth();
+    const response = await window.gapi.client.calendar.events.insert({
+      calendarId: 'primary',
+      resource: eventData,
+      sendUpdates: 'all',
+    });
+    return response.result;
+  } catch (error) {
+    console.error('Failed to create event:', error);
+    throw error;
+  }
+};
 
 // ----------------------------------------------------------------------
 
-export const updateEvent = () => null;
+export const updateEvent = async (eventId, eventData) => {
+  try {
+    await ensureGoogleCalendarAuth();
+    const response = await window.gapi.client.calendar.events.update({
+      calendarId: 'primary',
+      eventId,
+      resource: eventData,
+      sendUpdates: 'all',
+    });
+    return response.result;
+  } catch (error) {
+    console.error('Failed to update event:', error);
+    throw error;
+  }
+};
 
 // ----------------------------------------------------------------------
 
-export const deleteEvent = () => null;
+export const deleteEvent = async (eventId) => {
+  try {
+    await ensureGoogleCalendarAuth();
+    await window.gapi.client.calendar.events.delete({
+      calendarId: 'primary',
+      eventId,
+      sendUpdates: 'all',
+    });
+    return true;
+  } catch (error) {
+    console.error('Failed to delete event:', error);
+    throw error;
+  }
+};
