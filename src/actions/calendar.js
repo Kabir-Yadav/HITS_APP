@@ -1,8 +1,8 @@
 import useSWR from 'swr';
 import { useMemo } from 'react';
 
-import axios, { fetcher, endpoints } from 'src/lib/axios';
 import { ensureGoogleCalendarAuth } from 'src/utils/google-calendar';
+import axios, { fetcher, endpoints } from 'src/lib/axios';
 
 // ----------------------------------------------------------------------
 
