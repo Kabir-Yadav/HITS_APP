@@ -17,7 +17,7 @@ import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 
 import { fDate, fIsAfter, fIsBetween } from 'src/utils/format-time';
-import { initGoogleCalendarApi, authenticateGoogleCalendar, isAuthorizedDomain } from 'src/utils/google-calendar';
+import { initGoogleCalendarApi, ensureGoogleCalendarAuth, isAuthorizedDomain } from 'src/utils/google-calendar';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { CALENDAR_COLOR_OPTIONS } from 'src/_mock/_calendar';
@@ -83,23 +83,17 @@ export function CalendarView() {
   }, [onInitialView]);
 
   useEffect(() => {
-    const initGoogleCalendar = async () => {
+    const initCalendar = async () => {
       if (!isAuthorizedDomain()) {
         console.error('Current domain is not authorized for Google Calendar API');
         return;
       }
 
       try {
-        const gapi = await initGoogleCalendarApi();
-        const token = await authenticateGoogleCalendar();
+        await ensureGoogleCalendarAuth();
         
-        if (!token) {
-          console.error('Failed to get access token');
-          return;
-        }
-
         // Load events from Google Calendar
-        const response = await gapi.client.calendar.events.list({
+        const response = await window.gapi.client.calendar.events.list({
           calendarId: 'primary',
           timeMin: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString(),
           showDeleted: false,
@@ -134,7 +128,7 @@ export function CalendarView() {
       }
     };
 
-    initGoogleCalendar();
+    initCalendar();
   }, [theme.vars.palette.primary.main, theme.vars.palette.common.white]);
 
   const canReset =
