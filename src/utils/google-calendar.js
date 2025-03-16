@@ -11,23 +11,23 @@ export const initGoogleCalendarApi = async () => {
         script.async = true;
         script.defer = true;
         script.crossOrigin = "anonymous";
-        script.nonce = document.querySelector('meta[name="csp-nonce"]')?.content;
+        document.head.appendChild(script);
         script.onload = resolve;
         script.onerror = reject;
-        document.head.appendChild(script);
       });
     }
 
     // Load the gapi client
     await new Promise((resolve) => window.gapi.load('client', resolve));
 
-    // Initialize the client first
+    // Initialize the client with credentials
     await window.gapi.client.init({
       apiKey: GOOGLE_CALENDAR_CONFIG.API_KEY,
       discoveryDocs: GOOGLE_CALENDAR_CONFIG.DISCOVERY_DOCS,
+      clientId: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
     });
 
-    // Now load the identity platform script
+    // Load Google Identity Services script
     if (!window.google?.accounts) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -35,37 +35,33 @@ export const initGoogleCalendarApi = async () => {
         script.async = true;
         script.defer = true;
         script.crossOrigin = "anonymous";
-        script.nonce = document.querySelector('meta[name="csp-nonce"]')?.content;
+        document.head.appendChild(script);
         script.onload = resolve;
         script.onerror = reject;
-        document.head.appendChild(script);
       });
     }
 
-    // Initialize Google Identity Services
+    // Initialize token client
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
       scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
+      prompt: 'consent',
       callback: (response) => {
         if (response.error) {
           throw new Error(response.error);
         }
-        // Set the access token
         window.gapi.client.setToken(response);
       },
     });
 
-    // Request the token
-    await new Promise((resolve, reject) => {
-      try {
-        tokenClient.requestAccessToken({ prompt: 'consent' });
-        resolve();
-      } catch (error) {
-        reject(error);
-      }
+    // Request access token
+    return new Promise((resolve) => {
+      tokenClient.requestAccessToken({
+        prompt: 'consent',
+      });
+      resolve(window.gapi);
     });
 
-    return window.gapi;
   } catch (error) {
     console.error('Failed to initialize Google Calendar API:', error);
     throw error;
