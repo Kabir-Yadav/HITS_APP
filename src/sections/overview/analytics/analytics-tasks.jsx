@@ -18,6 +18,7 @@ import { useGetBoard, moveTaskBetweenColumns } from 'src/actions/kanban';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { EmptyContent } from 'src/components/empty-content';
 import { CustomPopover } from 'src/components/custom-popover';
 
 import { KanbanDetails } from 'src/sections/kanban/details/kanban-details';
@@ -34,7 +35,7 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
 
   // Get all tasks from all columns and filter for current user's tasks
   const allTasks = Object.values(board.tasks || {}).flat();
-  
+
   const userTasks = allTasks.filter(task => {
     // Check if user is assignee or reporter
     const isAssignee = task.assignee?.some(assignee => assignee.id === user?.id);
@@ -59,12 +60,12 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
     // Then sort by due date
     const aDate = dayjs(a.due?.[1]);
     const bDate = dayjs(b.due?.[1]);
-    
+
     // If one has no due date, put it last
     if (!aDate.isValid() && bDate.isValid()) return 1;
     if (aDate.isValid() && !bDate.isValid()) return -1;
     if (!aDate.isValid() && !bDate.isValid()) return 0;
-    
+
     // Sort by due date (earlier dates first)
     return aDate.diff(bDate);
   });
@@ -89,7 +90,7 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
 
       // Check if all subtasks are complete
       const hasIncompleteSubtasks = task.subtasks?.some(subtask => !subtask.completed);
-      
+
       if (hasIncompleteSubtasks) {
         toast.error('Please complete all subtasks before marking the task as complete', {
           position: 'top-center',
@@ -120,7 +121,7 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
 
       // Move the task to Archive column
       await moveTaskBetweenColumns(task, currentColumn.id, archiveColumn.id);
-      
+
       toast.success('Task marked as complete and moved to Archive!', {
         position: 'top-center',
       });
@@ -143,17 +144,21 @@ export function AnalyticsTasks({ title = "Today's Tasks", subheader, sx, ...othe
 
   return (
     <Card sx={{ width: '100%', ...sx }} {...other}>
-      <CardHeader 
-        title={title} 
-        subheader={subheader || `${sortedTasks.length} tasks pending`}
-        sx={{ mb: 1 }} 
+      <CardHeader
+        title={title}
+        subheader={sortedTasks.length > 0 ? `${sortedTasks.length} pending tasks` : ''}
+        sx={{ mb: 1 }}
       />
-
+      {sortedTasks.length === 0 && (
+        <EmptyContent
+          title='No Pending tasks'
+        />
+      )}
       <Scrollbar sx={{ maxHeight: 'calc(100vh - 300px)' }}>
-        <Stack 
+        <Stack
           spacing={2}
           divider={<Divider sx={{ borderStyle: 'dashed' }} />}
-          sx={{ 
+          sx={{
             p: 2,
             width: '100%'
           }}
@@ -187,10 +192,10 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
     try {
       setIsCompleting(true);
       menuActions.onClose();
-      
+
       // Check if all subtasks are complete
       const hasIncompleteSubtasks = task.subtasks?.some(subtask => !subtask.completed);
-      
+
       if (hasIncompleteSubtasks) {
         toast.error('Please complete all subtasks before marking the task as complete', {
           position: 'top-center',
@@ -218,7 +223,7 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
 
       // Move the task to Archive column
       await moveTaskBetweenColumns(task, currentColumn.id, archiveColumn.id);
-      
+
       toast.success('Task marked as complete and moved to Archive!', {
         position: 'top-center',
       });
@@ -271,7 +276,7 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
       >
         <FormControlLabel
           label={
-            <Box sx={{ 
+            <Box sx={{
               typography: 'body2',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -281,7 +286,7 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
               {isOverdue && (
                 <Box
                   component="span"
-                  sx={{ 
+                  sx={{
                     ml: 1,
                     color: 'error.main',
                     typography: 'caption',
@@ -301,7 +306,7 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
               inputProps={{ 'aria-label': `${task.name}-checkbox` }}
             />
           }
-          sx={{ 
+          sx={{
             m: 0,
             flexGrow: 1,
             '& .MuiFormControlLabel-label': {
@@ -311,8 +316,8 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
           }}
         />
 
-        <IconButton 
-          color={menuActions.open ? 'inherit' : 'default'} 
+        <IconButton
+          color={menuActions.open ? 'inherit' : 'default'}
           onClick={menuActions.onOpen}
           sx={{ ml: 1 }}
         >
@@ -327,7 +332,7 @@ function TaskItem({ task, selected, completing, onChange, sx, ...other }) {
         slotProps={{ arrow: { placement: 'right-top' } }}
       >
         <MenuList>
-          <MenuItem 
+          <MenuItem
             onClick={handleMarkComplete}
             disabled={isCompleting}
           >

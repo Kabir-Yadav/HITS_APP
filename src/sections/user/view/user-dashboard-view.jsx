@@ -157,17 +157,18 @@ export function UserDashboardView() {
                     />
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 6, lg: 12 }}>
+                <Grid size={{ xs: 12, md: 6, lg: 8 }}>
                     <AnalyticsTasks title="Today's Tasks" />
+                </Grid>
+                <Grid size={{ xs: 12, md: 6, lg: 4 }}>
+                    <AppUpcomingBirthdays title="UpComing Birthdays" list={_appAuthors} />
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 6, lg: 12 }}>
                     <AnalyticsNews title="What's happening" list={_analyticPosts} />
                 </Grid>
 
-                <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-                    <AppUpcomingBirthdays title="UpComing Birthdays" list={_appAuthors} />
-                </Grid>
+
 
             </Grid>
         </DashboardContent>
