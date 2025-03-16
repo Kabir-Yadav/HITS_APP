@@ -1,9 +1,11 @@
+// google-calendar.js
+
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
 // Initialize the Google API client and handle authentication
 export const initGoogleCalendarApi = async () => {
   try {
-    // First, load the gapi script if not already loaded
+    // Load gapi script if not already loaded
     if (!window.gapi) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -17,7 +19,7 @@ export const initGoogleCalendarApi = async () => {
       });
     }
 
-    // Load the gapi client
+    // Load gapi client
     await new Promise((resolve) => window.gapi.load('client', resolve));
 
     // Initialize the client with credentials
@@ -27,7 +29,7 @@ export const initGoogleCalendarApi = async () => {
       clientId: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
     });
 
-    // Load Google Identity Services script
+    // Load Google Identity Services script if not already loaded
     if (!window.google?.accounts) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -101,4 +103,22 @@ export const isAuthorizedDomain = () => {
   const currentDomain = window.location.host;
   return GOOGLE_CALENDAR_CONFIG.AUTHORIZED_DOMAINS.includes(currentDomain) || 
          currentDomain.includes('localhost'); // Allow localhost for development
-}; 
+};
+
+// Fetch Google Calendar events
+export const fetchCalendarEvents = async () => {
+  try {
+    await ensureGoogleCalendarAuth();
+    const response = await window.gapi.client.calendar.events.list({
+      calendarId: 'primary',
+      timeMin: new Date().toISOString(),
+      showDeleted: false,
+      singleEvents: true,
+      orderBy: 'startTime',
+    });
+    return response.result.items || [];
+  } catch (error) {
+    console.error('Error fetching calendar events:', error);
+    return [];
+  }
+};
