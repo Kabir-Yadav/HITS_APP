@@ -6,11 +6,11 @@ export const GOOGLE_CALENDAR_CONFIG = {
   SCOPES: [
     'https://www.googleapis.com/auth/calendar',
     'https://www.googleapis.com/auth/calendar.events',
-    'https://www.googleapis.com/auth/calendar.readonly'
   ],
   // Add your authorized domains here
   AUTHORIZED_DOMAINS: [
     'localhost:8000', // Development
-    'https://employeeos.tech' // Replace with your actual production domain
+    'employeeos.tech', // Production
+    'www.employeeos.tech' // Production with www
   ]
 }; 

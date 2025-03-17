@@ -1,20 +1,21 @@
 import { z as zod } from 'zod';
-import { useCallback } from 'react';
-import { uuidv4 } from 'minimal-shared/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
+import { useCallback, useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogActions from '@mui/material/DialogActions';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { fIsAfter } from 'src/utils/format-time';
 
-import { createEvent, updateEvent, deleteEvent } from 'src/actions/calendar';
+import { createEvent, updateEvent, deleteEvent, getEventDetails } from 'src/actions/calendar';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -38,15 +39,27 @@ export const EventSchema = zod.object({
   allDay: zod.boolean(),
   start: zod.union([zod.string(), zod.number()]),
   end: zod.union([zod.string(), zod.number()]),
+  attendees: zod.string().optional(),
 });
 
 // ----------------------------------------------------------------------
 
 export function CalendarForm({ currentEvent, colorOptions, onClose }) {
+  const theme = useTheme();
+  const [isLoading, setIsLoading] = useState(false);
+  
   const methods = useForm({
     mode: 'all',
     resolver: zodResolver(EventSchema),
-    defaultValues: currentEvent,
+    defaultValues: {
+      title: '',
+      description: '',
+      allDay: false,
+      start: new Date(),
+      end: new Date(),
+      color: theme.vars.palette.primary.main,
+      attendees: '',
+    },
   });
 
   const {
@@ -57,83 +70,146 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
     formState: { isSubmitting },
   } = methods;
 
-  const values = watch();
-
-  const dateError = fIsAfter(values.start, values.end);
-
-  const onSubmit = handleSubmit(async (data) => {
-    const eventData = {
-      id: currentEvent?.id ? currentEvent?.id : uuidv4(),
-      color: data?.color,
-      title: data?.title,
-      allDay: data?.allDay,
-      description: data?.description,
-      end: data?.end,
-      start: data?.start,
+  // Fetch and set event details when editing an existing event
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      if (!currentEvent?.id) return;
+      
+      setIsLoading(true);
+      try {
+        const eventDetails = await getEventDetails(currentEvent.id);
+        reset({
+          ...eventDetails,
+          start: new Date(eventDetails.start),
+          end: new Date(eventDetails.end),
+        });
+      } catch (error) {
+        console.error('Failed to fetch event details:', error);
+        toast.error('Failed to load event details. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    try {
-      if (!dateError) {
+    fetchEventDetails();
+  }, [currentEvent?.id, reset]);
+
+  const values = watch();
+  const dateError = fIsAfter(values.start, values.end);
+
+  const onSubmit = useCallback(
+    async (data) => {
+      try {
+        const { title, description, allDay, start, end, color, attendees } = data;
+        
+        // Create event directly in Google Calendar
+        const event = {
+          summary: title,
+          description,
+          start: {
+            dateTime: allDay ? undefined : new Date(start).toISOString(),
+            date: allDay ? new Date(start).toISOString().split('T')[0] : undefined,
+          },
+          end: {
+            dateTime: allDay ? undefined : new Date(end).toISOString(),
+            date: allDay ? new Date(end).toISOString().split('T')[0] : undefined,
+          },
+          colorId: color === theme.vars.palette.primary.main ? '1' : '2',
+          attendees: attendees ? attendees.split(',').map(email => ({ email: email.trim() })) : [],
+        };
+
         if (currentEvent?.id) {
-          await updateEvent(eventData);
-          toast.success('Update success!');
+          // Update existing event
+          await window.gapi.client.calendar.events.update({
+            calendarId: 'primary',
+            eventId: currentEvent.id,
+            resource: event,
+            sendUpdates: 'all',
+          });
         } else {
-          await createEvent(eventData);
-          toast.success('Create success!');
+          // Create new event
+          await window.gapi.client.calendar.events.insert({
+            calendarId: 'primary',
+            resource: event,
+            sendUpdates: 'all',
+          });
         }
+
         onClose();
-        reset();
+        toast.success('Event saved successfully!');
+      } catch (error) {
+        console.error('Failed to save event:', error);
+        toast.error('Failed to save event. Please try again.');
       }
-    } catch (error) {
-      console.error(error);
-    }
-  });
+    },
+    [currentEvent?.id, onClose]
+  );
 
   const onDelete = useCallback(async () => {
     try {
-      await deleteEvent(`${currentEvent?.id}`);
-      toast.success('Delete success!');
+      if (!currentEvent?.id) return;
+
+      await window.gapi.client.calendar.events.delete({
+        calendarId: 'primary',
+        eventId: currentEvent.id,
+      });
+
       onClose();
+      toast.success('Event deleted successfully!');
     } catch (error) {
-      console.error(error);
+      console.error('Failed to delete event:', error);
+      toast.error('Failed to delete event. Please try again.');
     }
   }, [currentEvent?.id, onClose]);
 
   return (
     <FormProvider methods={methods} onSubmit={onSubmit}>
       <Scrollbar sx={{ p: 3, bgcolor: 'background.neutral' }}>
-        <Stack spacing={3}>
-          <Field.Text name="title" label="Title" />
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Stack spacing={3}>
+            <Field.Text name="title" label="Title" />
 
-          <Field.Text name="description" label="Description" multiline rows={3} />
+            <Field.Text name="description" label="Description" multiline rows={3} />
 
-          <Field.Switch name="allDay" label="All day" />
+            <Field.Text 
+              name="attendees" 
+              label="Attendees" 
+              placeholder="Enter email addresses separated by commas"
+              helperText="Example: guest1@example.com, guest2@example.com"
+            />
 
-          <Field.MobileDateTimePicker name="start" label="Start date" />
+            <Field.Switch name="allDay" label="All day" />
 
-          <Field.MobileDateTimePicker
-            name="end"
-            label="End date"
-            slotProps={{
-              textField: {
-                error: dateError,
-                helperText: dateError ? 'End date must be later than start date' : null,
-              },
-            }}
-          />
+            <Field.MobileDateTimePicker name="start" label="Start date" />
 
-          <Controller
-            name="color"
-            control={control}
-            render={({ field }) => (
-              <ColorPicker
-                value={field.value}
-                onChange={(color) => field.onChange(color)}
-                options={colorOptions}
-              />
-            )}
-          />
-        </Stack>
+            <Field.MobileDateTimePicker
+              name="end"
+              label="End date"
+              slotProps={{
+                textField: {
+                  error: dateError,
+                  helperText: dateError ? 'End date must be later than start date' : null,
+                },
+              }}
+            />
+
+            <Controller
+              name="color"
+              control={control}
+              render={({ field }) => (
+                <ColorPicker
+                  value={field.value}
+                  onChange={(color) => field.onChange(color)}
+                  options={colorOptions}
+                />
+              )}
+            />
+          </Stack>
+        )}
       </Scrollbar>
 
       <DialogActions sx={{ flexShrink: 0 }}>

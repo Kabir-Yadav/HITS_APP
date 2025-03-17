@@ -165,7 +165,7 @@ export function UserDashboardView() {
                 </Grid>
 
                 <Grid size={{ xs: 12, md: 6, lg: 12 }}>
-                    <AnalyticsNews title="News" list={_analyticPosts} />
+                    <AnalyticsNews title="What's happening" list={_analyticPosts} />
                 </Grid>
 
 

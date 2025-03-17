@@ -58,3 +58,30 @@ export const CONFIG = {
     key: import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
   },
 };
+
+const CSP_POLICY = {
+  'default-src': ["'self'"],
+  'script-src': [
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "https://apis.google.com",
+    "https://accounts.google.com",
+    "https://www.googleapis.com"
+  ],
+  'frame-src': [
+    "'self'",
+    "https://accounts.google.com",
+    "https://apis.google.com"
+  ],
+  'connect-src': [
+    "'self'",
+    "https://accounts.google.com",
+    "https://www.googleapis.com",
+    "https://oauth2.googleapis.com",
+    "https://apis.google.com"
+  ],
+  'img-src': ["'self'", "data:", "https:", "blob:"],
+  'style-src': ["'self'", "'unsafe-inline'"],
+  'font-src': ["'self'", "data:"]
+};
