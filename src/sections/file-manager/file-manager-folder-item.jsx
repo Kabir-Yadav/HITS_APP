@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useBoolean, usePopover, useCopyToClipboard } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -16,7 +16,7 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 
 import { CONFIG } from 'src/global-config';
-import { toggleFavoriteFile } from 'src/actions/filemanager';
+import { getFolderContents, toggleFavorite } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -59,8 +59,8 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
     copy(folder.url);
   }, [copy, folder.url]);
 
-  const handleToggleFavorite = async (fileId, currentValue) => {
-    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+  const handleToggleFavorite = async (fileId, currentValue, isActualFolder) => {
+    const result = await toggleFavorite(fileId, userId, currentValue, isActualFolder);
     if (!result.success) {
       toast.error('Failed to toggle favorite');
     }
@@ -80,7 +80,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
         icon={<Iconify icon="eva:star-outline" />}
         checkedIcon={<Iconify icon="eva:star-fill" />}
         checked={favorite}
-        onChange={() => handleToggleFavorite(folder.id, favorite)}
+        onChange={() => handleToggleFavorite(folder.id, favorite, folder.type === 'folder')}
         inputProps={{
           id: `favorite-${folder.id}-checkbox`,
           'aria-label': `Favorite ${folder.id} checkbox`,
@@ -125,7 +125,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
       secondary={
         <>
           {fData(folder.size)}
-          <Box
+          {isFolder && (<Box
             component="span"
             sx={{
               mx: 0.75,
@@ -134,8 +134,8 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
               borderRadius: '50%',
               bgcolor: 'currentColor',
             }}
-          />
-          {folder.totalFiles} files
+          />)}
+          {isFolder && `${folder.totalFiles} files`}
         </>
       }
       slotProps={{
@@ -198,7 +198,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
           Share
         </MenuItem>
 
-        <MenuItem
+        {isFolder && (<MenuItem
           onClick={() => {
             menuActions.onClose();
             editFolderDialog.onTrue();
@@ -206,7 +206,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
         >
           <Iconify icon="solar:pen-bold" />
           Edit
-        </MenuItem>
+        </MenuItem>)}
 
         {folder.accessType === 'owner' && (<Divider sx={{ borderStyle: 'dashed' }} />)}
 
@@ -229,7 +229,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
       userId={userId}
       file={folder}
       favorited={favorite}
-      onFavorite={() => handleToggleFavorite(folder.id, favorite)}
+      onFavorite={() => handleToggleFavorite(folder.id, favorite, folder.type === 'folder')}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}
@@ -255,19 +255,46 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
       }}
     />
   );
+  const [folderContent, setFolderContent] = useState([])
+  const fetchData = async () => {
+    console.log("fetching again")
+    if (isFolder) {
+      try {
+        const data = await getFolderContents(userId, folder.id);
+        if (data?.data) {
+          setFolderContent(data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching folder contents:', error);
+      }
+    }
+  };
+
+  // Call fetchData when the component mounts and when folderId, userId, or isFolder changes
+  useEffect(() => {
+    fetchData();
+  }, [folder.id, userId, isFolder]);
+
 
   const renderEditFolderDialog = () => (
     <FileManagerNewFolderDialog
       open={editFolderDialog.value}
-      onClose={editFolderDialog.onFalse}
+      onClose={() => {
+        editFolderDialog.onFalse();
+        fetchData()
+      }}
       title="Edit Folder"
+      folderId={folder.id}
+      userId={userId}
       onUpdate={() => {
         editFolderDialog.onFalse();
         setFolderName(folderName);
         console.info('UPDATE FOLDER', folderName);
+        fetchData()
       }}
       folderName={folderName}
       onChangeFolderName={handleChangeFolderName}
+      selectedfiles={folderContent ?? []}
     />
   );
 

@@ -16,7 +16,7 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
 
-import { toggleFavoriteFile } from 'src/actions/filemanager';
+import { toggleFavorite } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -45,8 +45,9 @@ export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete
   const handleChangeInvite = useCallback((event) => {
     setInviteEmail(event.target.value);
   }, []);
-  const handleToggleFavorite = async (fileId, currentValue) => {
-    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+  const handleToggleFavorite = async (fileId, currentValue, isFolder) => {
+    console.log(isFolder)
+    const result = await toggleFavorite(fileId, userId, currentValue, isFolder);
     if (!result.success) {
       toast.error('Failed to toggle favorite');
     }
@@ -92,7 +93,7 @@ export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete
         icon={<Iconify icon="eva:star-outline" />}
         checkedIcon={<Iconify icon="eva:star-fill" />}
         checked={favorite}
-        onChange={() => handleToggleFavorite(file.id, favorite)}
+        onChange={() => handleToggleFavorite(file.id, favorite, file.type === 'folder')}
         inputProps={{
           id: `favorite-${file.id}-checkbox`,
           'aria-label': `Favorite ${file.id} checkbox`,
@@ -189,7 +190,7 @@ export function FileManagerFileItem({ file, userId, selected, onSelect, onDelete
       userId={userId}
       file={file}
       favorited={favorite}
-      onFavorite={() => handleToggleFavorite(file.id, favorite)}
+      onFavorite={() => handleToggleFavorite(file.id, favorite, file.type === 'folder')}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}

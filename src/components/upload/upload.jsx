@@ -25,6 +25,7 @@ export function Upload({
   thumbnail,
   helperText,
   onRemoveAll,
+  isCreatingFolder = false,
   className,
   multiple = false,
   ...other
@@ -75,7 +76,7 @@ export function Upload({
       className={mergeClasses([uploadClasses.upload, className])}
       sx={[{ width: 1, position: 'relative' }, ...(Array.isArray(sx) ? sx : [sx])]}
     >
-      <Box
+      {!isCreatingFolder && (<Box
         {...getRootProps()}
         sx={[
           (theme) => ({
@@ -104,7 +105,7 @@ export function Upload({
 
         {/* Single file */}
         {hasFile ? <SingleFilePreview file={value} /> : <UploadPlaceholder />}
-      </Box>
+      </Box>)}
 
       {/* Single file */}
       {hasFile && <DeleteButton onClick={onDelete} />}

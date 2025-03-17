@@ -20,7 +20,7 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 import { fData } from 'src/utils/format-number';
 import { fDate, fTime } from 'src/utils/format-time';
 
-import { toggleFavoriteFile } from 'src/actions/filemanager';
+import { toggleFavorite } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -50,8 +50,8 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
     setInviteEmail(event.target.value);
   }, []);
 
-  const handleToggleFavorite = async (fileId, currentValue) => {
-    const result = await toggleFavoriteFile(fileId, userId, currentValue);
+  const handleToggleFavorite = async (fileId, currentValue, isFolder) => {
+    const result = await toggleFavorite(fileId, userId, currentValue, isFolder);
     if (!result.success) {
       toast.error('Failed to toggle favorite');
     }
@@ -132,7 +132,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
       userId={userId}
       file={row}
       favorited={favorite}
-      onFavorite={() => handleToggleFavorite(row.id, favorite)}
+      onFavorite={() => handleToggleFavorite(row.id, favorite, row.type === 'folder')}
       onCopyLink={handleCopy}
       open={detailsDrawer.value}
       onClose={detailsDrawer.onFalse}
@@ -273,7 +273,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
             icon={<Iconify icon="eva:star-outline" />}
             checkedIcon={<Iconify icon="eva:star-fill" />}
             checked={favorite}
-            onChange={() => handleToggleFavorite(row.id, favorite)}
+            onChange={() => handleToggleFavorite(row.id, favorite, row.type === 'folder')}
             sx={{ p: 0.75 }}
             inputProps={{
               id: `favorite-checkbox-${row.id}`,

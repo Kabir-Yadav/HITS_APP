@@ -1,3 +1,5 @@
+import { useState, useCallback } from 'react';
+
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import Tooltip from '@mui/material/Tooltip';
@@ -6,6 +8,8 @@ import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
 import { tableCellClasses } from '@mui/material/TableCell';
 import { tablePaginationClasses } from '@mui/material/TablePagination';
+
+import { useBoolean } from 'src/hooks/use-boolean';
 
 import { Iconify } from 'src/components/iconify';
 import {
@@ -16,6 +20,7 @@ import {
 } from 'src/components/table';
 
 import { FileManagerTableRow } from './file-manager-table-row';
+import { FileManagerNewFolderDialog } from './file-manager-new-folder-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -38,6 +43,7 @@ export function FileManagerTable({
   onDeleteRow,
   dataFiltered,
   onOpenConfirm,
+  onCreateFolder,
   ...other
 }) {
   const {
@@ -57,6 +63,39 @@ export function FileManagerTable({
     onChangeRowsPerPage,
   } = table;
 
+  const newFilesDialog = useBoolean();
+  const [folderName, setFolderName] = useState('');
+
+  const selectedFiles = dataFiltered
+    .filter((row) => selected.includes(row.id))
+    .map((file) => ({
+      file_name: file.name,
+      file_size: file.size,
+      file_type: file.type
+    }));
+
+
+
+  const renderNewFilesDialog = () => (
+    < FileManagerNewFolderDialog
+      open={newFilesDialog.value}
+      onClose={() => {
+        newFilesDialog.onFalse();
+        setFolderName('');
+      }}
+      userId={userId}
+      title="Create Folder"
+      onCreate={() => {
+        onCreateFolder(userId, selected, folderName)
+        newFilesDialog.onFalse();
+        setFolderName('')
+      }}
+      isCreatingFolder
+      selectedfiles={selectedFiles}
+      folderName={folderName} // ✅ Pass folder name
+      onChangeFolderName={(e) => setFolderName(e.target.value)}
+    />
+  );
   return (
     <>
       <Box
@@ -80,6 +119,12 @@ export function FileManagerTable({
           }
           action={
             <>
+              <Tooltip title="Create Folder">
+                <IconButton color="primary" onClick={newFilesDialog.onTrue}>
+                  <Iconify icon="solar:add-folder-bold" />
+                </IconButton>
+              </Tooltip>
+
               <Tooltip title="Share">
                 <IconButton color="primary">
                   <Iconify icon="solar:share-bold" />
@@ -142,7 +187,7 @@ export function FileManagerTable({
                     row={row}
                     selected={selected.includes(row.id)}
                     onSelectRow={() => onSelectRow(row.id)}
-                    onDeleteRow={() => onDeleteRow(row.id)}
+                    onDeleteRow={() => onDeleteRow(row)}
                   />
                 ))}
 
@@ -157,6 +202,7 @@ export function FileManagerTable({
                 ]}
               />
             </TableBody>
+
           </Table>
         </TableContainer>
       </Box>
@@ -171,6 +217,9 @@ export function FileManagerTable({
         onRowsPerPageChange={onChangeRowsPerPage}
         sx={{ [`& .${tablePaginationClasses.toolbar}`]: { borderTopColor: 'transparent' } }}
       />
+      {renderNewFilesDialog()}
+
     </>
+
   );
 }

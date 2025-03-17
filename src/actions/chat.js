@@ -514,6 +514,18 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
     );
   }
 
+  // [NEW] Only if insertedMessage is truthy:
+  if (insertedMessage) {
+  // If it's a reply, parent_id is set, so we notify the original message's sender
+    if (parentId) {
+      await createChatNotificationForReply(conversationId, insertedMessage, senderId);
+    } else {
+    // Otherwise, it's a brand-new message, notify all participants except the sender
+      await createChatNotificationForNewMessage(conversationId, insertedMessage, senderId);
+    }
+  }
+
+
   // Revalidate messages via SWR to update UI instantly
   mutate(["conversation", conversationId],);
 
@@ -715,6 +727,9 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
 
         if (updateError) throw updateError;
         console.log("Reaction updated");
+
+        await createChatNotificationForReaction(conversationId, messageId, userId, emoji);
+
       }
     } else {
       // ✅ If no reaction exists, INSERT a new reaction
@@ -728,6 +743,9 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
 
       if (insertError) throw insertError;
       console.log("Reaction added");
+
+      await createChatNotificationForReaction(conversationId, messageId, userId, emoji);
+      
     }
 
     // ✅ Trigger a real-time UI update
@@ -738,3 +756,136 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
   }
 }
 
+// ----------------------------------------------------------------------
+//       NOTIFICATION HELPER FUNCTIONS (APPEND AT THE VERY BOTTOM)
+// ----------------------------------------------------------------------
+
+// 1) For a brand-new message (non-reply), notify ALL participants except the sender.
+async function createChatNotificationForNewMessage(conversationId, insertedMessage, senderId) {
+  try {
+    // Get all participants of the conversation
+    const { data: participants, error: partError } = await supabase
+      .from("conversation_participants")
+      .select("participant_id")
+      .eq("conversation_id", conversationId);
+
+    if (partError) {
+      console.error("Error fetching participants:", partError);
+      return;
+    }
+
+    if (!participants || !participants.length) return;
+
+    // Build notifications for all except the sender
+    const notifications = participants
+      .filter((p) => p.participant_id !== senderId)
+      .map((p) => ({
+        user_id: p.participant_id,     // who receives it
+        actor_id: senderId,            // who triggered it
+        conversation_id: conversationId,
+        message_id: insertedMessage.id,
+        notification_type: "message",  // or "new_message"
+        body: insertedMessage.body || "", // snippet
+      }));
+
+    // Insert them into chat_notifications
+    if (notifications.length) {
+      const { error: insertError } = await supabase
+        .from("chat_notifications")
+        .insert(notifications);
+
+      if (insertError) {
+        console.error("Error inserting message notifications:", insertError);
+      } else {
+        console.log("Inserted 'message' notifications:", notifications);
+      }
+    }
+  } catch (err) {
+    console.error("createChatNotificationForNewMessage error:", err);
+  }
+}
+
+// 2) For a REPLY, notify the original message’s sender (if different).
+async function createChatNotificationForReply(conversationId, insertedMessage, senderId) {
+  try {
+    if (!insertedMessage.parent_id) return;
+
+    // 1) Find the original message to see who sent it
+    const { data: parentMsg, error: fetchParentError } = await supabase
+      .from("messages")
+      .select("sender_id, body")
+      .eq("id", insertedMessage.parent_id)
+      .single();
+
+    if (fetchParentError) {
+      console.error("Error fetching parent message:", fetchParentError);
+      return;
+    }
+    if (!parentMsg) return;
+
+    // 2) If the original sender is the same as the new sender, skip
+    if (parentMsg.sender_id === senderId) return;
+
+    // 3) Insert a row in chat_notifications
+    const { error: insertError } = await supabase
+      .from("chat_notifications")
+      .insert({
+        user_id: parentMsg.sender_id,
+        actor_id: senderId,
+        conversation_id: conversationId,
+        message_id: insertedMessage.id,
+        notification_type: "reply",
+        body: insertedMessage.body || "",
+      });
+
+    if (insertError) {
+      console.error("Error inserting 'reply' notification:", insertError);
+    } else {
+      console.log("Inserted 'reply' notification for user:", parentMsg.sender_id);
+    }
+  } catch (err) {
+    console.error("createChatNotificationForReply error:", err);
+  }
+}
+
+// 3) For a REACTION, notify the original message’s sender (if different).
+async function createChatNotificationForReaction(conversationId, messageId, reactorId, emoji) {
+  try {
+    // 1) Find the original message
+    const { data: origMsg, error: msgError } = await supabase
+      .from("messages")
+      .select("sender_id, body")
+      .eq("id", messageId)
+      .single();
+
+    if (msgError) {
+      console.error("Error fetching original message for reaction:", msgError);
+      return;
+    }
+    if (!origMsg) return;
+
+    // 2) If user is reacting to their own message, skip
+    if (origMsg.sender_id === reactorId) return;
+
+    // 3) Insert row in chat_notifications
+    const { error: insertError } = await supabase
+      .from("chat_notifications")
+      .insert({
+        user_id: origMsg.sender_id, // message owner
+        actor_id: reactorId,        // user who reacted
+        conversation_id: conversationId,
+        message_id: messageId,
+        notification_type: "reaction",
+        body: origMsg.body || "",   // snippet of original text
+        reaction_emoji: emoji,      // store which emoji
+      });
+
+    if (insertError) {
+      console.error("Error inserting 'reaction' notification:", insertError);
+    } else {
+      console.log("Inserted 'reaction' notification for user:", origMsg.sender_id);
+    }
+  } catch (err) {
+    console.error("createChatNotificationForReaction error:", err);
+  }
+}
