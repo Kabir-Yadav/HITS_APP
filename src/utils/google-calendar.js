@@ -2,6 +2,8 @@
 
 // google-calendar.js
 
+import { supabase } from 'src/lib/supabase';
+
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
 const CLIENT_ID = '463956183839-i7j5nt5rkpbm4npukg21vfnhav5vvgeh.apps.googleusercontent.com';
@@ -13,65 +15,94 @@ let gapiInited = false;
 let gisInited = false;
 
 export const initializeGoogleCalendar = async () => {
-  // Initialize the Google API client
-  await new Promise((resolve, reject) => {
-    gapi.load('client', {
-      callback: resolve,
-      onerror: reject
+  try {
+    // Check if user is logged in with Supabase
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      throw new Error('User not authenticated');
+    }
+
+    // Get user's Google OAuth tokens from Supabase session
+    const provider = session.user.app_metadata.provider;
+    const accessToken = session.provider_token; // Google OAuth access token
+    const refreshToken = session.provider_refresh_token; // Google OAuth refresh token
+
+    if (provider !== 'google') {
+      throw new Error('User not authenticated with Google');
+    }
+
+    // Initialize the Google API client
+    await new Promise((resolve, reject) => {
+      gapi.load('client', async () => {
+        try {
+          await gapi.client.init({
+            apiKey: import.meta.env.VITE_GOOGLE_CALENDAR_API_KEY,
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+          });
+
+          // Set the access token directly
+          gapi.client.setToken({
+            access_token: accessToken,
+          });
+
+          // Initialize the tokenClient for refresh token handling
+          window.tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            scope: 'https://www.googleapis.com/auth/calendar',
+            callback: () => {}, // Token refresh callback
+          });
+
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
+      });
     });
-  });
 
-  // Initialize gapi.client
-  await gapi.client.init({
-    apiKey: API_KEY,
-    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
-  });
-
-  // Initialize the token client
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
-    scope: SCOPES,
-    callback: '', // defined at request time
-  });
-
-  gapiInited = true;
-  gisInited = true;
+    return true;
+  } catch (error) {
+    console.error('Error initializing Google Calendar:', error);
+    
+    // If there's an authentication error, redirect to Supabase Google login
+    if (error.message === 'User not authenticated' || error.message === 'User not authenticated with Google') {
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard/calendar`,
+          scopes: 'https://www.googleapis.com/auth/calendar',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      return false;
+    }
+    
+    throw error;
+  }
 };
 
-export const ensureGoogleCalendarAuth = async () => {
-  if (!gapiInited || !gisInited) {
-    await initializeGoogleCalendar();
-  }
+// Add a token refresh handler
+export const handleTokenRefresh = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('No session');
 
-  // Check if we already have a valid token
-  if (gapi.client.getToken() && gapi.client.getToken().access_token) {
-    try {
-      // Test the token with a simple API call
-      await gapi.client.calendar.calendarList.list();
-      return { status: 'valid_token' }; // Return value for valid token
-    } catch (error) {
-      console.log('Token validation failed, requesting new token');
-      // Continue to request new token
-    }
-  }
+    // Get new tokens from Supabase session
+    const accessToken = session.provider_token;
+    
+    // Update the Google API client with new token
+    gapi.client.setToken({
+      access_token: accessToken,
+    });
 
-  return new Promise((resolve, reject) => {
-    try {
-      tokenClient.callback = async (response) => {
-        if (response.error !== undefined) {
-          reject(response);
-          return;
-        }
-        await gapi.client.calendar.calendarList.list(); // Verify token works
-        resolve({ status: 'new_token', response }); // Return value for new token
-      };
-      
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } catch (err) {
-      console.error('Auth error:', err);
-      reject(err);
-    }
-  });
+    return true;
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return false;
+  }
 };
 
 // Get authorized domains
@@ -84,29 +115,34 @@ export const isAuthorizedDomain = () => {
 // Fetch Google Calendar events
 export const fetchCalendarEvents = async () => {
   try {
-    await ensureGoogleCalendarAuth();
-    
-    // Get events from the last month to next 6 months
-    const timeMin = new Date();
-    timeMin.setMonth(timeMin.getMonth() - 1);
-    
-    const timeMax = new Date();
-    timeMax.setMonth(timeMax.getMonth() + 6);
-
-    const response = await window.gapi.client.calendar.events.list({
+    // Try to fetch events
+    const response = await gapi.client.calendar.events.list({
       calendarId: 'primary',
-      timeMin: timeMin.toISOString(),
-      timeMax: timeMax.toISOString(),
+      timeMin: new Date().toISOString(),
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime',
-      maxResults: 2500, // Get more events
+      maxResults: 2500,
     });
 
-    console.log('Google Calendar API response:', response); // Debug log
     return response.result.items || [];
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
-    throw error; // Propagate error for better error handling
+    // If token expired, try to refresh
+    if (error.status === 401) {
+      const refreshed = await handleTokenRefresh();
+      if (refreshed) {
+        // Retry the fetch with new token
+        const response = await gapi.client.calendar.events.list({
+          calendarId: 'primary',
+          timeMin: new Date().toISOString(),
+          showDeleted: false,
+          singleEvents: true,
+          orderBy: 'startTime',
+          maxResults: 2500,
+        });
+        return response.result.items || [];
+      }
+    }
+    throw error;
   }
 };

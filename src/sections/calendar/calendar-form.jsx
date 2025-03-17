@@ -1,16 +1,21 @@
 import { z as zod } from 'zod';
+import PropTypes from 'prop-types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, Controller } from 'react-hook-form';
 import { useCallback, useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import { useTheme } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogActions from '@mui/material/DialogActions';
+import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fIsAfter } from 'src/utils/format-time';
@@ -20,7 +25,6 @@ import { createEvent, updateEvent, deleteEvent, getEventDetails } from 'src/acti
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-import { ColorPicker } from 'src/components/color-utils';
 import { FormProvider, Field } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
@@ -32,34 +36,35 @@ export const EventSchema = zod.object({
     .max(100, { message: 'Title must be less than 100 characters' }),
   description: zod
     .string()
-    .min(1, { message: 'Description is required!' })
-    .min(50, { message: 'Description must be at least 50 characters' }),
-  // Not required
-  color: zod.string(),
-  allDay: zod.boolean(),
-  start: zod.union([zod.string(), zod.number()]),
-  end: zod.union([zod.string(), zod.number()]),
-  attendees: zod.string().optional(),
+    .optional()
+    .default(''),
+  start: zod.any().refine(val => !isNaN(new Date(val)), {
+    message: "Invalid start date"
+  }),
+  end: zod.any().refine(val => !isNaN(new Date(val)), {
+    message: "Invalid end date"
+  }),
+  attendees: zod.string().optional().default(''),
 });
 
 // ----------------------------------------------------------------------
 
-export function CalendarForm({ currentEvent, colorOptions, onClose }) {
+export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
   const theme = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   
+  const defaultValues = {
+    title: '',
+    description: '',
+    start: new Date(),
+    end: new Date(),
+    attendees: '',
+  };
+  
   const methods = useForm({
-    mode: 'all',
+    mode: 'onChange',
     resolver: zodResolver(EventSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      allDay: false,
-      start: new Date(),
-      end: new Date(),
-      color: theme.vars.palette.primary.main,
-      attendees: '',
-    },
+    defaultValues,
   });
 
   const {
@@ -67,13 +72,23 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
     watch,
     control,
     handleSubmit,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = methods;
+
+  // Reset form when opening for new event
+  useEffect(() => {
+    if (!currentEvent) {
+      reset(defaultValues);
+    }
+  }, [currentEvent, reset]);
 
   // Fetch and set event details when editing an existing event
   useEffect(() => {
     const fetchEventDetails = async () => {
-      if (!currentEvent?.id) return;
+      if (!currentEvent?.id) {
+        reset(defaultValues); // Reset form for new event
+        return;
+      }
       
       setIsLoading(true);
       try {
@@ -98,28 +113,40 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
   const dateError = fIsAfter(values.start, values.end);
 
   const onSubmit = useCallback(
-    async (data) => {
+    async (data, e) => {
+      e.preventDefault();
+      
       try {
-        const { title, description, allDay, start, end, color, attendees } = data;
+        const { title, description, start, end, attendees } = data;
+        
+        // Get current user's email from Google Calendar
+        const calendarList = await window.gapi.client.calendar.calendarList.get({
+          calendarId: 'primary'
+        });
+        const organizerEmail = calendarList.result.id;
         
         // Create event directly in Google Calendar
         const event = {
           summary: title,
           description,
           start: {
-            dateTime: allDay ? undefined : new Date(start).toISOString(),
-            date: allDay ? new Date(start).toISOString().split('T')[0] : undefined,
+            dateTime: new Date(start).toISOString(),
           },
           end: {
-            dateTime: allDay ? undefined : new Date(end).toISOString(),
-            date: allDay ? new Date(end).toISOString().split('T')[0] : undefined,
+            dateTime: new Date(end).toISOString(),
           },
-          colorId: color === theme.vars.palette.primary.main ? '1' : '2',
-          attendees: attendees ? attendees.split(',').map(email => ({ email: email.trim() })) : [],
+          attendees: [
+            // Add organizer as first attendee with response status 'accepted'
+            { email: organizerEmail, responseStatus: 'accepted' },
+            // Add other attendees
+            ...(attendees ? attendees.split(',').map(email => ({ 
+              email: email.trim(),
+              responseStatus: 'needsAction'
+            })) : []),
+          ],
         };
 
         if (currentEvent?.id) {
-          // Update existing event
           await window.gapi.client.calendar.events.update({
             calendarId: 'primary',
             eventId: currentEvent.id,
@@ -127,7 +154,6 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
             sendUpdates: 'all',
           });
         } else {
-          // Create new event
           await window.gapi.client.calendar.events.insert({
             calendarId: 'primary',
             resource: event,
@@ -135,6 +161,7 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
           });
         }
 
+        await onEventChange?.();
         onClose();
         toast.success('Event saved successfully!');
       } catch (error) {
@@ -142,7 +169,7 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
         toast.error('Failed to save event. Please try again.');
       }
     },
-    [currentEvent?.id, onClose]
+    [currentEvent?.id, onClose, onEventChange]
   );
 
   const onDelete = useCallback(async () => {
@@ -154,88 +181,190 @@ export function CalendarForm({ currentEvent, colorOptions, onClose }) {
         eventId: currentEvent.id,
       });
 
+      await onEventChange?.();
       onClose();
       toast.success('Event deleted successfully!');
     } catch (error) {
       console.error('Failed to delete event:', error);
       toast.error('Failed to delete event. Please try again.');
     }
-  }, [currentEvent?.id, onClose]);
+  }, [currentEvent?.id, onClose, onEventChange]);
+
+  const handleRemoveAttendee = (emailToRemove, field) => {
+    const currentAttendees = field.value ? field.value.split(',').map(e => e.trim()) : [];
+    const updatedAttendees = currentAttendees
+      .filter(email => email !== emailToRemove)
+      .join(', ');
+    field.onChange(updatedAttendees);
+  };
 
   return (
-    <FormProvider methods={methods} onSubmit={onSubmit}>
-      <Scrollbar sx={{ p: 3, bgcolor: 'background.neutral' }}>
-        {isLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-            <CircularProgress />
-          </Box>
-        ) : (
-          <Stack spacing={3}>
-            <Field.Text name="title" label="Title" />
+    <Dialog
+      fullWidth
+      maxWidth="xs"
+      open={open}
+      onClose={onClose}
+      sx={{ 
+        '& .MuiDialog-paper': { 
+          maxHeight: 'calc(100% - 32px)',
+          margin: (t) => t.spacing(2),
+        }
+      }}
+    >
+      <FormProvider methods={methods} onSubmit={handleSubmit(onSubmit)}>
+        <Scrollbar sx={{ p: 3, bgcolor: 'background.neutral' }}>
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : (
+            <Stack spacing={3}>
+              <Field.Text 
+                name="title" 
+                label="Title" 
+                helperText={errors.title?.message}
+              />
 
-            <Field.Text name="description" label="Description" multiline rows={3} />
+              <Field.Text 
+                name="description" 
+                label="Description" 
+                multiline 
+                rows={3}
+                helperText={errors.description?.message}
+              />
 
-            <Field.Text 
-              name="attendees" 
-              label="Attendees" 
-              placeholder="Enter email addresses separated by commas"
-              helperText="Example: guest1@example.com, guest2@example.com"
-            />
-
-            <Field.Switch name="allDay" label="All day" />
-
-            <Field.MobileDateTimePicker name="start" label="Start date" />
-
-            <Field.MobileDateTimePicker
-              name="end"
-              label="End date"
-              slotProps={{
-                textField: {
-                  error: dateError,
-                  helperText: dateError ? 'End date must be later than start date' : null,
-                },
-              }}
-            />
-
-            <Controller
-              name="color"
-              control={control}
-              render={({ field }) => (
-                <ColorPicker
-                  value={field.value}
-                  onChange={(color) => field.onChange(color)}
-                  options={colorOptions}
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2">Attendees</Typography>
+                <Field.Text 
+                  name="attendees" 
+                  placeholder="Add guests"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Iconify icon="solar:users-group-rounded-bold" width={24} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  helperText={
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <Iconify icon="eva:info-fill" width={16} sx={{ color: 'info.main' }} />
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Separate email addresses with commas
+                      </Typography>
+                    </Stack>
+                  }
                 />
-              )}
-            />
-          </Stack>
-        )}
-      </Scrollbar>
+                <Controller
+                  name="attendees"
+                  control={control}
+                  render={({ field }) => (
+                    <Box sx={{ mt: 1 }}>
+                      <Stack spacing={1}>
+                        {field.value && field.value.split(',').map((email, index) => {
+                          const trimmedEmail = email.trim();
+                          return trimmedEmail && (
+                            <Chip
+                              key={index}
+                              label={trimmedEmail}
+                              size="small"
+                              icon={<Iconify icon="solar:user-rounded-bold" />}
+                              onDelete={() => handleRemoveAttendee(trimmedEmail, field)}
+                              sx={{ 
+                                maxWidth: '100%',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  bgcolor: 'error.lighter',
+                                  '& .MuiChip-deleteIcon': {
+                                    color: 'error.main',
+                                  }
+                                },
+                                '& .MuiChip-label': { 
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden'
+                                },
+                                '& .MuiChip-deleteIcon': {
+                                  color: 'text.secondary',
+                                  '&:hover': {
+                                    color: 'error.main',
+                                  }
+                                }
+                              }}
+                            />
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  )}
+                />
+              </Stack>
 
-      <DialogActions sx={{ flexShrink: 0 }}>
-        {!!currentEvent?.id && (
-          <Tooltip title="Delete event">
-            <IconButton onClick={onDelete}>
-              <Iconify icon="solar:trash-bin-trash-bold" />
-            </IconButton>
-          </Tooltip>
-        )}
+              <Field.MobileDateTimePicker 
+                name="start" 
+                label="Start date"
+                helperText={errors.start?.message}
+              />
 
-        <Box sx={{ flexGrow: 1 }} />
+              <Field.MobileDateTimePicker
+                name="end"
+                label="End date"
+                slotProps={{
+                  textField: {
+                    error: dateError || !!errors.end,
+                    helperText: dateError 
+                      ? 'End date must be later than start date'
+                      : errors.end?.message,
+                  },
+                }}
+              />
+            </Stack>
+          )}
+        </Scrollbar>
 
-        <Button variant="outlined" color="inherit" onClick={onClose}>
-          Cancel
-        </Button>
+        <DialogActions sx={{ flexShrink: 0 }}>
+          {!!currentEvent?.id && (
+            <Tooltip title="Delete event">
+              <IconButton 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDelete();
+                }}
+              >
+                <Iconify icon="solar:trash-bin-trash-bold" />
+              </IconButton>
+            </Tooltip>
+          )}
 
-        <LoadingButton
-          type="submit"
-          variant="contained"
-          loading={isSubmitting}
-          disabled={dateError}
-        >
-          Save changes
-        </LoadingButton>
-      </DialogActions>
-    </FormProvider>
+          <Box sx={{ flexGrow: 1 }} />
+
+          <Button 
+            variant="outlined" 
+            color="inherit" 
+            onClick={(e) => {
+              e.preventDefault();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
+
+          <LoadingButton
+            type="submit"
+            variant="contained"
+            loading={isSubmitting}
+            disabled={dateError || Object.keys(errors).length > 0}
+          >
+            Save changes
+          </LoadingButton>
+        </DialogActions>
+      </FormProvider>
+    </Dialog>
   );
 }
+
+CalendarForm.propTypes = {
+  currentEvent: PropTypes.object,
+  onClose: PropTypes.func,
+  open: PropTypes.bool,
+  onEventChange: PropTypes.func,
+};

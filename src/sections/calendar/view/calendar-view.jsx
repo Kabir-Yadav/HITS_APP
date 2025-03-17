@@ -32,6 +32,7 @@ import { CalendarForm } from '../calendar-form';
 import { useCalendar } from '../hooks/use-calendar';
 import { CalendarToolbar } from '../calendar-toolbar';
 import { CalendarFilters } from '../calendar-filters';
+import CalendarEventDetails from '../calendar-event-details';
 import { CalendarFiltersResult } from '../calendar-filters-result';
 
 
@@ -79,6 +80,40 @@ export function CalendarView() {
 
   const currentEvent = useEvent(events, selectEventId, selectedRange, openForm);
 
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [dialogState, setDialogState] = useState({
+    details: false,
+    form: false
+  });
+
+  const handleCloseDetails = () => {
+    setDialogState(prev => ({ ...prev, details: false }));
+    setSelectedEvent(null);
+  };
+
+  const handleCloseForm = async () => {
+    setDialogState(prev => ({ ...prev, form: false }));
+    setSelectedEvent(null);
+    await refreshCalendarEvents();
+  };
+
+  const handleEditEvent = (eventData) => {
+    setDialogState({
+      details: false,
+      form: true
+    });
+    setSelectedEvent(eventData);
+  };
+
+  const onClickEventInCalendar = (info) => {
+    if (info.event.extendedProps?.source === 'google') {
+      setSelectedEvent(info.event);
+      setDialogState(prev => ({ ...prev, details: true }));
+    } else {
+      // Handle your existing event click logic
+    }
+  };
+
   useEffect(() => {
     onInitialView();
   }, [onInitialView]);
@@ -87,11 +122,16 @@ export function CalendarView() {
     const initCalendar = async () => {
       try {
         setIsLoading(true);
-        await initializeGoogleCalendar();
+        
+        // Check if user is authenticated with Google
+        const initialized = await initializeGoogleCalendar();
+        if (!initialized) {
+          // User is being redirected to Google login
+          return;
+        }
         
         // Fetch events after ensuring authentication
         const calendarEvents = await fetchCalendarEvents();
-        console.log('Fetched calendar events:', calendarEvents); // Debug log
         
         // Format events for FullCalendar
         const formattedEvents = calendarEvents.map(event => ({
@@ -104,11 +144,12 @@ export function CalendarView() {
           color: event.colorId === '1' ? theme.vars.palette.primary.main : theme.vars.palette.secondary.main,
           extendedProps: {
             source: 'google',
+            description: event.description,
+            attendees: event.attendees || [],
             calendar: event.organizer?.email || 'primary'
           }
         }));
 
-        console.log('Formatted events:', formattedEvents); // Debug log
         setGoogleEvents(formattedEvents);
       } catch (error) {
         console.error('Error initializing calendar:', error);
@@ -144,6 +185,44 @@ export function CalendarView() {
     flexDirection: 'column',
   };
 
+  const handleNewEvent = () => {
+    setSelectedEvent(null); // Clear any selected event
+    setDialogState({
+      details: false,
+      form: true
+    });
+  };
+
+  const refreshCalendarEvents = async () => {
+    try {
+      setIsLoading(true);
+      const calendarEvents = await fetchCalendarEvents();
+      
+      const formattedEvents = calendarEvents.map(event => ({
+        id: event.id,
+        title: event.summary || 'Untitled Event',
+        description: event.description || '',
+        start: event.start?.dateTime || event.start?.date,
+        end: event.end?.dateTime || event.end?.date,
+        allDay: !event.start?.dateTime,
+        color: event.colorId === '1' ? theme.vars.palette.primary.main : theme.vars.palette.secondary.main,
+        extendedProps: {
+          source: 'google',
+          description: event.description,
+          attendees: event.attendees || [],
+          calendar: event.organizer?.email || 'primary'
+        }
+      }));
+
+      setGoogleEvents(formattedEvents);
+    } catch (error) {
+      console.error('Error refreshing calendar events:', error);
+      toast.error('Failed to refresh calendar events');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <>
       <DashboardContent maxWidth="xl" sx={{ ...flexStyles }}>
@@ -159,7 +238,7 @@ export function CalendarView() {
           <Button
             variant="contained"
             startIcon={<Iconify icon="mingcute:add-line" />}
-            onClick={onOpenForm}
+            onClick={handleNewEvent}
           >
             New event
           </Button>
@@ -205,7 +284,7 @@ export function CalendarView() {
               eventDisplay="block"
               headerToolbar={false}
               select={onSelectRange}
-              eventClick={onClickEvent}
+              eventClick={onClickEventInCalendar}
               events={dataFiltered}
               eventDrop={(arg) => {
                 if (arg.event.extendedProps.source === 'google') {
@@ -238,37 +317,21 @@ export function CalendarView() {
         </Card>
       </DashboardContent>
 
-      <Dialog
-        fullWidth
-        maxWidth="xs"
-        open={openForm}
-        onClose={onCloseForm}
-        transitionDuration={{
-          enter: theme.transitions.duration.shortest,
-          exit: theme.transitions.duration.shortest - 80,
-        }}
-        PaperProps={{
-          sx: {
-            display: 'flex',
-            overflow: 'hidden',
-            flexDirection: 'column',
-            '& form': {
-              ...flexStyles,
-              minHeight: 0,
-            },
-          },
-        }}
-      >
-        <DialogTitle sx={{ minHeight: 76 }}>
-          {openForm && <> {currentEvent?.id ? 'Edit' : 'Add'} event</>}
-        </DialogTitle>
+      <CalendarEventDetails 
+        event={selectedEvent}
+        open={dialogState.details}
+        onClose={handleCloseDetails}
+        onEdit={handleEditEvent}
+        onUpdateAttendees={refreshCalendarEvents}
+      />
 
-        <CalendarForm
-          currentEvent={currentEvent}
-          colorOptions={CALENDAR_COLOR_OPTIONS}
-          onClose={onCloseForm}
-        />
-      </Dialog>
+      <CalendarForm
+        currentEvent={selectedEvent}
+        onClose={handleCloseForm}
+        onEventChange={refreshCalendarEvents}
+        colorOptions={CALENDAR_COLOR_OPTIONS}
+        open={dialogState.form}
+      />
 
       <CalendarFilters
         events={events}
