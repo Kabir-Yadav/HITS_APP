@@ -122,40 +122,11 @@ export function CalendarView() {
     const initCalendar = async () => {
       try {
         setIsLoading(true);
-        
-        // Check if user is authenticated with Google
-        const initialized = await initializeGoogleCalendar();
-        if (!initialized) {
-          // User is being redirected to Google login
-          return;
-        }
-        
-        // Fetch events after ensuring authentication
-        const calendarEvents = await fetchCalendarEvents();
-        
-        // Format events for FullCalendar
-        const formattedEvents = calendarEvents.map(event => ({
-          id: event.id,
-          title: event.summary || 'Untitled Event',
-          description: event.description || '',
-          start: event.start?.dateTime || event.start?.date,
-          end: event.end?.dateTime || event.end?.date,
-          allDay: !event.start?.dateTime,
-          color: event.colorId === '1' ? theme.vars.palette.primary.main : theme.vars.palette.secondary.main,
-          extendedProps: {
-            source: 'google',
-            description: event.description,
-            attendees: event.attendees || [],
-            calendar: event.organizer?.email || 'primary'
-          }
-        }));
-
-        setGoogleEvents(formattedEvents);
+        await initializeGoogleCalendar();
+        await refreshCalendarEvents();
       } catch (error) {
         console.error('Error initializing calendar:', error);
         toast.error('Failed to load calendar events. Please try again.');
-      } finally {
-        setIsLoading(false);
       }
     };
 
