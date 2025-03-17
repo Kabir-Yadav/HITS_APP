@@ -1,101 +1,77 @@
+/* global gapi, google */
+
 // google-calendar.js
 
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
-// Initialize the Google API client and handle authentication
-export const initGoogleCalendarApi = async () => {
-  try {
-    // Load gapi script if not already loaded
-    if (!window.gapi) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://apis.google.com/js/api.js';
-        script.async = true;
-        script.defer = true;
-        script.crossOrigin = "anonymous";
-        document.head.appendChild(script);
-        script.onload = resolve;
-        script.onerror = reject;
-      });
-    }
+const CLIENT_ID = '463956183839-i7j5nt5rkpbm4npukg21vfnhav5vvgeh.apps.googleusercontent.com';
+const API_KEY = 'AIzaSyDh4-SOuKTopXe45oDM9nQA7R4cNJ1So0c';
+const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
-    // Load gapi client
-    await new Promise((resolve) => window.gapi.load('client', resolve));
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
 
-    // Initialize the client with credentials
-    await window.gapi.client.init({
-      apiKey: GOOGLE_CALENDAR_CONFIG.API_KEY,
-      discoveryDocs: GOOGLE_CALENDAR_CONFIG.DISCOVERY_DOCS,
-      clientId: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
+export const initializeGoogleCalendar = async () => {
+  // Initialize the Google API client
+  await new Promise((resolve, reject) => {
+    gapi.load('client', {
+      callback: resolve,
+      onerror: reject
     });
+  });
 
-    // Load Google Identity Services script if not already loaded
-    if (!window.google?.accounts) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.crossOrigin = "anonymous";
-        document.head.appendChild(script);
-        script.onload = resolve;
-        script.onerror = reject;
-      });
-    }
+  // Initialize gapi.client
+  await gapi.client.init({
+    apiKey: API_KEY,
+    discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
+  });
 
-    // Initialize token client
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CALENDAR_CONFIG.CLIENT_ID,
-      scope: GOOGLE_CALENDAR_CONFIG.SCOPES.join(' '),
-      prompt: 'consent',
-      callback: (response) => {
-        if (response.error) {
-          throw new Error(response.error);
-        }
-        window.gapi.client.setToken(response);
-      },
-    });
+  // Initialize the token client
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: '', // defined at request time
+  });
 
-    // Request access token
-    return new Promise((resolve) => {
-      tokenClient.requestAccessToken({
-        prompt: 'consent',
-      });
-      resolve(window.gapi);
-    });
-
-  } catch (error) {
-    console.error('Failed to initialize Google Calendar API:', error);
-    throw error;
-  }
+  gapiInited = true;
+  gisInited = true;
 };
 
-// Check if user is authenticated and has required permissions
 export const ensureGoogleCalendarAuth = async () => {
-  try {
-    if (!window.gapi?.client?.calendar) {
-      await initGoogleCalendarApi();
-      return true;
-    }
-
-    // Check if we have a valid token
-    const token = window.gapi.client.getToken();
-    if (!token) {
-      await initGoogleCalendarApi();
-      return true;
-    }
-
-    // Check if token is expired
-    if (token.expires_at && token.expires_at < Date.now()) {
-      await initGoogleCalendarApi();
-      return true;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Failed to ensure Google Calendar authentication:', error);
-    throw error;
+  if (!gapiInited || !gisInited) {
+    await initializeGoogleCalendar();
   }
+
+  // Check if we already have a valid token
+  if (gapi.client.getToken() && gapi.client.getToken().access_token) {
+    try {
+      // Test the token with a simple API call
+      await gapi.client.calendar.calendarList.list();
+      return { status: 'valid_token' }; // Return value for valid token
+    } catch (error) {
+      console.log('Token validation failed, requesting new token');
+      // Continue to request new token
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    try {
+      tokenClient.callback = async (response) => {
+        if (response.error !== undefined) {
+          reject(response);
+          return;
+        }
+        await gapi.client.calendar.calendarList.list(); // Verify token works
+        resolve({ status: 'new_token', response }); // Return value for new token
+      };
+      
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (err) {
+      console.error('Auth error:', err);
+      reject(err);
+    }
+  });
 };
 
 // Get authorized domains
@@ -109,16 +85,28 @@ export const isAuthorizedDomain = () => {
 export const fetchCalendarEvents = async () => {
   try {
     await ensureGoogleCalendarAuth();
+    
+    // Get events from the last month to next 6 months
+    const timeMin = new Date();
+    timeMin.setMonth(timeMin.getMonth() - 1);
+    
+    const timeMax = new Date();
+    timeMax.setMonth(timeMax.getMonth() + 6);
+
     const response = await window.gapi.client.calendar.events.list({
       calendarId: 'primary',
-      timeMin: new Date().toISOString(),
+      timeMin: timeMin.toISOString(),
+      timeMax: timeMax.toISOString(),
       showDeleted: false,
       singleEvents: true,
       orderBy: 'startTime',
+      maxResults: 2500, // Get more events
     });
+
+    console.log('Google Calendar API response:', response); // Debug log
     return response.result.items || [];
   } catch (error) {
     console.error('Error fetching calendar events:', error);
-    return [];
+    throw error; // Propagate error for better error handling
   }
 };

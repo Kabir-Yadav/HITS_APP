@@ -25,36 +25,24 @@ export default defineConfig(({ mode }) => {
       port: 8000,
       strictPort: true,
       cors: {
-        origin: [
-          'https://accounts.google.com',
-          'https://apis.google.com',
-          'https://www.googleapis.com',
-        ],
+        origin: true,
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        credentials: true,
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin'],
+        credentials: true
       },
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-        'Content-Security-Policy': `
-          default-src 'self';
-          script-src 'self' 'unsafe-inline' 'unsafe-eval'
-            https://apis.google.com https://accounts.google.com https://www.googleapis.com;
-          frame-src 'self' https://accounts.google.com https://apis.google.com;
-          connect-src 'self' https://accounts.google.com https://www.googleapis.com
-            https://oauth2.googleapis.com https://apis.google.com;
-          img-src 'self' data: https: blob:;
-          style-src 'self' 'unsafe-inline';
-          font-src 'self' data:;
-        `.replace(/\n/g, ' '), // Ensures CSP is formatted correctly
-      },
+      proxy: {
+        '/googleapis': {
+          target: 'https://accounts.google.com',
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/googleapis/, '')
+        }
+      }
     },
     build: {
-      minify: 'esbuild', // Improved minification with esbuild
-      sourcemap: true, // Enables debugging with source maps
-      chunkSizeWarningLimit: 1500, // Increases warning limit for chunk sizes
+      minify: 'esbuild', 
+      sourcemap: true, 
+      chunkSizeWarningLimit: 1500, 
     },
     define: {
       'process.env': env,

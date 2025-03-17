@@ -1,3 +1,4 @@
+import { toast } from 'react-hot-toast';
 import Calendar from '@fullcalendar/react';
 import listPlugin from '@fullcalendar/list';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -17,7 +18,7 @@ import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 
 import { fDate, fIsAfter, fIsBetween } from 'src/utils/format-time';
-import { initGoogleCalendarApi, ensureGoogleCalendarAuth, isAuthorizedDomain } from 'src/utils/google-calendar';
+import { initializeGoogleCalendar, fetchCalendarEvents } from 'src/utils/google-calendar';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { CALENDAR_COLOR_OPTIONS } from 'src/_mock/_calendar';
@@ -40,7 +41,7 @@ export function CalendarView() {
   const theme = useTheme();
 
   const openFilters = useBoolean();
-  const [isGoogleCalendarInitialized, setIsGoogleCalendarInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [googleEvents, setGoogleEvents] = useState([]);
 
   const { events, eventsLoading } = useGetEvents();
@@ -84,52 +85,41 @@ export function CalendarView() {
 
   useEffect(() => {
     const initCalendar = async () => {
-      if (!isAuthorizedDomain()) {
-        console.error('Current domain is not authorized for Google Calendar API');
-        return;
-      }
-
       try {
-        await ensureGoogleCalendarAuth();
+        setIsLoading(true);
+        await initializeGoogleCalendar();
         
-        // Load events from Google Calendar
-        const response = await window.gapi.client.calendar.events.list({
-          calendarId: 'primary',
-          timeMin: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString(),
-          showDeleted: false,
-          singleEvents: true,
-          maxResults: 2500,
-          orderBy: 'startTime',
-        });
-
-        if (!response.result) {
-          console.error('No response from Google Calendar API');
-          return;
-        }
-
-        const googleEventsList = response.result.items || [];
-        const formattedEvents = googleEventsList.map(event => ({
+        // Fetch events after ensuring authentication
+        const calendarEvents = await fetchCalendarEvents();
+        console.log('Fetched calendar events:', calendarEvents); // Debug log
+        
+        // Format events for FullCalendar
+        const formattedEvents = calendarEvents.map(event => ({
           id: event.id,
-          title: event.summary,
-          start: event.start.dateTime || event.start.date,
-          end: event.end.dateTime || event.end.date,
-          color: theme.vars.palette.primary.main,
-          textColor: theme.vars.palette.common.white,
-          source: 'google',
+          title: event.summary || 'Untitled Event',
+          description: event.description || '',
+          start: event.start?.dateTime || event.start?.date,
+          end: event.end?.dateTime || event.end?.date,
+          allDay: !event.start?.dateTime,
+          color: event.colorId === '1' ? theme.vars.palette.primary.main : theme.vars.palette.secondary.main,
+          extendedProps: {
+            source: 'google',
+            calendar: event.organizer?.email || 'primary'
+          }
         }));
 
+        console.log('Formatted events:', formattedEvents); // Debug log
         setGoogleEvents(formattedEvents);
-        setIsGoogleCalendarInitialized(true);
       } catch (error) {
-        console.error('Failed to initialize Google Calendar:', error);
-        // Reset state on error
-        setGoogleEvents([]);
-        setIsGoogleCalendarInitialized(false);
+        console.error('Error initializing calendar:', error);
+        toast.error('Failed to load calendar events. Please try again.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     initCalendar();
-  }, [theme.vars.palette.primary.main, theme.vars.palette.common.white]);
+  }, [theme.vars.palette.primary.main, theme.vars.palette.secondary.main]);
 
   const canReset =
     currentFilters.colors.length > 0 || (!!currentFilters.startDate && !!currentFilters.endDate);
@@ -192,8 +182,7 @@ export function CalendarView() {
             <CalendarToolbar
               date={fDate(date)}
               view={view}
-              canReset={canReset}
-              loading={eventsLoading}
+              loading={isLoading}
               onNextDate={onDateNext}
               onPrevDate={onDatePrev}
               onToday={onDateToday}
@@ -217,11 +206,9 @@ export function CalendarView() {
               headerToolbar={false}
               select={onSelectRange}
               eventClick={onClickEvent}
-              aspectRatio={3}
               events={dataFiltered}
               eventDrop={(arg) => {
                 if (arg.event.extendedProps.source === 'google') {
-                  // Don't allow editing Google Calendar events
                   arg.revert();
                   return;
                 }
@@ -231,7 +218,6 @@ export function CalendarView() {
               }}
               eventResize={(arg) => {
                 if (arg.event.extendedProps.source === 'google') {
-                  // Don't allow editing Google Calendar events
                   arg.revert();
                   return;
                 }
