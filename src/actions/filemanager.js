@@ -35,7 +35,7 @@ export default function useGetFiles(user_id) {
       // 1) Fetch Owned Files
       const { data: ownedFiles, error: ownedFilesError } = await supabase
         .from('files')
-        .select('id, user_id, file_name, file_size, file_type, storage_url, created_at')
+        .select('id, user_id, file_name, file_size, file_type, storage_url, created_at, folder_id')
         .eq('user_id', user_id)
         .order('created_at', { ascending: false });
 
@@ -46,14 +46,17 @@ export default function useGetFiles(user_id) {
         .from('file_sharing')
         .select(`
           file_id, access_type, 
-          files (id, user_id, file_name, file_size, file_type, storage_url, created_at)
+          files (id, user_id, file_name, file_size, file_type, storage_url, created_at, folder_id)
         `)
         .eq('shared_with', user_id);
 
       if (sharedFilesError) throw sharedFilesError;
 
       // 3) Fetch file-sharing records (who has access to each file)
-      const fileIds = [...ownedFiles.map(f => f.id), ...sharedFilesData.map(s => s.file_id)];
+      const fileIds = [
+        ...ownedFiles.map((f) => f.id),
+        ...sharedFilesData.map((s) => s.file_id),
+      ];
       let sharingData = [];
       if (fileIds.length) {
         const { data: sharingRows, error: sharingError } = await supabase
@@ -66,7 +69,7 @@ export default function useGetFiles(user_id) {
       }
 
       // 4) Fetch user details for shared users
-      const sharedUserIds = [...new Set(sharingData.map(s => s.shared_with))];
+      const sharedUserIds = [...new Set(sharingData.map((s) => s.shared_with))];
       let sharedUsers = [];
       if (sharedUserIds.length) {
         sharedUsers = await fetchUsersByIds(sharedUserIds);
@@ -87,6 +90,7 @@ export default function useGetFiles(user_id) {
           permission: share.access_type, // 'view' or 'edit'
         });
       }
+
       // 6) Fetch User's Favorites
       const { data: favoritesData, error: favoritesError } = await supabase
         .from('file_favorites')
@@ -94,47 +98,10 @@ export default function useGetFiles(user_id) {
         .eq('user_id', user_id);
 
       if (favoritesError) throw favoritesError;
-      const favoriteIds = new Set(favoritesData.map(fav => fav.file_id));
+      const favoriteFileIds = new Set(favoritesData.map((fav) => fav.file_id));
+      const favoriteFolderIds = new Set(favoritesData.map((fav) => fav.folder_id).filter(Boolean));
 
-      // 7) Format Owned Files
-      const ownedFilesFormatted = ownedFiles.map((file) => ({
-        id: file.id,
-        name: file.file_name,
-        url: supabase.storage.from('file_attachments').getPublicUrl(file.storage_url)?.data.publicUrl || '',
-        type: file.file_type,
-        size: file.file_size,
-        createdAt: file.created_at,
-        modifiedAt: file.created_at,
-        isFavorited: favoriteIds.has(file.id), // Check if the file is favorited
-        tags: [],
-        shared: sharedMap[file.id] || [],
-        isShared: false,
-        accessType: 'owner',
-      }));
-
-      // 8) Format Shared Files (files shared **with** the user)
-      const sharedFilesFormatted = sharedFilesData.map((record) => {
-        const file = record.files;
-        if (!file) return null; // Skip if the file doesn't exist
-
-        return {
-          id: file.id,
-          name: file.file_name,
-          url: supabase.storage.from('file_attachments').getPublicUrl(file.storage_url)?.data.publicUrl || '',
-          type: file.file_type,
-          size: file.file_size,
-          createdAt: file.created_at,
-          modifiedAt: file.created_at,
-          isFavorited: favoriteIds.has(file.id), // Check if favorited
-          tags: [],
-          shared: sharedMap[file.id] || [],
-          isShared: true,
-          accessType: record.access_type,
-          ownerId: file.user_id,
-        };
-      }).filter(Boolean); // Remove null values
-
-      // 9) Fetch Folders
+      // 7) Fetch Folders
       const { data: foldersData, error: foldersError } = await supabase
         .from('folders')
         .select('id, folder_name, created_at')
@@ -143,29 +110,92 @@ export default function useGetFiles(user_id) {
 
       if (foldersError) throw foldersError;
 
+      // 8) Compute Folder Sizes & File Counts
+      const folderMap = {};
+      for (const file of ownedFiles) {
+        if (file.folder_id) {
+          if (!folderMap[file.folder_id]) {
+            folderMap[file.folder_id] = { totalFiles: 0, totalSize: 0 };
+          }
+          folderMap[file.folder_id].totalFiles += 1;
+          folderMap[file.folder_id].totalSize += file.file_size;
+        }
+      }
+
+      // 9) Format Folders with computed size & file count
       const folders = foldersData.map((folder) => ({
         id: folder.id,
         name: folder.folder_name,
         url: '',
         type: 'folder',
-        size: null,
-        totalFiles: 0,
+        size: folderMap[folder.id]?.totalSize || 0, // Total size of files in this folder
+        totalFiles: folderMap[folder.id]?.totalFiles || 0, // Number of files in this folder
         createdAt: folder.created_at,
         modifiedAt: folder.created_at,
-        isFavorited: favoriteIds.has(folder.id), // Check if favorited
+        isFavorited: favoriteFolderIds.has(folder.id),
         tags: [],
         shared: [],
+        accessType: 'owner',
       }));
 
-      // 10) Merge Everything
+      // 10) Format Owned Files (only those that are NOT inside a folder => folder_id == null)
+      const ownedFilesFormatted = ownedFiles
+        .filter((file) => !file.folder_id) // skip if file is in a folder
+        .map((file) => ({
+          id: file.id,
+          name: file.file_name,
+          url: supabase.storage
+            .from('file_attachments')
+            .getPublicUrl(file.storage_url)?.data.publicUrl || '',
+          type: file.file_type,
+          size: file.file_size,
+          createdAt: file.created_at,
+          modifiedAt: file.created_at,
+          isFavorited: favoriteFileIds.has(file.id),
+          tags: [],
+          shared: sharedMap[file.id] || [],
+          isShared: false,
+          accessType: 'owner',
+        }));
+
+      // 11) Format Shared Files (skip those that are in a folder => folder_id != null)
+      const sharedFilesFormatted = sharedFilesData
+        .map((record) => {
+          const file = record.files;
+          if (!file) return null;
+          if (file.folder_id) return null; // skip if file is inside a folder
+          return {
+            id: file.id,
+            name: file.file_name,
+            url: supabase.storage
+              .from('file_attachments')
+              .getPublicUrl(file.storage_url)?.data.publicUrl || '',
+            type: file.file_type,
+            size: file.file_size,
+            createdAt: file.created_at,
+            modifiedAt: file.created_at,
+            isFavorited: favoriteFileIds.has(file.id),
+            tags: [],
+            shared: sharedMap[file.id] || [],
+            isShared: true,
+            accessType: record.access_type,
+            ownerId: file.user_id,
+          };
+        })
+        .filter(Boolean); // remove nulls
+
+      // 12) Merge Everything => folders first, then root-level files
+      // (so the user sees folders at the top, files below)
       return [...folders, ...ownedFilesFormatted, ...sharedFilesFormatted];
     }
   );
+
+  // Realtime subscription so changes in file_sharing are auto-updated
   useEffect(() => {
     const channel = supabase
       .channel('file_sharing_realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'file_sharing' }, (payload) => {
-        console.log("🔄 Realtime update in file_sharing:", payload);
+        console.log('🔄 Realtime update in file_sharing:', payload);
         mutate(['get_files', user_id]); // Refresh file list in real-time
       })
       .subscribe();
@@ -184,9 +214,10 @@ export default function useGetFiles(user_id) {
 
 
 
+
 // ----------------------------------------------------------------------------
 
-export async function uploadFiles(user_id, files, folder_name = null) {
+export async function uploadFiles(user_id, files, folder_name = null, folderId = null) {
   try {
     for (const file of files) {
       const base64Response = await fetch(file.file_base64);
@@ -216,7 +247,7 @@ export async function uploadFiles(user_id, files, folder_name = null) {
           file_type: file.file_type,
           file_size: file.file_size,
           storage_url: data.path,
-          folder_id: null, // or you can handle folder if you prefer
+          folder_id: folderId, // or you can handle folder if you prefer
         }]);
 
       if (dbError) {
@@ -237,65 +268,101 @@ export async function uploadFiles(user_id, files, folder_name = null) {
 // ----------------------------------------------------------------------------
 // Delete files using Supabase Storage and remove metadata from the database.
 // This function loops through fileIds, removes the file from storage, then deletes the record.
-export async function deleteFiles(user_id, fileIds) {
-  console.log("DEBUG deleting files", fileIds)
-
+export async function deleteEntities(userId, items) {
   try {
-    if (!fileIds.length) throw new Error('No files selected for deletion.');
-
-    for (const fileId of fileIds) {
-      // First, get the file record from the database (to know its storage_url)
-      const { data: fileData, error: fileError } = await supabase
-        .from('files')
-        .select('storage_url')
-        .eq('id', fileId)
-        .single();
-      if (fileError) throw fileError;
-
-      // Delete the file from Supabase Storage
-      const { error: removeError } = await supabase.storage
-        .from('file_attachments')
-        .remove([fileData.storage_url]);
-      if (removeError) throw removeError;
-
-      // Delete the file record from the "files" table
-      const { error: dbError } = await supabase
-        .from('files')
-        .delete()
-        .eq('id', fileId)
-        .eq('user_id', user_id);
-      if (dbError) throw dbError;
+    if (!items.length) {
+      throw new Error('No items selected for deletion.');
     }
 
-    mutate(['get_files', user_id]);
+    // Optionally, gather file storage URLs to remove them in fewer calls
+    // We'll do a per-item approach here, but you can optimize further if needed
+
+    for (const item of items) {
+      if (item.type === 'folder') {
+        // ----- DELETE FOLDER -----
+        // 1) Optional: Orphan or remove child files
+        //    If you want to orphan child files, do: 
+        //    await supabase.from('files').update({ folder_id: null }).eq('folder_id', item.id);
+        //    If you have ON DELETE CASCADE from folders -> files, or you want to fully remove them, handle that here.
+
+        const { error: folderError } = await supabase
+          .from('folders')
+          .delete()
+          .eq('id', item.id)
+          .eq('user_id', userId); // ownership check
+
+        if (folderError) throw folderError;
+
+      } else {
+        // ----- DELETE FILE -----
+        // 1) Fetch file to get storage_url (so we can remove from Supabase Storage)
+        const { data: fileData, error: fileError } = await supabase
+          .from('files')
+          .select('user_id, storage_url')
+          .eq('id', item.id)
+          .single();
+
+        if (fileError) throw fileError;
+
+        // ownership check
+        if (fileData.user_id !== userId) {
+          throw new Error(`You do not own file ID = ${item.id}`);
+        }
+
+        // 2) Remove from storage
+        if (fileData.storage_url) {
+          const { error: removeError } = await supabase.storage
+            .from('file_attachments')
+            .remove([fileData.storage_url]);
+          if (removeError) throw removeError;
+        }
+
+        // 3) Delete from files table
+        const { error: fileDelError } = await supabase
+          .from('files')
+          .delete()
+          .eq('id', item.id)
+          .eq('user_id', userId);
+        if (fileDelError) throw fileDelError;
+      }
+    }
+
+    // Finally, revalidate so your SWR-based UI updates
+    mutate(['get_files', userId]);
+
     return { success: true };
   } catch (error) {
-    console.error('Error deleting files:', error);
+    console.error('Error deleting entities:', error);
     return { success: false, error };
   }
 }
 
-export async function toggleFavoriteFile(fileId, userId, isCurrentlyFavorited) {
+export async function toggleFavorite(entityId, userId, isCurrentlyFavorited, isFolder = false) {
   try {
+    if (!entityId) {
+      return { success: false, error: 'No file or folder specified.' };
+    }
+
+    const favoriteObj = isFolder
+      ? { user_id: userId, folder_id: entityId }
+      : { user_id: userId, file_id: entityId };
+
     if (isCurrentlyFavorited) {
       // Remove from favorites
       const { error } = await supabase
         .from('file_favorites')
         .delete()
-        .eq('user_id', userId)
-        .eq('file_id', fileId);
-
+        .match(favoriteObj); // match user_id + (folder_id or file_id)
       if (error) throw error;
     } else {
       // Add to favorites
       const { error } = await supabase
         .from('file_favorites')
-        .insert([{ user_id: userId, file_id: fileId }]);
-
+        .insert([favoriteObj]);
       if (error) throw error;
     }
 
-    // Refresh UI for all users
+    // Refresh SWR so UI updates
     mutate(['get_files', userId]);
 
     return { success: true };
@@ -339,6 +406,132 @@ export async function shareFile(ownerId, fileId, recipientId, accessType = 'view
     return { success: true };
   } catch (error) {
     console.error('Error sharing file:', error);
+    return { success: false, error };
+  }
+}
+
+export async function createFolder(userId, folderName, selectedFiles = []) {
+  if (!userId || !folderName) {
+    return { success: false, error: 'User ID and folder name are required.' };
+  }
+
+  try {
+    // Step 1: Insert folder into the database
+    const { data: folderData, error: folderError } = await supabase
+      .from('folders')
+      .insert([{ user_id: userId, folder_name: folderName }])
+      .select()
+      .single();
+
+    if (folderError) throw folderError;
+
+    const folderId = folderData.id;
+
+    // Step 2: Move selected files into the folder
+    if (selectedFiles.length > 0) {
+      console.log(selectedFiles)
+      const { error: updateError } = await supabase
+        .from('files')
+        .update({ folder_id: folderId })
+        .in('id', selectedFiles);
+
+      if (updateError) throw updateError;
+    }
+
+    // Step 3: Refresh UI
+    mutate(['get_files', userId]);
+
+    return { success: true, folderId };
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    return { success: false, error };
+  }
+}
+
+export async function getFolderContents(userId, folderId) {
+  try {
+    const { data, error } = await supabase
+      .from('files')
+      .select('id, user_id, file_name, file_size, file_type, storage_url, created_at, folder_id')
+      .eq('folder_id', folderId);
+
+    if (error) throw error;
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error fetching folder contents:', error);
+    return { success: false, error };
+  }
+}
+
+export async function updateFolderName(userId, folderId, newName) {
+  try {
+    // (Optional) Check if the folder belongs to this user
+    // e.g. SELECT user_id FROM folders WHERE id = folderId => must match userId
+
+    const { error } = await supabase
+      .from('folders')
+      .update({ folder_name: newName })
+      .eq('id', folderId)
+      .eq('user_id', userId); // ensure only the owner can rename
+
+    if (error) throw error;
+
+    // Revalidate user’s file/folder list
+    mutate(['get_files', userId]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating folder name:', error);
+    return { success: false, error };
+  }
+}
+
+export async function removeFilesFromFolder(userId, folderId, fileIds) {
+  if (!fileIds?.length) {
+    return { success: false, error: 'No files specified.' };
+  }
+  try {
+    // Move these files to root (folder_id = null)
+    const { error } = await supabase
+      .from('files')
+      .update({ folder_id: null })
+      .in('id', fileIds)
+      .eq('folder_id', folderId)      // ensure they're currently in that folder
+      .eq('user_id', userId);         // ensure user owns them, or do an ownership check
+
+    if (error) throw error;
+
+    // Revalidate user’s file/folder list
+    mutate(['get_files', userId]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error removing files from folder:', error);
+    return { success: false, error };
+  }
+}
+
+export async function addFilesToFolder(userId, folderId, fileIds) {
+  if (!fileIds?.length) {
+    return { success: false, error: 'No files specified.' };
+  }
+
+  try {
+    const { error } = await supabase
+      .from('files')
+      .update({ folder_id: folderId })
+      .in('id', fileIds)
+      .eq('user_id', userId); // optional ownership check
+
+    if (error) throw error;
+
+    // Revalidate user’s file/folder list
+    mutate(['get_files', userId]);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error adding files to folder:', error);
     return { success: false, error };
   }
 }

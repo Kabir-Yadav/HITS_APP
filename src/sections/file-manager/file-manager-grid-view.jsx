@@ -100,9 +100,10 @@ export function FileManagerGridView({ table, userId, dataFiltered, onDeleteItem,
               <FileManagerFolderItem
                 key={folder.id}
                 folder={folder}
+                userId={userId}
                 selected={selected.includes(folder.id)}
                 onSelect={() => onSelectItem(folder.id)}
-                onDelete={() => onDeleteItem(folder.id)}
+                onDelete={() => onDeleteItem(folder)}
               />
             ))}
         </Box>
@@ -142,7 +143,7 @@ export function FileManagerGridView({ table, userId, dataFiltered, onDeleteItem,
                 file={file}
                 selected={selected.includes(file.id)}
                 onSelect={() => onSelectItem(file.id)}
-                onDelete={() => onDeleteItem(file.id)}
+                onDelete={() => onDeleteItem(file)}
               />
             ))}
         </Box>

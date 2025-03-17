@@ -8,7 +8,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
-import { uploadFiles } from 'src/actions/filemanager';
+import { createFolder, removeFilesFromFolder, updateFolderName, uploadFiles } from 'src/actions/filemanager';
 
 import { Upload } from 'src/components/upload';
 import { toast } from 'src/components/snackbar';
@@ -23,6 +23,9 @@ export function FileManagerNewFolderDialog({
   folderName,
   onChangeFolderName,
   title = 'Upload files',
+  isCreatingFolder = false,
+  selectedfiles = [],
+  folderId,
   userId, // Pass userId as a prop
   refreshFiles, // Function to refresh file list after upload
   ...other
@@ -30,10 +33,10 @@ export function FileManagerNewFolderDialog({
   const [files, setFiles] = useState([]);
 
   useEffect(() => {
-    if (!open) {
-      setFiles([]);
+    if (open) {
+      setFiles([...selectedfiles]);
     }
-  }, [open]);
+  }, [open, JSON.stringify(selectedfiles)]);
 
   const handleDrop = useCallback(
     (acceptedFiles) => {
@@ -93,6 +96,41 @@ export function FileManagerNewFolderDialog({
   const handleRemoveAllFiles = () => {
     setFiles([]);
   };
+  const handleFolderChanges = async () => {
+    if (!userId || !folderId) {
+      toast.error('User ID or Folder ID is missing');
+      return;
+    }
+
+    try {
+      // 1) **Update Folder Name** if changed
+      if (onChangeFolderName && folderName) {
+        await updateFolderName(userId, folderId, folderName);
+      }
+
+      // 2) **Upload new files** if any
+      const newFiles = files.filter((file) => !file.id); // Identify new files (those without an ID)
+      if (newFiles.length > 0) {
+        await uploadFiles(userId, newFiles, null, folderId);
+      }
+
+      // 3) **Remove files from folder** if deleted
+      const existingFileIds = selectedfiles.map((f) => f.id);
+      const removedFileIds = existingFileIds.filter(
+        (id) => !files.some((file) => file.id === id)
+      );
+
+      if (removedFileIds.length > 0) {
+        await removeFilesFromFolder(userId, folderId, removedFileIds);
+      }
+
+      toast.success('Folder updated successfully!');
+      onClose();
+    } catch (error) {
+      toast.error('Error updating folder.');
+      console.error(error);
+    }
+  };
 
   return (
     <Dialog fullWidth maxWidth="sm" open={open} onClose={onClose} {...other}>
@@ -109,17 +147,17 @@ export function FileManagerNewFolderDialog({
           />
         )}
 
-        <Upload multiple value={files} onDrop={handleDrop} onRemove={handleRemoveFile} />
+        <Upload isCreatingFolder={isCreatingFolder} multiple value={files} onDrop={handleDrop} onRemove={handleRemoveFile} />
       </DialogContent>
 
       <DialogActions>
-        <Button
+        {!isCreatingFolder && (<Button
           variant="contained"
           startIcon={<Iconify icon="eva:cloud-upload-fill" />}
           onClick={handleUpload}
         >
           Upload
-        </Button>
+        </Button>)}
 
         {!!files.length && (
           <Button variant="outlined" color="inherit" onClick={handleRemoveAllFiles}>
@@ -127,10 +165,17 @@ export function FileManagerNewFolderDialog({
           </Button>
         )}
 
-        {(onCreate || onUpdate) && (
+        {(onCreate) && (
           <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="soft" onClick={onCreate || onUpdate}>
-              {onUpdate ? 'Save' : 'Create'}
+            <Button variant="soft" onClick={onCreate}>
+              Create
+            </Button>
+          </Box>
+        )}
+        {(onUpdate) && (
+          <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button variant="soft" onClick={handleFolderChanges}>
+              Save
             </Button>
           </Box>
         )}

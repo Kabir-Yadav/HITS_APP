@@ -16,9 +16,9 @@ import { paths } from 'src/routes/paths';
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { CONFIG } from 'src/global-config';
-import useGetFiles from 'src/actions/filemanager';
-import { deleteFiles } from 'src/actions/filemanager';
+import { deleteEntities } from 'src/actions/filemanager';
 import { DashboardContent } from 'src/layouts/dashboard';
+import useGetFiles, { createFolder } from 'src/actions/filemanager';
 import { _allFiles, FILE_TYPE_OPTIONS, _files, _folders } from 'src/_mock';
 
 import { toast } from 'src/components/snackbar';
@@ -97,18 +97,19 @@ export function FileManagerView() {
     }
   }, []);
 
-  const handleDeleteItem = useCallback(async (id) => {
+  const handleDeleteItem = useCallback(async (item) => {
+    console.log(item, '<=')
     try {
-      const result = await deleteFiles(userId, [id]); // API call with single file
+      const result = await deleteEntities(userId, [item]); // API call with single file
 
       if (result.success) {
-        toast.success('File deleted successfully!');
+        toast.success(`${item.type.toUpperCase()} deleted successfully!`);
 
         // ✅ Remove the deleted file from `tableData`
-        setTableData((prevData) => prevData.filter((row) => row.id !== id));
+        setTableData((prevData) => prevData.filter((row) => row.id !== item.id));
 
         // ✅ Clear selection if this file was selected
-        table.setSelected((prevSelected) => prevSelected.filter((selectedId) => selectedId !== id));
+        table.setSelected((prevSelected) => prevSelected.filter((selectedId) => selectedId !== item.id));
 
         // ✅ Update pagination if needed
         table.onUpdatePageDeleteRow(dataInPage.length);
@@ -129,8 +130,8 @@ export function FileManagerView() {
     }
 
     try {
-      console.log(table.selected)
-      const result = await deleteFiles(userId, table.selected);
+      const deletiondata = tableData.filter((file) => table.selected.includes(file.id))
+      const result = await deleteEntities(userId, deletiondata);
 
       if (result.success) {
         toast.success('Files deleted successfully!');
@@ -240,12 +241,33 @@ export function FileManagerView() {
       }
     />
   );
-  console.log(tableData)
+  const handleCreateFolder = async (user_Id, selectedFiles, folderName) => {
+    if (!user_Id || !folderName) {
+      toast.error("User ID and folder name are required");
+      return;
+    }
+    console.log(selectedFiles)
+    try {
+      const result = await createFolder(user_Id, folderName, selectedFiles);
+
+      if (result.success) {
+        table.setSelected([]);
+        toast.success("Folder created successfully!");
+      } else {
+        throw new Error("Failed to create folder");
+      }
+    } catch (error) {
+      console.error("Error creating folder:", error);
+      toast.error("Error creating folder");
+    }
+  };
+
   const renderList = () =>
     displayMode === 'list' ? (
       <FileManagerTable
         userId={user.id}
         table={table}
+        onCreateFolder={handleCreateFolder}
         dataFiltered={dataFiltered}
         onDeleteRow={handleDeleteItem}
         notFound={notFound}
@@ -426,7 +448,7 @@ export function FileManagerView() {
                       userId={userId}
                       key={file.id}
                       file={file}
-                      onDelete={() => handleDeleteItem(file.id)}
+                      onDelete={() => handleDeleteItem(file)}
                     />
                   ))}
                 </Box>
