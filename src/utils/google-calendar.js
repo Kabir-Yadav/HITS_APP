@@ -12,6 +12,32 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
+// Function to save token to localStorage
+const saveTokenToStorage = (token) => {
+  if (token) {
+    localStorage.setItem('googleCalendarToken', JSON.stringify({
+      token,
+      timestamp: new Date().getTime()
+    }));
+  }
+};
+
+// Function to get token from localStorage
+const getTokenFromStorage = () => {
+  const tokenData = localStorage.getItem('googleCalendarToken');
+  if (!tokenData) return null;
+
+  const { token, timestamp } = JSON.parse(tokenData);
+  // Check if token is less than 1 hour old (3600000 ms)
+  if (new Date().getTime() - timestamp < 3600000) {
+    return token;
+  }
+  
+  // Clear expired token
+  localStorage.removeItem('googleCalendarToken');
+  return null;
+};
+
 export const initializeGoogleCalendar = async () => {
   // Initialize the Google API client
   await new Promise((resolve, reject) => {
@@ -36,6 +62,12 @@ export const initializeGoogleCalendar = async () => {
 
   gapiInited = true;
   gisInited = true;
+
+  // Try to set token from storage
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    gapi.client.setToken(storedToken);
+  }
 };
 
 export const ensureGoogleCalendarAuth = async () => {
@@ -44,14 +76,30 @@ export const ensureGoogleCalendarAuth = async () => {
   }
 
   // Check if we already have a valid token
-  if (gapi.client.getToken() && gapi.client.getToken().access_token) {
+  const currentToken = gapi.client.getToken();
+  if (currentToken && currentToken.access_token) {
     try {
       // Test the token with a simple API call
       await gapi.client.calendar.calendarList.list();
       return { status: 'valid_token' }; // Return value for valid token
     } catch (error) {
       console.log('Token validation failed, requesting new token');
+      // Clear invalid token
+      localStorage.removeItem('googleCalendarToken');
       // Continue to request new token
+    }
+  }
+
+  // Check storage for a valid token
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    try {
+      gapi.client.setToken(storedToken);
+      await gapi.client.calendar.calendarList.list();
+      return { status: 'valid_token' };
+    } catch (error) {
+      console.log('Stored token validation failed, requesting new token');
+      localStorage.removeItem('googleCalendarToken');
     }
   }
 
@@ -62,6 +110,8 @@ export const ensureGoogleCalendarAuth = async () => {
           reject(response);
           return;
         }
+        // Save the new token
+        saveTokenToStorage(response);
         await gapi.client.calendar.calendarList.list(); // Verify token works
         resolve({ status: 'new_token', response }); // Return value for new token
       };

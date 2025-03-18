@@ -134,7 +134,18 @@ export default function CalendarEventDetails({ event, open, onClose, onEdit, onU
                 {event.extendedProps.attendees.map((attendee, index) => (
                   <Chip
                     key={index}
-                    label={attendee.email}
+                    label={
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="body2">
+                          {attendee.email}
+                        </Typography>
+                        {attendee.optional && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            (Optional)
+                          </Typography>
+                        )}
+                      </Stack>
+                    }
                     size="small"
                     icon={<Iconify icon="solar:user-rounded-bold" />}
                     onDelete={() => handleRemoveAttendee(attendee)}
@@ -142,6 +153,9 @@ export default function CalendarEventDetails({ event, open, onClose, onEdit, onU
                     sx={{ 
                       maxWidth: '100%',
                       cursor: 'pointer',
+                      ...(attendee.optional && {
+                        bgcolor: 'action.selected',
+                      }),
                       '&:hover': {
                         bgcolor: 'error.lighter',
                         '& .MuiChip-deleteIcon': {

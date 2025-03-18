@@ -138,11 +138,17 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
           attendees: [
             // Add organizer as first attendee with response status 'accepted'
             { email: organizerEmail, responseStatus: 'accepted' },
-            // Add other attendees
-            ...(attendees ? attendees.split(',').map(email => ({ 
-              email: email.trim(),
-              responseStatus: 'needsAction'
-            })) : []),
+            // Add other attendees with optional status
+            ...(attendees ? attendees.split(',').map(email => {
+              const trimmedEmail = email.trim();
+              const isOptional = trimmedEmail.startsWith('optional:');
+              const actualEmail = isOptional ? trimmedEmail.slice(9) : trimmedEmail;
+              return { 
+                email: actualEmail.trim(),
+                optional: isOptional,
+                responseStatus: 'needsAction'
+              };
+            }) : []),
           ],
         };
 
@@ -195,6 +201,20 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
     const updatedAttendees = currentAttendees
       .filter(email => email !== emailToRemove)
       .join(', ');
+    field.onChange(updatedAttendees);
+  };
+
+  // Add new function to toggle optional status
+  const handleToggleOptional = (email, field) => {
+    const currentAttendees = field.value ? field.value.split(',').map(e => e.trim()) : [];
+    const updatedAttendees = currentAttendees.map(e => {
+      if (e.startsWith('optional:') && e.slice(9) === email) {
+        return email; // Remove optional status
+      } else if (e === email) {
+        return `optional:${email}`; // Add optional status
+      }
+      return e;
+    }).join(', ');
     field.onChange(updatedAttendees);
   };
 
@@ -262,22 +282,35 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
                       <Stack spacing={1}>
                         {field.value && field.value.split(',').map((email, index) => {
                           const trimmedEmail = email.trim();
-                          return trimmedEmail && (
+                          const isOptional = trimmedEmail.startsWith('optional:');
+                          const displayEmail = isOptional ? trimmedEmail.slice(9) : trimmedEmail;
+                          
+                          return displayEmail && (
                             <Chip
                               key={index}
-                              label={trimmedEmail}
+                              label={displayEmail}
                               size="small"
-                              icon={<Iconify icon="solar:user-rounded-bold" />}
+                              icon={
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                  <Iconify icon="solar:user-rounded-bold" />
+                                  {isOptional && (
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      (Optional)
+                                    </Typography>
+                                  )}
+                                </Stack>
+                              }
                               onDelete={() => handleRemoveAttendee(trimmedEmail, field)}
+                              onClick={() => handleToggleOptional(displayEmail, field)}
                               sx={{ 
                                 maxWidth: '100%',
                                 cursor: 'pointer',
                                 '&:hover': {
-                                  bgcolor: 'error.lighter',
-                                  '& .MuiChip-deleteIcon': {
-                                    color: 'error.main',
-                                  }
+                                  bgcolor: 'action.hover',
                                 },
+                                ...(isOptional && {
+                                  bgcolor: 'action.selected',
+                                }),
                                 '& .MuiChip-label': { 
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',

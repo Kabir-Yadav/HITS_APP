@@ -49,6 +49,7 @@ export function TechnicalRoundSection({ filters, candidate }) {
   const [assignedBy, setAssignedBy] = useState('');
   const [duration, setDuration] = useState('');
   const [calendarEventCreated, setCalendarEventCreated] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
 
   const statusDialog = useBoolean();
   const loading = useBoolean();
@@ -106,29 +107,65 @@ export function TechnicalRoundSection({ filters, candidate }) {
         const eventCreated = await listenForCalendarEventCreation(calendarWindow);
 
         if (eventCreated) {
-          // Schedule the interview internally
-          await scheduleInterview({
-            applicationIds: selectedApplications,
-            stage: 'technical',
-            status: 'scheduled',
-            scheduleDate,
-            interviewer,
-            assignedBy,
-          });
+          // Show confirmation dialog
+          setConfirmDialog({
+            open: true,
+            title: 'Calendar Event Confirmation',
+            message: 'Did you successfully schedule the calendar event?',
+            onConfirm: async () => {
+              try {
+                // Schedule the interview internally
+                await scheduleInterview({
+                  applicationIds: selectedApplications,
+                  stage: 'technical',
+                  status: 'scheduled',
+                  scheduleDate,
+                  interviewer,
+                  assignedBy,
+                });
 
-          // Reset form
-          setScheduleDialog(false);
-          setSelectedApplications([]);
-          setScheduleDate(null);
-          setInterviewer('');
-          setAssignedBy('');
+                // Reset form
+                setScheduleDialog(false);
+                setSelectedApplications([]);
+                setScheduleDate(null);
+                setInterviewer('');
+                setAssignedBy('');
+                setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+              } catch (error) {
+                setConfirmDialog({
+                  open: true,
+                  title: 'Error',
+                  message: 'An error occurred while scheduling the interview. Please try again.',
+                  onConfirm: () => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null })
+                });
+              }
+            },
+            onCancel: () => {
+              setConfirmDialog({
+                open: true,
+                title: 'Action Required',
+                message: 'Please schedule the calendar event before proceeding.',
+                onConfirm: () => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null })
+              });
+            }
+          });
         } else {
-          // Handle case where event wasn't created
-          console.error('Calendar event creation failed or timed out');
+          setConfirmDialog({
+            open: true,
+            title: 'Calendar Event Failed',
+            message: 'Calendar event creation failed or timed out. Please try again.',
+            onConfirm: () => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null })
+          });
         }
       }
     } catch (error) {
       console.error('Error scheduling interview:', error);
+      setConfirmDialog({
+        open: true,
+        title: 'Error',
+        message: 'An error occurred while scheduling the interview. Please try again.',
+        onConfirm: () => setConfirmDialog({ open: false, title: '', message: '', onConfirm: null })
+      });
     } finally {
       loading.onFalse();
     }
@@ -459,6 +496,39 @@ export function TechnicalRoundSection({ filters, candidate }) {
     </Dialog>
   );
 
+  const renderConfirmDialog = (
+    <Dialog
+      open={confirmDialog.open}
+      onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
+    >
+      <DialogTitle>{confirmDialog.title}</DialogTitle>
+      <DialogContent>
+        <Typography>{confirmDialog.message}</Typography>
+      </DialogContent>
+      <DialogActions>
+        {confirmDialog.onCancel && (
+          <Button onClick={() => {
+            confirmDialog.onCancel();
+          }}>
+            No
+          </Button>
+        )}
+        <Button
+          variant="contained"
+          onClick={() => {
+            if (confirmDialog.onConfirm) {
+              confirmDialog.onConfirm();
+            } else {
+              setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+            }
+          }}
+        >
+          {confirmDialog.onCancel ? 'Yes' : 'OK'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+
   return (
     <>
       <Card>
@@ -509,6 +579,7 @@ export function TechnicalRoundSection({ filters, candidate }) {
 
       {renderScheduleDialog}
       {renderStatusDialog}
+      {renderConfirmDialog}
     </>
   );
 }
