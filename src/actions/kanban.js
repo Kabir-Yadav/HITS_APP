@@ -4,6 +4,7 @@ import { useMemo, startTransition, useEffect } from 'react';
 
 import { supabase } from 'src/lib/supabase';
 import axios, { fetcher, endpoints } from 'src/lib/axios';
+import { useAuthContext } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
@@ -22,8 +23,9 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 
 export function useGetBoard() {
+  const { user } = useAuthContext();
   const { data, isLoading, error, isValidating } = useSWR(
-    KANBAN_CACHE_KEY,
+    user ? KANBAN_CACHE_KEY : null, // Only fetch if user is logged in
     async () => {
       try {
         console.log('Fetching kanban board data...');
@@ -61,6 +63,7 @@ export function useGetBoard() {
         }
 
         // Fetch tasks with assignees, attachments, and subtasks
+        // Filter tasks to only include those created by or assigned to the current user
         const { data: tasksData, error: tasksError } = await supabase
           .from('kanban_tasks')
           .select(`
@@ -72,6 +75,7 @@ export function useGetBoard() {
             reporter:user_profiles!kanban_tasks_reporter_id_fkey(*),
             subtasks:kanban_task_subtasks(*)
           `)
+          .or(`reporter_id.eq.${user.id},kanban_task_assignees.user_id.eq.${user.id}`)
           .order('created_at');
 
         // Log tasks result  
