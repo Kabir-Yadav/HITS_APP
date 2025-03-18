@@ -41,29 +41,8 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
 
   // Modified filtering/grouping logic
   const groupedTasks = useMemo(() => {
-    console.log('Grouping tasks with:', {
-      tasksAvailable: !!tasks,
-      tasksLength: tasks?.length,
-      userAvailable: !!user,
-      userId: user?.id,
-      firstTask: tasks?.[0]
-    });
-
-    // If no tasks, return empty arrays
-    if (!tasks) {
-      return {
-        created: [],
-        assigned: []
-      };
-    }
-
-    // If no user ID yet, show all tasks temporarily
-    if (!user?.id) {
-      console.log('No user ID available yet, showing all tasks temporarily');
-      return {
-        created: tasks,
-        assigned: []
-      };
+    if (!tasks || !user?.id) {
+      return { all: tasks || [] };
     }
     
     const grouped = {
@@ -71,54 +50,27 @@ export function KanbanColumn({ children, column, tasks, disabled, sx }) {
       assigned: [],
     };
     
-    tasks.forEach((task, index) => {
-      try {
-        // Log task structure for debugging
-        if (index === 0) {
-          console.log('First task structure:', {
-            taskId: task.id,
-            reporterId: task?.reporter?.id,
-            assignees: task?.assignee,
-            userId: user.id
-          });
-        }
-
-        // Safely check reporter ID
-        const reporterId = task?.reporter?.id;
-        const assignees = Array.isArray(task?.assignee) ? task.assignee : [];
-
-        // Check if user created the task
-        if (reporterId === user.id) {
-          grouped.created.push(task);
-        }
-        // Check if task is assigned to user
-        else if (assignees.some((assignee) => assignee?.id === user.id)) {
-          grouped.assigned.push(task);
-        }
-      } catch (error) {
-        console.error('Error processing task:', error, task);
-        // On error, add task to created group as fallback
+    tasks.forEach((task) => {
+      // Check if user created the task
+      if (task.reporter?.id === user.id) {
         grouped.created.push(task);
       }
-    });
-
-    console.log('Grouped tasks result:', {
-      createdCount: grouped.created.length,
-      assignedCount: grouped.assigned.length
+      // Check if task is assigned to user
+      else if (Array.isArray(task.assignee) && 
+        task.assignee.some((assignee) => assignee?.id === user.id)) {
+        grouped.assigned.push(task);
+      }
+      // We're no longer collecting other tasks
     });
 
     return grouped;
   }, [tasks, user?.id]);
 
   // Get all task IDs for drag and drop
-  const tasksIds = useMemo(() => {
-    const allTasks = [...(groupedTasks.created || []), ...(groupedTasks.assigned || [])];
-    console.log('All tasks for drag and drop:', {
-      count: allTasks.length,
-      ids: allTasks.map(t => t.id)
-    });
-    return allTasks.map(task => task.id);
-  }, [groupedTasks]);
+  const tasksIds = useMemo(() => 
+    [...(groupedTasks.created || []), ...(groupedTasks.assigned || [])].map(task => task.id), 
+    [groupedTasks]
+  );
 
   const isOverContainer = useMemo(() => {
     if (!over || !active) return false;

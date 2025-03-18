@@ -22,7 +22,7 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 
 export function useGetBoard() {
-  const { data, isLoading, error: boardError, isValidating } = useSWR(
+  const { data, isLoading, error, isValidating } = useSWR(
     KANBAN_CACHE_KEY,
     async () => {
       try {
@@ -75,11 +75,8 @@ export function useGetBoard() {
           .order('created_at');
 
         // Log tasks result  
-        console.log('Tasks query result:', {
-          tasksCount: tasksData?.length || 0,
-          firstTask: tasksData?.[0],
-          error: tasksError
-        });
+        console.log('Tasks:', tasksData);
+        console.log('Tasks error:', tasksError);
 
         if (tasksError) {
           console.error('Error fetching tasks:', tasksError);
@@ -92,64 +89,42 @@ export function useGetBoard() {
           return acc;
         }, {});
 
-        // Organize tasks by column with better error handling
+        // Organize tasks by column
         if (tasksData) {
-          tasksData.forEach((task, index) => {
-            try {
-              if (task.column_id && Object.prototype.hasOwnProperty.call(tasks, task.column_id)) {
-                // Log first task transformation for debugging
-                if (index === 0) {
-                  console.log('First task transformation:', {
-                    original: task,
-                    assignees: task.assignees,
-                    reporter: task.reporter
-                  });
-                }
-
-                tasks[task.column_id].push({
-                  id: task.id,
-                  name: task.name,
-                  description: task.description,
-                  priority: task.priority,
-                  status: columns.find(col => col.id === task.column_id)?.name || '',
-                  column_id: task.column_id,
-                  due: [task.due_start, task.due_end],
-                  assignee: task.assignees?.map(({ user }) => ({
-                    id: user.id,
-                    name: user.name || user.email,
-                    email: user.email,
-                    avatarUrl: user.avatar_url,
-                  })) || [],
-                  attachments: task.attachments?.map(att => ({
-                    id: att.id,
-                    file_name: att.file_name,
-                    file_url: att.file_url,
-                    file_type: att.file_type,
-                    file_size: att.file_size,
-                  })) || [],
-                  reporter: task.reporter ? {
-                    id: task.reporter.id,
-                    name: task.reporter.name || task.reporter.email,
-                    email: task.reporter.email,
-                    avatarUrl: task.reporter.avatar_url,
-                  } : null,
-                  subtasks: task.subtasks || [],
-                });
-              }
-            } catch (taskProcessingError) {
-              console.error('Error processing task:', taskProcessingError, task);
+          tasksData.forEach(task => {
+            if (task.column_id && Object.prototype.hasOwnProperty.call(tasks, task.column_id)) {
+              tasks[task.column_id].push({
+                id: task.id,
+                name: task.name,
+                description: task.description,
+                priority: task.priority,
+                status: columns.find(col => col.id === task.column_id)?.name || '',
+                column_id: task.column_id,
+                due: [task.due_start, task.due_end],
+                assignee: task.assignees?.map(({ user }) => ({
+                  id: user.id,
+                  name: user.name || user.email,
+                  email: user.email,
+                  avatarUrl: user.avatar_url,
+                })) || [],
+                attachments: task.attachments?.map(att => ({
+                  id: att.id,
+                  file_name: att.file_name,
+                  file_url: att.file_url,
+                  file_type: att.file_type,
+                  file_size: att.file_size,
+                })) || [],
+                reporter: task.reporter ? {
+                  id: task.reporter.id,
+                  name: task.reporter.name || task.reporter.email,
+                  email: task.reporter.email,
+                  avatarUrl: task.reporter.avatar_url,
+                } : null,
+                subtasks: task.subtasks || [],
+              });
             }
           });
         }
-
-        // Log final board state
-        console.log('Final board state:', {
-          columnsCount: columns.length,
-          tasksPerColumn: Object.entries(tasks).map(([columnId, columnTasks]) => ({
-            columnId,
-            taskCount: columnTasks.length
-          }))
-        });
 
         return {
           board: {
@@ -171,11 +146,11 @@ export function useGetBoard() {
         columns: data?.board.columns ?? [],
       },
       boardLoading: isLoading,
-      boardError,
+      boardError: error,
       boardValidating: isValidating,
       boardEmpty: !isLoading && !isValidating && !data?.board.columns.length,
     }),
-    [data?.board.columns, data?.board.tasks, boardError, isLoading, isValidating]
+    [data?.board.columns, data?.board.tasks, error, isLoading, isValidating]
   );
 
   return memoizedValue;

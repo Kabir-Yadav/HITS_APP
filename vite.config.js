@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
     build: {
       minify: 'esbuild', 
       sourcemap: true, 
-      chunkSizeWarningLimit: 1500, 
+      chunkSizeWarningLimit: 5000, 
     },
     define: {
       'process.env': env,
