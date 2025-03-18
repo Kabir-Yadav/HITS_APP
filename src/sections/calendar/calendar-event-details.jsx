@@ -127,39 +127,83 @@ export default function CalendarEventDetails({ event, open, onClose, onEdit, onU
 
           <Stack spacing={1.5}>
             <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+              Organizer
+            </Typography>
+            {event.extendedProps?.attendees?.find(attendee => attendee.responseStatus === 'accepted') ? (
+              <Chip
+                label={
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Typography variant="body2">
+                      {event.extendedProps.attendees.find(attendee => attendee.responseStatus === 'accepted').email}
+                    </Typography>
+                    <Box component="span" sx={{ color: 'text.secondary', ml: 0.5 }}>
+                      (Organizer)
+                    </Box>
+                  </Stack>
+                }
+                size="small"
+                icon={<Iconify icon="solar:user-id-bold" />}
+                color="primary"
+                sx={{ 
+                  maxWidth: '100%',
+                  '& .MuiChip-label': { 
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden'
+                  }
+                }}
+              />
+            ) : (
+              <Typography variant="body2">No organizer</Typography>
+            )}
+          </Stack>
+
+          <Stack spacing={1.5}>
+            <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
               Attendees
             </Typography>
-            {event.extendedProps?.attendees?.length > 0 ? (
+            {event.extendedProps?.attendees?.filter(attendee => attendee.responseStatus !== 'accepted').length > 0 ? (
               <Stack spacing={1}>
-                {event.extendedProps.attendees.map((attendee, index) => (
+                {event.extendedProps.attendees
+                  .filter(attendee => attendee.responseStatus !== 'accepted')
+                  .map((attendee, index) => (
                   <Chip
                     key={index}
                     label={
                       <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="body2">
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: attendee.optional ? '#fff' : 'inherit',
+                            textShadow: attendee.optional ? '0px 0px 1px rgba(0,0,0,0.5)' : 'none'
+                          }}
+                        >
                           {attendee.email}
+                          {attendee.optional && (
+                            <Box component="span" sx={{ color: 'rgba(255,255,255,0.8)', ml: 0.5 }}>
+                              (Optional)
+                            </Box>
+                          )}
                         </Typography>
-                        {attendee.optional && (
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            (Optional)
-                          </Typography>
-                        )}
                       </Stack>
                     }
                     size="small"
-                    icon={<Iconify icon="solar:user-rounded-bold" />}
+                    icon={<Iconify icon="solar:user-rounded-bold" sx={{ color: attendee.optional ? '#fff' : 'inherit' }} />}
                     onDelete={() => handleRemoveAttendee(attendee)}
                     color={attendee.responseStatus === 'accepted' ? 'success' : 'default'}
                     sx={{ 
                       maxWidth: '100%',
                       cursor: 'pointer',
                       ...(attendee.optional && {
-                        bgcolor: 'action.selected',
+                        bgcolor: 'primary.main',
+                        '& .MuiChip-deleteIcon': {
+                          color: '#fff',
+                        }
                       }),
                       '&:hover': {
-                        bgcolor: 'error.lighter',
+                        bgcolor: attendee.optional ? 'primary.dark' : 'error.lighter',
                         '& .MuiChip-deleteIcon': {
-                          color: 'error.main',
+                          color: attendee.optional ? '#fff' : 'error.main',
                         }
                       },
                       '& .MuiChip-label': { 
@@ -170,7 +214,7 @@ export default function CalendarEventDetails({ event, open, onClose, onEdit, onU
                       '& .MuiChip-deleteIcon': {
                         color: 'text.secondary',
                         '&:hover': {
-                          color: 'error.main',
+                          color: attendee.optional ? '#fff' : 'error.main',
                         }
                       }
                     }}
