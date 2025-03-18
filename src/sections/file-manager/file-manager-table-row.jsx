@@ -17,6 +17,9 @@ import TableRow, { tableRowClasses } from '@mui/material/TableRow';
 import TableCell, { tableCellClasses } from '@mui/material/TableCell';
 import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { fData } from 'src/utils/format-number';
 import { fDate, fTime } from 'src/utils/format-time';
 
@@ -33,13 +36,13 @@ import { FileManagerFileDetails } from './file-manager-file-details';
 
 // ----------------------------------------------------------------------
 
-export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDeleteRow }) {
+export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDeleteRow, isinFolder = false, onRemoveFilefromFolder }) {
   const theme = useTheme();
 
   const { copy } = useCopyToClipboard();
 
   const [inviteEmail, setInviteEmail] = useState('');
-
+  const router = useRouter()
   const shareDialog = useBoolean();
   const detailsDrawer = useBoolean();
   const confirmDialog = useBoolean();
@@ -68,6 +71,12 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
     copy(row.url);
   }, [copy, row.url]);
 
+  const handleFolderClick = useDoubleClick({
+    click: () => {
+      router.push(`${paths.dashboard.fileManager}?folderId=${row.id}`);
+    },
+    doubleClick: () => console.info('DOUBLE CLICK'),
+  });
   const defaultStyles = {
     borderTop: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.16)}`,
     borderBottom: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.16)}`,
@@ -112,6 +121,14 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
         </MenuItem>
 
         {row.accessType === 'owner' && (<Divider sx={{ borderStyle: 'dashed' }} />)}
+
+        {row.accessType === 'owner' && isinFolder && (<MenuItem
+          onClick={onRemoveFilefromFolder}
+          sx={{ color: 'error.main' }}
+        >
+          <Iconify icon="solar:close-circle-bold" />
+          Remove
+        </MenuItem>)}
 
         {row.accessType === 'owner' && (<MenuItem
           onClick={() => {
@@ -209,7 +226,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
           />)}
         </TableCell>
 
-        <TableCell onClick={handleClick}>
+        <TableCell onClick={row.type === 'folder' ? handleFolderClick : row.type === 'folder' ? handleFolderClick : handleClick}>
           <Box sx={{ gap: 2, display: 'flex', alignItems: 'center' }}>
             <FileThumbnail file={row.type} />
 
@@ -227,15 +244,15 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
           </Box>
         </TableCell>
 
-        <TableCell onClick={handleClick} sx={{ whiteSpace: 'nowrap' }}>
+        <TableCell onClick={row.type === 'folder' ? handleFolderClick : handleClick} sx={{ whiteSpace: 'nowrap' }}>
           {fData(row.size)}
         </TableCell>
 
-        <TableCell onClick={handleClick} sx={{ whiteSpace: 'nowrap' }}>
+        <TableCell onClick={row.type === 'folder' ? handleFolderClick : handleClick} sx={{ whiteSpace: 'nowrap' }}>
           {row.type}
         </TableCell>
 
-        <TableCell onClick={handleClick} sx={{ whiteSpace: 'nowrap' }}>
+        <TableCell onClick={row.type === 'folder' ? handleFolderClick : handleClick} sx={{ whiteSpace: 'nowrap' }}>
           <ListItemText
             primary={fDate(row.modifiedAt)}
             secondary={fTime(row.modifiedAt)}
@@ -248,7 +265,7 @@ export function FileManagerTableRow({ userId, row, selected, onSelectRow, onDele
           />
         </TableCell>
 
-        <TableCell align="right" onClick={handleClick}>
+        <TableCell align="right" onClick={row.type === 'folder' ? handleFolderClick : handleClick}>
           <AvatarGroup
             max={4}
             sx={{
