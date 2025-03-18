@@ -52,6 +52,7 @@ export const EventSchema = zod.object({
 export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
   const theme = useTheme();
   const [isLoading, setIsLoading] = useState(false);
+  const [organizerEmail, setOrganizerEmail] = useState('');
   
   const defaultValues = {
     title: '',
@@ -109,6 +110,21 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
     fetchEventDetails();
   }, [currentEvent?.id, reset]);
 
+  // Fetch organizer email when component mounts
+  useEffect(() => {
+    const fetchOrganizerEmail = async () => {
+      try {
+        const calendarList = await window.gapi.client.calendar.calendarList.get({
+          calendarId: 'primary'
+        });
+        setOrganizerEmail(calendarList.result.id);
+      } catch (error) {
+        console.error('Failed to fetch organizer email:', error);
+      }
+    };
+    fetchOrganizerEmail();
+  }, []);
+
   const values = watch();
   const dateError = fIsAfter(values.start, values.end);
 
@@ -118,12 +134,6 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
       
       try {
         const { title, description, start, end, attendees } = data;
-        
-        // Get current user's email from Google Calendar
-        const calendarList = await window.gapi.client.calendar.calendarList.get({
-          calendarId: 'primary'
-        });
-        const organizerEmail = calendarList.result.id;
         
         // Create event directly in Google Calendar
         const event = {
@@ -175,7 +185,7 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
         toast.error('Failed to save event. Please try again.');
       }
     },
-    [currentEvent?.id, onClose, onEventChange]
+    [currentEvent?.id, onClose, onEventChange, organizerEmail]
   );
 
   const onDelete = useCallback(async () => {
@@ -252,6 +262,30 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
                 rows={3}
                 helperText={errors.description?.message}
               />
+
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2">Organizer</Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: 'background.neutral',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Iconify icon="solar:user-id-bold" width={24} />
+                  <Typography variant="body2" sx={{ flex: 1 }}>
+                    {organizerEmail}
+                  </Typography>
+                  <Box component="span" sx={{ color: 'text.secondary' }}>
+                    (You)
+                  </Box>
+                </Box>
+              </Stack>
 
               <Stack spacing={1.5}>
                 <Typography variant="subtitle2">Attendees</Typography>
