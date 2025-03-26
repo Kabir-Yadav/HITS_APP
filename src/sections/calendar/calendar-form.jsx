@@ -27,6 +27,8 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { FormProvider, Field } from 'src/components/hook-form';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 // ----------------------------------------------------------------------
 
 export const EventSchema = zod.object({
@@ -45,12 +47,14 @@ export const EventSchema = zod.object({
     message: "Invalid end date"
   }),
   attendees: zod.string().optional().default(''),
+  generateMeet: zod.boolean().optional().default(false),
 });
 
 // ----------------------------------------------------------------------
 
 export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
   const theme = useTheme();
+  const { user } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
   const [organizerEmail, setOrganizerEmail] = useState('');
   
@@ -60,6 +64,7 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
     start: new Date(),
     end: new Date(),
     attendees: '',
+    generateMeet: false,
   };
   
   const methods = useForm({
@@ -93,11 +98,26 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
       
       setIsLoading(true);
       try {
-        const eventDetails = await getEventDetails(currentEvent.id);
+        // Get full event details including conferencing data
+        const response = await window.gapi.client.calendar.events.get({
+          calendarId: 'primary',
+          eventId: currentEvent.id
+        });
+        
+        const eventDetails = response.result;
+        
         reset({
-          ...eventDetails,
-          start: new Date(eventDetails.start),
-          end: new Date(eventDetails.end),
+          title: eventDetails.summary,
+          description: eventDetails.description || '',
+          start: new Date(eventDetails.start.dateTime || eventDetails.start.date),
+          end: new Date(eventDetails.end.dateTime || eventDetails.end.date),
+          attendees: eventDetails.attendees 
+            ? eventDetails.attendees
+                .filter(a => a.responseStatus !== 'accepted')
+                .map(a => (a.optional ? `optional:${a.email}` : a.email))
+                .join(', ')
+            : '',
+          generateMeet: !!eventDetails.conferenceData?.conferenceId,
         });
       } catch (error) {
         console.error('Failed to fetch event details:', error);
@@ -112,18 +132,10 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
 
   // Fetch organizer email when component mounts
   useEffect(() => {
-    const fetchOrganizerEmail = async () => {
-      try {
-        const calendarList = await window.gapi.client.calendar.calendarList.get({
-          calendarId: 'primary'
-        });
-        setOrganizerEmail(calendarList.result.id);
-      } catch (error) {
-        console.error('Failed to fetch organizer email:', error);
-      }
-    };
-    fetchOrganizerEmail();
-  }, []);
+    if (user?.email) {
+      setOrganizerEmail(user.email);
+    }
+  }, [user]);
 
   const values = watch();
   const dateError = fIsAfter(values.start, values.end);
@@ -133,7 +145,7 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
       e.preventDefault();
       
       try {
-        const { title, description, start, end, attendees } = data;
+        const { title, description, start, end, attendees, generateMeet } = data;
         
         // Create event directly in Google Calendar
         const event = {
@@ -160,21 +172,37 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
               };
             }) : []),
           ],
+          // Add conferencing data if generateMeet is true
+          conferenceData: generateMeet ? {
+            createRequest: {
+              requestId: `${Date.now()}-${Math.random().toString(36).substring(7)}`,
+              conferenceSolutionKey: { type: 'hangoutsMeet' },
+            },
+          } : undefined,
         };
 
+        let response;
         if (currentEvent?.id) {
-          await window.gapi.client.calendar.events.update({
+          response = await window.gapi.client.calendar.events.update({
             calendarId: 'primary',
             eventId: currentEvent.id,
             resource: event,
             sendUpdates: 'all',
+            conferenceDataVersion: generateMeet ? 1 : 0,
           });
         } else {
-          await window.gapi.client.calendar.events.insert({
+          response = await window.gapi.client.calendar.events.insert({
             calendarId: 'primary',
             resource: event,
             sendUpdates: 'all',
+            conferenceDataVersion: generateMeet ? 1 : 0,
           });
+        }
+
+        // Check if the response contains the conference data
+        if (generateMeet && !response.result.conferenceData?.conferenceId) {
+          toast.error('Failed to generate Google Meet link. Please try again.');
+          return;
         }
 
         await onEventChange?.();
@@ -261,6 +289,12 @@ export function CalendarForm({ currentEvent, onClose, open, onEventChange }) {
                 multiline 
                 rows={3}
                 helperText={errors.description?.message}
+              />
+
+              <Field.Switch
+                name="generateMeet"
+                label="Generate Google Meet Link"
+                helperText="Add a video conferencing link to this event"
               />
 
               <Stack spacing={1.5}>
