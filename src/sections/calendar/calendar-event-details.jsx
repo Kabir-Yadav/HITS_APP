@@ -109,6 +109,27 @@ export default function CalendarEventDetails({ event, open, onClose, onEdit, onU
 
           <Stack spacing={1.5}>
             <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+              Google Meet
+            </Typography>
+            {event.hangoutLink ? (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Iconify icon="mdi:google-meet" />}
+                href={event.hangoutLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ justifyContent: 'flex-start' }}
+              >
+                Join Meeting
+              </Button>
+            ) : (
+              <Typography variant="body2">No meeting link</Typography>
+            )}
+          </Stack>
+
+          <Stack spacing={1.5}>
+            <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
               Start date
             </Typography>
             <Typography variant="body2">
