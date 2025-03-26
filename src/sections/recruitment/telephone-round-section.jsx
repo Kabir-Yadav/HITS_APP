@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Checkbox from '@mui/material/Checkbox';
+import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -30,6 +31,8 @@ import { useInterviews } from 'src/hooks/use-interviews';
 import { fDate } from 'src/utils/format-time';
 import { createGoogleCalendarEventUrl, listenForCalendarEventCreation } from 'src/utils/calendar';
 
+import { supabase } from 'src/lib/supabase';
+
 import { Iconify } from 'src/components/iconify';
 import { TableNoData } from 'src/components/table';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -50,12 +53,32 @@ export function TelephoneRoundSection({ filters }) {
   const [duration, setDuration] = useState('');
   const [calendarEventCreated, setCalendarEventCreated] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+  const [hrUsers, setHrUsers] = useState([]);
 
   const statusDialog = useBoolean();
   const loading = useBoolean();
   const { user } = useAuthContext();
 
   const { interviews, applications, fetchInterviews, scheduleInterview, updateInterviewStatus } = useInterviews();
+
+  // Fetch HR users
+  useEffect(() => {
+    const fetchHrUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_info')
+          .select('id, full_name, email')
+          .eq('role', 'HR');
+
+        if (error) throw error;
+        setHrUsers(data || []);
+      } catch (error) {
+        console.error('Error fetching HR users:', error);
+      }
+    };
+
+    fetchHrUsers();
+  }, []);
 
   useEffect(() => {
     fetchInterviews('telephone', filters);
@@ -131,6 +154,9 @@ export function TelephoneRoundSection({ filters }) {
                 setInterviewer('');
                 setAssignedBy('');
                 setConfirmDialog({ open: false, title: '', message: '', onConfirm: null });
+
+                // Fetch updated interviews
+                await fetchInterviews('telephone', filters);
               } catch (error) {
                 setConfirmDialog({
                   open: true,
@@ -384,21 +410,51 @@ export function TelephoneRoundSection({ filters }) {
             }}
           />
 
-          <TextField
-            fullWidth
-            label="Interviewer"
-            value={interviewer}
-            onChange={(e) => setInterviewer(e.target.value)}
-            error={!interviewer}
-          />
+          <Stack spacing={2}>
+            <TextField
+              select
+              fullWidth
+              label="Interviewer"
+              value={interviewer}
+              onChange={(e) => setInterviewer(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  PaperProps: {
+                    sx: { maxHeight: 220 },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">Select Interviewer</MenuItem>
+              {hrUsers.map((hrUser) => (
+                <MenuItem key={hrUser.id} value={hrUser.full_name}>
+                  {hrUser.full_name}
+                </MenuItem>
+              ))}
+            </TextField>
 
-          <TextField
-            fullWidth
-            label="Assigned By"
-            value={assignedBy}
-            onChange={(e) => setAssignedBy(e.target.value)}
-            error={!assignedBy}
-          />
+            <TextField
+              select
+              fullWidth
+              label="Assigned By"
+              value={assignedBy}
+              onChange={(e) => setAssignedBy(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  PaperProps: {
+                    sx: { maxHeight: 220 },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">Select Assigner</MenuItem>
+              {hrUsers.map((hrUser) => (
+                <MenuItem key={hrUser.id} value={hrUser.full_name}>
+                  {hrUser.full_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
 
           <Typography 
             variant="caption" 
