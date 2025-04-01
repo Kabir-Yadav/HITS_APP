@@ -4,8 +4,8 @@
 
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
-const CLIENT_ID = '463956183839-i7j5nt5rkpbm4npukg21vfnhav5vvgeh.apps.googleusercontent.com';
-const API_KEY = 'AIzaSyDh4-SOuKTopXe45oDM9nQA7R4cNJ1So0c';
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const API_KEY = process.env.GOOGLE_CALENDAR_API_KEY;
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
 let tokenClient;

@@ -79,6 +79,12 @@ export const navData = [
         icon: ICONS.folder,
       },
       {
+        title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
+      },
+      {
+        title: 'Mail', path: paths.dashboard.mail, icon: ICONS.mail
+      },
+      {
         title: 'Recruitment',
         path: paths.dashboard.recruitment.root,
         icon: ICONS.external,
@@ -88,9 +94,6 @@ export const navData = [
           { title: 'Interview Scheduling', path: paths.dashboard.recruitment.root },
         ],
         roles: ['ADMIN', 'HR']
-      },
-      {
-        title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
       },
       {
         title: 'User Management',
