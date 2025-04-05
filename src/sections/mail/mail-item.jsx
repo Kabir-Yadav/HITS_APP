@@ -9,6 +9,10 @@ import { fToNow } from 'src/utils/format-time';
 // ----------------------------------------------------------------------
 
 export function MailItem({ mail, selected, sx, ...other }) {
+  // Extract name from email address
+  const fromName = mail.from ? mail.from.split('<')[0].trim() || mail.from.split('@')[0] : 'Unknown';
+  const fromEmail = mail.from ? (mail.from.match(/<(.+)>/) || [])[1] || mail.from : '';
+  
   return (
     <Box component="li" sx={{ display: 'flex' }}>
       <ListItemButton
@@ -24,19 +28,19 @@ export function MailItem({ mail, selected, sx, ...other }) {
         ]}
         {...other}
       >
-        <Avatar alt={mail.from.name} src={mail.from.avatarUrl ?? ''}>
-          {mail.from.name.charAt(0).toUpperCase()}
+        <Avatar alt={fromName}>
+          {fromName.charAt(0).toUpperCase()}
         </Avatar>
 
         <ListItemText
-          primary={mail.from.name}
-          secondary={mail.message}
+          primary={fromName}
+          secondary={mail.snippet || mail.body}
           slotProps={{
             primary: { noWrap: true },
             secondary: {
               noWrap: true,
               sx: {
-                ...(mail.isUnread && {
+                ...(!mail.isRead && {
                   color: 'text.primary',
                   fontWeight: 'fontWeightSemiBold',
                 }),
@@ -59,10 +63,10 @@ export function MailItem({ mail, selected, sx, ...other }) {
             component="span"
             sx={{ mb: 1.5, fontSize: 12, color: 'text.disabled' }}
           >
-            {fToNow(mail.createdAt)}
+            {fToNow(new Date(mail.date))}
           </Typography>
 
-          {!!mail.isUnread && (
+          {!mail.isRead && (
             <Box
               component="span"
               sx={{

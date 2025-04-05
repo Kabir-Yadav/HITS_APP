@@ -11,8 +11,8 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetMail, useGetMails, useGetLabels } from 'src/actions/mail';
 
+import MailLayout from '../layout';
 import { MailNav } from '../mail-nav';
-import { MailLayout } from '../layout';
 import { MailList } from '../mail-list';
 import { MailHeader } from '../mail-header';
 import { MailCompose } from '../mail-compose';

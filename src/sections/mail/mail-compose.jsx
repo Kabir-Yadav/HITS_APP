@@ -1,18 +1,24 @@
 import { varAlpha } from 'minimal-shared/utils';
 import { useBoolean } from 'minimal-shared/hooks';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
+import { LoadingButton } from '@mui/lab';
 import Button from '@mui/material/Button';
 import Portal from '@mui/material/Portal';
+import { alpha } from '@mui/material/styles';
+import Collapse from '@mui/material/Collapse';
 import Backdrop from '@mui/material/Backdrop';
 import InputBase from '@mui/material/InputBase';
 import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
+
+import { sendEmail } from 'src/utils/gmail';
+import { fData } from 'src/utils/format-number';
 
 import { Editor } from 'src/components/editor';
 import { Iconify } from 'src/components/iconify';
@@ -24,14 +30,72 @@ const POSITION = 20;
 export function MailCompose({ onCloseCompose }) {
   const theme = useTheme();
   const smUp = useMediaQuery(theme.breakpoints.up('sm'));
+  const fileInputRef = useRef(null);
 
   const fullScreen = useBoolean();
+  const [sending, setSending] = useState(false);
+  const showCc = useBoolean(false);
+  const showBcc = useBoolean(false);
 
+  const [to, setTo] = useState('');
+  const [cc, setCc] = useState('');
+  const [bcc, setBcc] = useState('');
+  const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [attachments, setAttachments] = useState([]);
 
   const handleChangeMessage = useCallback((value) => {
     setMessage(value);
   }, []);
+
+  const handleChangeTo = useCallback((event) => {
+    setTo(event.target.value);
+  }, []);
+
+  const handleChangeCc = useCallback((event) => {
+    setCc(event.target.value);
+  }, []);
+
+  const handleChangeBcc = useCallback((event) => {
+    setBcc(event.target.value);
+  }, []);
+
+  const handleChangeSubject = useCallback((event) => {
+    setSubject(event.target.value);
+  }, []);
+
+  const handleAttachFile = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const handleFileChange = useCallback((event) => {
+    const files = Array.from(event.target.files || []);
+    setAttachments(prev => [...prev, ...files]);
+  }, []);
+
+  const handleRemoveAttachment = useCallback((index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleSend = async () => {
+    if (!to || !subject || !message) {
+      // TODO: Show error message
+      return;
+    }
+
+    try {
+      setSending(true);
+      await sendEmail(to, subject, message, { cc, bcc }, attachments);
+      onCloseCompose();
+    } catch (error) {
+      console.error('Error sending email:', error);
+      // TODO: Show error message
+    } finally {
+      setSending(false);
+    }
+  };
 
   useEffect(() => {
     if (fullScreen.value) {
@@ -93,10 +157,22 @@ export function MailCompose({ onCloseCompose }) {
         <InputBase
           id="mail-compose-to"
           placeholder="To"
+          value={to}
+          onChange={handleChangeTo}
           endAdornment={
             <Box sx={{ gap: 0.5, display: 'flex', typography: 'subtitle2' }}>
-              <Box sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>Cc</Box>
-              <Box sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}>Bcc</Box>
+              <Box 
+                sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                onClick={showCc.onToggle}
+              >
+                Cc
+              </Box>
+              <Box 
+                sx={{ cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                onClick={showBcc.onToggle}
+              >
+                Bcc
+              </Box>
             </Box>
           }
           sx={[
@@ -108,9 +184,41 @@ export function MailCompose({ onCloseCompose }) {
           ]}
         />
 
+        <Collapse in={showCc.value}>
+          <InputBase
+            placeholder="Cc"
+            value={cc}
+            onChange={handleChangeCc}
+            sx={[
+              {
+                px: 2,
+                height: 48,
+                borderBottom: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
+              },
+            ]}
+          />
+        </Collapse>
+
+        <Collapse in={showBcc.value}>
+          <InputBase
+            placeholder="Bcc"
+            value={bcc}
+            onChange={handleChangeBcc}
+            sx={[
+              {
+                px: 2,
+                height: 48,
+                borderBottom: `solid 1px ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
+              },
+            ]}
+          />
+        </Collapse>
+
         <InputBase
           id="mail-compose-subject"
           placeholder="Subject"
+          value={subject}
+          onChange={handleChangeSubject}
           sx={[
             {
               px: 2,
@@ -129,24 +237,70 @@ export function MailCompose({ onCloseCompose }) {
             sx={{ maxHeight: 480, ...(fullScreen.value && { maxHeight: 1, flex: '1 1 auto' }) }}
           />
 
+          {attachments.length > 0 && (
+            <Box 
+              sx={{ 
+                gap: 1, 
+                display: 'flex', 
+                flexWrap: 'wrap',
+                p: 1,
+                borderRadius: 1,
+                bgcolor: 'background.neutral',
+              }}
+            >
+              {attachments.map((file, index) => (
+                <Box
+                  key={index}
+                  sx={{
+                    p: 0.75,
+                    borderRadius: 0.75,
+                    display: 'flex',
+                    alignItems: 'center',
+                    bgcolor: (themeParam) => alpha(themeParam.palette.grey[500], 0.08),
+                  }}
+                >
+                  <Iconify icon="eva:file-fill" width={20} sx={{ mr: 0.5 }} />
+                  <Typography variant="body2" noWrap>
+                    {file.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mx: 0.75 }}>
+                    {fData(file.size)}
+                  </Typography>
+                  <IconButton 
+                    size="small" 
+                    onClick={() => handleRemoveAttachment(index)}
+                    sx={{ p: 0.25 }}
+                  >
+                    <Iconify icon="mingcute:close-line" width={16} />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          )}
+
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-              <IconButton>
-                <Iconify icon="solar:gallery-add-bold" />
-              </IconButton>
-
-              <IconButton>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+                multiple
+              />
+              <IconButton onClick={handleAttachFile}>
                 <Iconify icon="eva:attach-2-fill" />
               </IconButton>
             </Box>
 
-            <Button
+            <LoadingButton
               variant="contained"
               color="primary"
               endIcon={<Iconify icon="iconamoon:send-fill" />}
+              loading={sending}
+              onClick={handleSend}
             >
               Send
-            </Button>
+            </LoadingButton>
           </Box>
         </Stack>
       </Paper>

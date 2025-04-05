@@ -2,7 +2,7 @@ import { styled } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 
-export function MailLayout({ slots, slotProps, sx, ...other }) {
+export default function MailLayout({ slots, slotProps, sx, ...other }) {
   return (
     <LayoutRoot sx={sx} {...other}>
       {slots.header}
