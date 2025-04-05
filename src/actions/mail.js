@@ -2,7 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 import { keyBy } from 'es-toolkit';
 
-import { fetcher, endpoints } from 'src/lib/axios';
+import { ensureGmailAuth, getGmailLabels, getGmailMessages, getGmailMessage } from 'src/utils/gmail';
 
 // ----------------------------------------------------------------------
 
@@ -15,9 +15,15 @@ const swrOptions = {
 // ----------------------------------------------------------------------
 
 export function useGetLabels() {
-  const url = endpoints.mail.labels;
-
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(
+    'gmail-labels',
+    async () => {
+      await ensureGmailAuth();
+      const labels = await getGmailLabels();
+      return { labels };
+    },
+    swrOptions
+  );
 
   const memoizedValue = useMemo(
     () => ({
@@ -36,12 +42,18 @@ export function useGetLabels() {
 // ----------------------------------------------------------------------
 
 export function useGetMails(labelId) {
-  const url = labelId ? [endpoints.mail.list, { params: { labelId } }] : '';
-
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(
+    labelId ? ['gmail-messages', labelId] : null,
+    async () => {
+      await ensureGmailAuth();
+      const messages = await getGmailMessages(labelId);
+      return { mails: messages };
+    },
+    swrOptions
+  );
 
   const memoizedValue = useMemo(() => {
-    const byId = data?.mails.length ? keyBy(data?.mails, (option) => option.id) : {};
+    const byId = data?.mails?.length ? keyBy(data?.mails, (option) => option.id) : {};
     const allIds = Object.keys(byId);
 
     return {
@@ -59,9 +71,15 @@ export function useGetMails(labelId) {
 // ----------------------------------------------------------------------
 
 export function useGetMail(mailId) {
-  const url = mailId ? [endpoints.mail.details, { params: { mailId } }] : '';
-
-  const { data, isLoading, error, isValidating } = useSWR(url, fetcher, swrOptions);
+  const { data, isLoading, error, isValidating } = useSWR(
+    mailId ? ['gmail-message', mailId] : null,
+    async () => {
+      await ensureGmailAuth();
+      const message = await getGmailMessage(mailId);
+      return { mail: message };
+    },
+    swrOptions
+  );
 
   const memoizedValue = useMemo(
     () => ({
