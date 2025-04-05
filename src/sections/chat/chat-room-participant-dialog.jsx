@@ -33,15 +33,6 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }) {
 
           <Typography variant="subtitle1">{participant.name}</Typography>
 
-          <Box sx={{ display: 'flex', typography: 'caption', color: 'text.disabled' }}>
-            <Iconify
-              icon="mingcute:location-fill"
-              width={16}
-              sx={{ flexShrink: 0, mr: 0.5, mt: '2px' }}
-            />
-            {participant.address}
-          </Box>
-
           <Box sx={{ gap: 1, pt: 1.5, display: 'flex' }}>
             <IconButton
               size="small"
