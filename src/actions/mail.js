@@ -126,3 +126,27 @@ export const sendMail = async (to, subject, body) => {
     throw error;
   }
 };
+
+// Helper function to count unread messages
+const countUnreadMessages = (messages = []) => 
+  messages.filter(message => !message.isRead).length;
+
+export function useGetUnreadCount() {
+  const { data, isLoading } = useSWR(
+    'gmail-unread-count',
+    async () => {
+      const messages = await fetchGmailMessages(50, 'INBOX');
+      return countUnreadMessages(messages);
+    },
+    {
+      ...swrOptions,
+      refreshInterval: 30000, // Refresh every 30 seconds
+      revalidateOnFocus: true, // Revalidate when window gets focus
+    }
+  );
+
+  return {
+    unreadCount: data || 0,
+    loading: isLoading,
+  };
+}

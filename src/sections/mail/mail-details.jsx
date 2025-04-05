@@ -1,3 +1,4 @@
+import { mutate } from 'swr';
 import { useState, useCallback } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
 
@@ -43,6 +44,30 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
 
   // State for tracking downloading attachments
   const [downloadingAttachments, setDownloadingAttachments] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!mail?.id) return;
+    
+    try {
+      setIsRefreshing(true);
+      
+      // Get the current label from the mail's labelIds
+      const currentLabel = mail.labelIds?.find(id => 
+        ['INBOX', 'SENT', 'DRAFT', 'TRASH', 'SPAM', 'IMPORTANT', 'STARRED'].includes(id)
+      ) || 'INBOX';
+      
+      // Refresh the specific mail and its label list
+      await Promise.all([
+        // Refresh the current mail details
+        mutate(`gmail-message-${mail.id}`),
+        // Refresh the mail list for the current label
+        mutate(['gmail-messages', currentLabel.toLowerCase()]),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [mail?.id, mail?.labelIds]);
 
   const handleDownloadAttachment = useCallback(async (attachment) => {
     try {
@@ -139,6 +164,12 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Tooltip title="Refresh">
+          <IconButton onClick={handleRefresh} disabled={isRefreshing}>
+            <Iconify icon={isRefreshing ? "eos-icons:loading" : "mdi:refresh"} />
+          </IconButton>
+        </Tooltip>
+
         <Checkbox
           color="warning"
           icon={<Iconify icon="eva:star-outline" />}
