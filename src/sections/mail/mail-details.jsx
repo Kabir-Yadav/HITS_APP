@@ -60,9 +60,32 @@ const parseCalendarEvent = (body) => {
   const phoneMatch = body.match(/Join by phone[^\n]*\n([^P]+)PIN: ([0-9]+)/);
   const organizerMatch = body.match(/Organizer\s*([^\n]+)/);
 
+  // Parse the date from the whenMatch
+  let eventDate = null;
+  if (whenMatch) {
+    const dateStr = whenMatch[1].trim();
+    // Try to parse the date string
+    const parsedDate = new Date(dateStr);
+    if (!isNaN(parsedDate.getTime())) {
+      eventDate = parsedDate;
+    } else {
+      // If direct parsing fails, try to extract date components
+      const dateComponents = dateStr.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i);
+      if (dateComponents) {
+        const [_, day, month, year] = dateComponents;
+        const monthMap = {
+          'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+          'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+        };
+        eventDate = new Date(year, monthMap[month.toLowerCase()], parseInt(day, 10));
+      }
+    }
+  }
+
   return {
     meetLink: meetLinkMatch ? `https://${meetLinkMatch[0]}` : null,
     when: whenMatch ? whenMatch[1].trim() : null,
+    eventDate: eventDate,
     phone: phoneMatch ? {
       number: phoneMatch[1].trim(),
       pin: phoneMatch[2].trim()
@@ -518,12 +541,16 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
               minWidth: 80
             }}
           >
-            <Typography variant="h6" sx={{ lineHeight: 1 }}>
-              {new Date(eventDetails.when).getDate()}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              {new Date(eventDetails.when).toLocaleString('default', { month: 'short' })}
-            </Typography>
+            {eventDetails.eventDate && (
+              <>
+                <Typography variant="h6" sx={{ lineHeight: 1 }}>
+                  {eventDetails.eventDate.getDate()}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  {eventDetails.eventDate.toLocaleString('default', { month: 'short' })}
+                </Typography>
+              </>
+            )}
           </Box>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1">
