@@ -1,6 +1,6 @@
 import { m } from 'framer-motion';
-import { useState, useCallback } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
 
+import { useChatNotifications } from 'src/actions/chat';
 import { useKanbanNotifications } from 'src/actions/kanban';
 
 import { Label } from 'src/components/label';
@@ -25,7 +26,8 @@ import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 import { useAuthContext } from 'src/auth/hooks';
 
-import { NotificationItem } from './notification-item';
+import { NotificationItem,ChatNotificationItem  } from './notification-item';
+
 
 // ----------------------------------------------------------------------
 
@@ -44,6 +46,7 @@ const DROPDOWN_OPTIONS = [
 export function NotificationsDrawer({ sx, ...other }) {
   const { user } = useAuthContext();
   const { notifications, deleteNotification } = useKanbanNotifications(user?.id);
+  const { notifications: chatNotifications, deleteNotification: deleteChatNotification } = useChatNotifications(user?.id);
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedOption, setSelectedOption] = useState('kanban');
@@ -66,18 +69,41 @@ export function NotificationsDrawer({ sx, ...other }) {
     handleDropdownClose();
   };
 
-  const totalUnRead = notifications.length;
+  // Calculate the total unread notifications across all categories
+  const totalUnreadNotifications = notifications.length + chatNotifications.length;
 
+  // [NEW for combined logic] Decide which notifications array to show
+  const selectedNotifications =
+    selectedOption === 'chat'
+      ? chatNotifications
+      : selectedOption === 'file-manager'
+      ? [] // For now, empty
+      : notifications; // default is Kanban
+  console.log(chatNotifications);
+  // [NEW for combined logic] Decide which delete function to use
+  const selectedDeleteNotification =
+    selectedOption === 'chat'
+      ? deleteChatNotification
+      : selectedOption === 'file-manager'
+      ? () => {} // no-op for now
+      : deleteNotification;
+
+  // [MODIFIED for combined logic] totalUnRead uses the selected array
+  const totalUnRead = selectedNotifications.length;
+
+  // [MODIFIED for combined logic] Mark all as read => delete all in selected array
   const handleMarkAllAsRead = async () => {
     try {
-      // Delete all notifications for the current user
       await Promise.all(
-        notifications.map(notification => deleteNotification(notification.id))
+        selectedNotifications.map((notif) =>
+          selectedDeleteNotification(notif.id)
+        )
       );
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
   };
+
 
   const renderHead = () => (
     <Box
@@ -212,23 +238,53 @@ export function NotificationsDrawer({ sx, ...other }) {
   const renderList = () => (
     <Scrollbar>
       <Box component="ul" sx={{ p: 0, m: 0 }}>
-        {notifications.map((notification) => (
-          <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
-            <NotificationItem
-              notification={notification}
-              onDelete={deleteNotification}
-            />
-          </Box>
-        ))}
-
-        {notifications.length === 0 && (
+        {selectedOption === 'kanban' && (
+          <>
+            {notifications.map((notification) => (
+              <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
+                <NotificationItem
+                  notification={notification}
+                  onDelete={deleteNotification}
+                />
+              </Box>
+            ))}
+  
+            {notifications.length === 0 && (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="subtitle2">No notifications</Typography>
+              </Box>
+            )}
+          </>
+        )}
+  
+        {selectedOption === 'chat' && (
+          <>
+            {chatNotifications.map((notification) => (
+              <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
+                <ChatNotificationItem
+                  notification={notification}
+                  onDelete={deleteChatNotification}
+                />
+              </Box>
+            ))}
+  
+            {chatNotifications.length === 0 && (
+              <Box sx={{ p: 3, textAlign: 'center' }}>
+                <Typography variant="subtitle2">No chat notifications</Typography>
+              </Box>
+            )}
+          </>
+        )}
+  
+        {selectedOption === 'file-manager' && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="subtitle2">No notifications</Typography>
+            <Typography variant="subtitle2">No file manager notifications</Typography>
           </Box>
         )}
       </Box>
     </Scrollbar>
   );
+  
 
   return (
     <>
@@ -242,7 +298,7 @@ export function NotificationsDrawer({ sx, ...other }) {
         sx={sx}
         {...other}
       >
-        <Badge badgeContent={totalUnRead} color="error">
+        <Badge badgeContent={totalUnreadNotifications} color="error">
           <SvgIcon>
             <path
               fill="currentColor"
