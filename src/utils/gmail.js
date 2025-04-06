@@ -175,6 +175,35 @@ const processAttachments = async (messageId, payload) => {
   return attachments;
 };
 
+// Helper function to find the best content part from a message
+const findMessageContent = (part) => {
+  // For calendar invites, prefer HTML content
+  if (part.mimeType === 'text/html' && part.body?.data) {
+    return {
+      content: decodeBase64Url(part.body.data),
+      isHtml: true
+    };
+  }
+  
+  // For plain text content
+  if (part.mimeType === 'text/plain' && part.body?.data) {
+    return {
+      content: decodeBase64Url(part.body.data),
+      isHtml: false
+    };
+  }
+  
+  // Recursively check parts
+  if (part.parts) {
+    for (const subPart of part.parts) {
+      const content = findMessageContent(subPart);
+      if (content) return content;
+    }
+  }
+  
+  return null;
+};
+
 // Helper function to process a Gmail message into our format
 const processGmailMessage = async (messageId) => {
   const details = await gapi.client.gmail.users.messages.get({
@@ -190,31 +219,37 @@ const processGmailMessage = async (messageId) => {
   const date = headers.find(h => h.name === 'Date')?.value || '';
   
   let body = '';
+  let isHtmlContent = false;
   const payload = details.result.payload;
 
-  // Function to find text content in message parts
-  const findTextContent = (part) => {
-    if (part.mimeType === 'text/plain' && part.body?.data) {
-      return decodeBase64Url(part.body.data);
-    }
-    if (part.parts) {
-      for (const subPart of part.parts) {
-        const content = findTextContent(subPart);
-        if (content) return content;
-      }
-    }
-    return null;
-  };
-
-  // Try to find text content in the message
+  // Try to find content in the message
   if (payload.parts) {
-    body = findTextContent(payload) || '';
+    const content = findMessageContent(payload);
+    if (content) {
+      body = content.content;
+      isHtmlContent = content.isHtml;
+    }
   } else if (payload.body?.data) {
     body = decodeBase64Url(payload.body.data);
+    isHtmlContent = payload.mimeType === 'text/html';
   }
 
   // Process attachments
   const attachments = await processAttachments(messageId, payload);
+
+  // Check if this is a calendar invite
+  const isCalendarInvite = subject.startsWith('Invitation:') || 
+                          subject.startsWith('Updated invitation:') ||
+                          subject.startsWith('Accepted:') ||
+                          subject.startsWith('Declined:') ||
+                          subject.startsWith('Tentative:');
+
+  // For calendar invites, always preserve HTML content
+  if (isCalendarInvite && !isHtmlContent) {
+    // If we only have plain text for a calendar invite, wrap it in pre tags
+    body = `<pre>${body}</pre>`;
+    isHtmlContent = true;
+  }
 
   return {
     id: messageId,
@@ -224,6 +259,7 @@ const processGmailMessage = async (messageId) => {
     to,
     date,
     body,
+    isHtmlContent,
     snippet: details.result.snippet,
     isRead: !details.result.labelIds.includes('UNREAD'),
     labelIds: details.result.labelIds || [],
@@ -493,4 +529,77 @@ export const toggleImportant = async (messageId, isImportant) => {
     console.error('Error toggling important:', error);
     throw error;
   }
+};
+
+// Function to send calendar response
+export const sendCalendarResponse = async (messageId, response) => {
+  try {
+    await ensureGmailAuth();
+    
+    // Get the original message to get event details
+    const message = await fetchGmailMessage(messageId);
+    if (!message) throw new Error('Message not found');
+
+    // Parse the event details
+    const eventDetails = parseCalendarEvent(message.body);
+    if (!eventDetails) throw new Error('Event details not found');
+
+    // Create response email
+    const responseText = {
+      'yes': 'Yes, I will attend',
+      'no': 'No, I cannot attend',
+      'maybe': 'I might attend'
+    }[response];
+
+    const subject = `${responseText}: ${message.subject.replace(/^Invitation: /, '')}`;
+    
+    // Send the response
+    await sendEmail(
+      message.from,  // Send to the organizer
+      subject,
+      `I am responding ${responseText.toLowerCase()} to the event:\n\n${eventDetails.when}`,
+      {},  // No CC/BCC
+      [],   // No attachments
+      message.threadId  // Keep in same thread
+    );
+
+    // Update the message with appropriate label
+    const labelMap = {
+      'yes': 'ACCEPTED',
+      'no': 'DECLINED',
+      'maybe': 'TENTATIVE'
+    };
+
+    await modifyMessageLabels(
+      messageId,
+      [labelMap[response]],  // Add new response label
+      ['ACCEPTED', 'DECLINED', 'TENTATIVE'].filter(l => l !== labelMap[response])  // Remove other response labels
+    );
+
+    return true;
+  } catch (error) {
+    console.error('Error sending calendar response:', error);
+    throw error;
+  }
+};
+
+// Helper function to parse calendar event details
+const parseCalendarEvent = (body) => {
+  if (!body) return null;
+
+  // Extract event details using regex
+  const meetLinkMatch = body.match(/meet\.google\.com\/[a-z-]+/);
+  const whenMatch = body.match(/When\s*([^\n]+)/);
+  const phoneMatch = body.match(/Join by phone[^\n]*\n([^P]+)PIN: ([0-9]+)/);
+  const organizerMatch = body.match(/Organizer\s*([^\n]+)/);
+
+  return {
+    meetLink: meetLinkMatch ? `https://${meetLinkMatch[0]}` : null,
+    when: whenMatch ? whenMatch[1].trim() : null,
+    phone: phoneMatch ? {
+      number: phoneMatch[1].trim(),
+      pin: phoneMatch[2].trim()
+    } : null,
+    organizer: organizerMatch ? organizerMatch[1].trim() : null
+  };
 }; 

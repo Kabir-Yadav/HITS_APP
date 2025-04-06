@@ -7,6 +7,7 @@ import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
+import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Checkbox from '@mui/material/Checkbox';
@@ -18,7 +19,7 @@ import { darken, lighten, alpha as hexAlpha } from '@mui/material/styles';
 
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
-import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant } from 'src/utils/gmail';
+import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant, sendCalendarResponse } from 'src/utils/gmail';
 
 import { CONFIG } from 'src/global-config';
 
@@ -32,6 +33,43 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 
 // ----------------------------------------------------------------------
+
+// Helper function to check if email is a calendar invite
+const isCalendarInvite = (mail) => {
+  if (!mail) return false;
+  return mail.subject?.startsWith('Invitation:') || 
+         mail.subject?.startsWith('Updated invitation:');
+};
+
+// Helper function to get current response status
+const getResponseStatus = (mail) => {
+  if (!mail?.labelIds) return 'none';
+  if (mail.labelIds.includes('ACCEPTED')) return 'yes';
+  if (mail.labelIds.includes('TENTATIVE')) return 'maybe';
+  if (mail.labelIds.includes('DECLINED')) return 'no';
+  return 'none';
+};
+
+// Helper function to parse calendar event details from email body
+const parseCalendarEvent = (body) => {
+  if (!body) return null;
+
+  // Extract event details using regex
+  const meetLinkMatch = body.match(/meet\.google\.com\/[a-z-]+/);
+  const whenMatch = body.match(/When\s*([^\n]+)/);
+  const phoneMatch = body.match(/Join by phone[^\n]*\n([^P]+)PIN: ([0-9]+)/);
+  const organizerMatch = body.match(/Organizer\s*([^\n]+)/);
+
+  return {
+    meetLink: meetLinkMatch ? `https://${meetLinkMatch[0]}` : null,
+    when: whenMatch ? whenMatch[1].trim() : null,
+    phone: phoneMatch ? {
+      number: phoneMatch[1].trim(),
+      pin: phoneMatch[2].trim()
+    } : null,
+    organizer: organizerMatch ? organizerMatch[1].trim() : null
+  };
+};
 
 export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onCompose }) {
   const showAttachments = useBoolean(true);
@@ -54,6 +92,14 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
   // State for tracking downloading attachments
   const [downloadingAttachments, setDownloadingAttachments] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const [rsvpStatus, setRsvpStatus] = useState(getResponseStatus(mail));
+  const [isRsvpLoading, setIsRsvpLoading] = useState(false);
+
+  // Update RSVP status when mail changes
+  useEffect(() => {
+    setRsvpStatus(getResponseStatus(mail));
+  }, [mail]);
 
   const handleRefresh = useCallback(async () => {
     if (!mail?.id) return;
@@ -201,6 +247,29 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
     }
   }, [mail?.attachments, handleDownloadAttachment]);
 
+  const handleRsvp = useCallback(async (response) => {
+    if (!mail?.id || isRsvpLoading) return;
+
+    try {
+      setIsRsvpLoading(true);
+      await sendCalendarResponse(mail.id, response);
+      setRsvpStatus(response);
+      
+      // Refresh both the current mail and the mail list
+      await Promise.all([
+        mutate(`gmail-message-${mail.id}`),
+        mutate(['gmail-messages', 'inbox']),
+        mutate(['gmail-messages', 'sent']),
+      ]);
+    } catch (rsvperror) {
+      console.error('Error sending RSVP:', rsvperror);
+      // Revert the status if there was an error
+      setRsvpStatus(getResponseStatus(mail));
+    } finally {
+      setIsRsvpLoading(false);
+    }
+  }, [mail?.id, isRsvpLoading]);
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -326,14 +395,14 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <Tooltip title="Reply">
             <IconButton size="small" onClick={handleReply}>
-              <Iconify width={18} icon="solar:reply-bold" />
-            </IconButton>
+            <Iconify width={18} icon="solar:reply-bold" />
+          </IconButton>
           </Tooltip>
 
           <Tooltip title="Forward">
             <IconButton size="small" onClick={handleForward}>
-              <Iconify width={18} icon="solar:forward-bold" />
-            </IconButton>
+            <Iconify width={18} icon="solar:forward-bold" />
+          </IconButton>
           </Tooltip>
         </Box>
 
@@ -419,53 +488,222 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
     </Stack>
   );
 
-  const renderContent = () => (
-    <Box sx={{ p: 3 }}>
-      <Markdown children={mail?.body || mail?.snippet || ''} />
-    </Box>
+  const renderCalendarInvite = () => {
+    if (!mail?.body) return null;
+
+    const eventDetails = parseCalendarEvent(mail.body);
+    if (!eventDetails) return null;
+
+    const showRsvpButtons = isCalendarInvite(mail);
+
+    return (
+      <Box
+        sx={{
+          p: 3,
+          gap: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 1,
+          bgcolor: 'background.neutral'
+        }}
+      >
+        {/* Event Time */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: 'background.paper',
+              textAlign: 'center',
+              minWidth: 80
+            }}
+          >
+            <Typography variant="h6" sx={{ lineHeight: 1 }}>
+              {new Date(eventDetails.when).getDate()}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {new Date(eventDetails.when).toLocaleString('default', { month: 'short' })}
+            </Typography>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle1">
+              {mail.subject.replace(/^(Invitation: |Accepted: |Declined: |Tentative: )/, '')}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {eventDetails.when}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* RSVP Buttons - only show for invitations */}
+        {showRsvpButtons && (
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant={rsvpStatus === 'yes' ? 'contained' : 'outlined'}
+              color="success"
+              disabled={isRsvpLoading}
+              onClick={() => handleRsvp('yes')}
+              startIcon={<Iconify icon="ic:round-check-circle" />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              Yes
+            </Button>
+            <Button
+              variant={rsvpStatus === 'maybe' ? 'contained' : 'outlined'}
+              color="warning"
+              disabled={isRsvpLoading}
+              onClick={() => handleRsvp('maybe')}
+              startIcon={<Iconify icon="ic:round-help" />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              Maybe
+            </Button>
+            <Button
+              variant={rsvpStatus === 'no' ? 'contained' : 'outlined'}
+              color="error"
+              disabled={isRsvpLoading}
+              onClick={() => handleRsvp('no')}
+              startIcon={<Iconify icon="ic:round-cancel" />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500
+              }}
+            >
+              No
+            </Button>
+          </Stack>
+        )}
+
+        <Divider />
+
+        {/* Meet Link */}
+        {eventDetails.meetLink && (
+          <Button
+            variant="contained"
+            href={eventDetails.meetLink}
+            target="_blank"
+            startIcon={
+              <Iconify 
+                icon="logos:google-meet" 
+                sx={{ 
+                  width: 20, 
+                  height: 20,
+                  mr: 0.5 
+                }} 
+              />
+            }
+            sx={{
+              alignSelf: 'flex-start',
+              bgcolor: '#00796b',
+              color: '#fff',
+              px: 2.5,
+              py: 1,
+              borderRadius: '100px',
+              textTransform: 'none',
+              fontSize: '0.9375rem',
+              fontWeight: 500,
+              letterSpacing: '0.25px',
+              boxShadow: '0 1px 2px 0 rgba(60,64,67,0.302), 0 1px 3px 1px rgba(60,64,67,0.149)',
+              '&:hover': {
+                bgcolor: '#00695c',
+                boxShadow: '0 1px 3px 0 rgba(60,64,67,0.302), 0 4px 8px 3px rgba(60,64,67,0.149)'
+              }
+            }}
+          >
+            Join with Google Meet
+          </Button>
+        )}
+
+        {/* Phone Details */}
+        {eventDetails.phone && (
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 0.5,
+            mt: 2 
+          }}>
+            <Typography variant="subtitle2" sx={{ color: 'text.primary' }}>
+              Join by phone
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              {eventDetails.phone.number}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              PIN: {eventDetails.phone.pin}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Organizer */}
+        {eventDetails.organizer && (
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
+            Organized by {eventDetails.organizer}
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
+  const renderContent = () => {
+    if (!mail?.body) return null;
+
+    if (isCalendarInvite(mail)) {
+      return renderCalendarInvite();
+    }
+
+    return (
+      <Box sx={{ p: 3 }}>
+        <Markdown children={mail?.body || mail?.snippet || ''} />
+      </Box>
   );
+  };
 
   return (
-    <>
-      <Box
-        sx={{
+      <>
+        <Box
+          sx={{
           p: 2,
           gap: 2,
-          display: 'flex',
-          alignItems: 'center',
+            display: 'flex',
+            alignItems: 'center',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
-        }}
-      >
-        {renderHead()}
-      </Box>
+          }}
+        >
+          {renderHead()}
+        </Box>
 
-      <Box
+        <Box
         sx={{
-          p: 2,
-          gap: 2,
-          display: 'flex',
+              p: 2,
+              gap: 2,
+              display: 'flex',
           alignItems: 'flex-start',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
         }}
-      >
-        {renderSubject()}
-      </Box>
+        >
+          {renderSubject()}
+        </Box>
 
-      <Box
-        sx={{
+        <Box
+          sx={{
           p: 2,
           gap: 2,
-          display: 'flex',
+            display: 'flex',
           alignItems: 'flex-start',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
-        }}
-      >
-        {renderSender()}
-      </Box>
+          }}
+        >
+          {renderSender()}
+        </Box>
 
       <Scrollbar>
         {!!mail?.attachments?.length && renderAttachments()}
-
         {renderContent()}
       </Scrollbar>
     </>
@@ -526,7 +764,7 @@ function FileItem({ file, downloading, onDownload }) {
         <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
           {fData(file.size)}
         </Typography>
-      </Stack>
+        </Stack>
     </Box>
   );
 }
