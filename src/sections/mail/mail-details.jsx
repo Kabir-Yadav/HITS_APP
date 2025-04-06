@@ -1,6 +1,6 @@
 import { mutate } from 'swr';
-import { useState, useCallback } from 'react';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useState, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Link from '@mui/material/Link';
@@ -18,7 +18,7 @@ import { darken, lighten, alpha as hexAlpha } from '@mui/material/styles';
 
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
-import { downloadAttachment } from 'src/utils/gmail';
+import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant } from 'src/utils/gmail';
 
 import { CONFIG } from 'src/global-config';
 
@@ -33,10 +33,19 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
 
-export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
+export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onCompose }) {
   const showAttachments = useBoolean(true);
-  const isStarred = useBoolean(mail?.labelIds?.includes('STARRED'));
-  const isImportant = useBoolean(mail?.labelIds?.includes('IMPORTANT'));
+  const [isStarred, setIsStarred] = useState(mail?.labelIds?.includes('STARRED') || false);
+  const [isImportant, setIsImportant] = useState(mail?.labelIds?.includes('IMPORTANT') || false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Update state when mail changes
+  useEffect(() => {
+    if (mail) {
+      setIsStarred(mail.labelIds?.includes('STARRED') || false);
+      setIsImportant(mail.labelIds?.includes('IMPORTANT') || false);
+    }
+  }, [mail]);
 
   // Extract sender info
   const fromName = mail?.from ? mail.from.split('<')[0].trim() || mail.from.split('@')[0] : 'Unknown';
@@ -68,6 +77,83 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
       setIsRefreshing(false);
     }
   }, [mail?.id, mail?.labelIds]);
+
+  const handleReply = useCallback(() => {
+    if (!mail) return;
+
+    onCompose({
+      to: mail.from.email,
+      subject: `Re: ${mail.subject}`,
+      // For replies, we don't include the original message or attachments
+      threadId: mail.threadId // This will associate the reply with the original thread
+    });
+  }, [mail, onCompose]);
+
+  const handleForward = useCallback(() => {
+    if (!mail) return;
+
+    onCompose({
+      subject: `Fwd: ${mail.subject}`,
+      body: `\n\n---------- Forwarded message ---------\nFrom: ${mail.from.name} <${mail.from.email}>\nDate: ${new Date(mail.date).toLocaleString()}\nSubject: ${mail.subject}\nTo: ${mail.to.map(t => t.email).join(', ')}\n\n${mail.body}`,
+      attachments: mail.attachments // Include attachments for forwards
+    });
+  }, [mail, onCompose]);
+
+  const handleToggleStarred = useCallback(async () => {
+    if (!mail?.id || isUpdating) return;
+
+    try {
+      setIsUpdating(true);
+      const newValue = !isStarred;
+      await toggleStarred(mail.id, newValue);
+      setIsStarred(newValue);
+      
+      // Refresh the mail data
+      await mutate(`gmail-message-${mail.id}`);
+      
+      // Get the current label from the mail's labelIds
+      const currentLabel = mail.labelIds?.find(id => 
+        ['INBOX', 'SENT', 'DRAFT', 'TRASH', 'SPAM', 'IMPORTANT', 'STARRED'].includes(id)
+      ) || 'INBOX';
+      
+      // Refresh the mail list for the current label
+      await mutate(['gmail-messages', currentLabel.toLowerCase()]);
+    } catch (togglerror) {
+      console.error('Error toggling star:', togglerror);
+      // Revert the state if there was an error
+      setIsStarred(!isStarred);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [mail?.id, isStarred, isUpdating]);
+
+  const handleToggleImportant = useCallback(async () => {
+    if (!mail?.id || isUpdating) return;
+
+    try {
+      setIsUpdating(true);
+      const newValue = !isImportant;
+      await toggleImportant(mail.id, newValue);
+      setIsImportant(newValue);
+      
+      // Refresh the mail data
+      await mutate(`gmail-message-${mail.id}`);
+      
+      // Get the current label from the mail's labelIds
+      const currentLabel = mail.labelIds?.find(id => 
+        ['INBOX', 'SENT', 'DRAFT', 'TRASH', 'SPAM', 'IMPORTANT', 'STARRED'].includes(id)
+      ) || 'INBOX';
+      
+      // Refresh the mail list for the current label
+      await mutate(['gmail-messages', currentLabel.toLowerCase()]);
+    } catch (togimperror) {
+      console.error('Error toggling important:', togimperror);
+      // Revert the state if there was an error
+      setIsImportant(!isImportant);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [mail?.id, isImportant, isUpdating]);
 
   const handleDownloadAttachment = useCallback(async (attachment) => {
     try {
@@ -170,23 +256,36 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
           </IconButton>
         </Tooltip>
 
-        <Checkbox
-          color="warning"
-          icon={<Iconify icon="eva:star-outline" />}
-          checkedIcon={<Iconify icon="eva:star-fill" />}
-          checked={isStarred.value}
-          onChange={isStarred.onToggle}
-          inputProps={{ id: 'starred-checkbox', 'aria-label': 'Starred checkbox' }}
-        />
+        <Tooltip title={isStarred ? "Unstar" : "Star"}>
+          <IconButton 
+            onClick={handleToggleStarred}
+            disabled={isUpdating}
+            color={isStarred ? "warning" : "default"}
+          >
+            <Iconify 
+              icon={isStarred ? "eva:star-fill" : "eva:star-outline"} 
+              sx={{ 
+                ...(isUpdating && { animation: 'spin 1s linear infinite' }),
+              }} 
+            />
+          </IconButton>
+        </Tooltip>
 
-        <Checkbox
-          color="warning"
-          icon={<Iconify icon="material-symbols:label-important-rounded" />}
-          checkedIcon={<Iconify icon="material-symbols:label-important-rounded" />}
-          checked={isImportant.value}
-          onChange={isImportant.onToggle}
-          inputProps={{ id: 'important-checkbox', 'aria-label': 'Important checkbox' }}
-        />
+        <Tooltip title={isImportant ? "Mark not important" : "Mark important"}>
+          <IconButton 
+            onClick={handleToggleImportant}
+            disabled={isUpdating}
+            color={isImportant ? "warning" : "default"}
+          >
+            <Iconify 
+              icon="material-symbols:label-important-rounded"
+              sx={{ 
+                ...(isUpdating && { animation: 'spin 1s linear infinite' }),
+                transform: isImportant ? 'none' : 'rotate(180deg)',
+              }} 
+            />
+          </IconButton>
+        </Tooltip>
 
         <Tooltip title="Archive">
           <IconButton>
@@ -205,10 +304,6 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
             <Iconify icon="solar:trash-bin-trash-bold" />
           </IconButton>
         </Tooltip>
-
-        <IconButton>
-          <Iconify icon="eva:more-vertical-fill" />
-        </IconButton>
       </Box>
     </>
   );
@@ -229,17 +324,17 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading }) {
 
       <Stack spacing={0.5}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <IconButton size="small">
-            <Iconify width={18} icon="solar:reply-bold" />
-          </IconButton>
+          <Tooltip title="Reply">
+            <IconButton size="small" onClick={handleReply}>
+              <Iconify width={18} icon="solar:reply-bold" />
+            </IconButton>
+          </Tooltip>
 
-          <IconButton size="small">
-            <Iconify width={18} icon="solar:multiple-forward-left-broken" />
-          </IconButton>
-
-          <IconButton size="small">
-            <Iconify width={18} icon="solar:forward-bold" />
-          </IconButton>
+          <Tooltip title="Forward">
+            <IconButton size="small" onClick={handleForward}>
+              <Iconify width={18} icon="solar:forward-bold" />
+            </IconButton>
+          </Tooltip>
         </Box>
 
         <Typography variant="caption" noWrap sx={{ color: 'text.disabled' }}>

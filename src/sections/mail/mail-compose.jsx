@@ -27,22 +27,36 @@ import { Iconify } from 'src/components/iconify';
 
 const POSITION = 20;
 
-export function MailCompose({ onCloseCompose }) {
+export function MailCompose({ onCloseCompose, initialData = {} }) {
   const theme = useTheme();
   const smUp = useMediaQuery(theme.breakpoints.up('sm'));
   const fileInputRef = useRef(null);
 
   const fullScreen = useBoolean();
   const [sending, setSending] = useState(false);
-  const showCc = useBoolean(false);
-  const showBcc = useBoolean(false);
+  const showCc = useBoolean(!!initialData.cc);
+  const showBcc = useBoolean(!!initialData.bcc);
 
-  const [to, setTo] = useState('');
-  const [cc, setCc] = useState('');
-  const [bcc, setBcc] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [attachments, setAttachments] = useState([]);
+  const [to, setTo] = useState(initialData.to || '');
+  const [cc, setCc] = useState(initialData.cc || '');
+  const [bcc, setBcc] = useState(initialData.bcc || '');
+  const [subject, setSubject] = useState(initialData.subject || '');
+  const [message, setMessage] = useState(initialData.body || '');
+  const [attachments, setAttachments] = useState(initialData.attachments || []);
+
+  useEffect(() => {
+    if (initialData) {
+      setTo(initialData.to || '');
+      setCc(initialData.cc || '');
+      setBcc(initialData.bcc || '');
+      setSubject(initialData.subject || '');
+      setMessage(initialData.body || '');
+      setAttachments(initialData.attachments || []);
+      
+      if (initialData.cc) showCc.onTrue();
+      if (initialData.bcc) showBcc.onTrue();
+    }
+  }, [initialData]);
 
   const handleChangeMessage = useCallback((value) => {
     setMessage(value);

@@ -218,6 +218,7 @@ const processGmailMessage = async (messageId) => {
 
   return {
     id: messageId,
+    threadId: details.result.threadId,
     subject,
     from,
     to,
@@ -342,39 +343,154 @@ const createEmail = async (to, subject, body, { cc = '', bcc = '' } = {}, attach
 };
 
 // Send email with attachments
-export const sendEmail = async (to, subject, body, { cc = '', bcc = '' } = {}, attachments = []) => {
+export async function sendEmail(to, subject, body, { cc, bcc } = {}, attachments = [], threadId = null) {
+  try {
+    const message = {
+      to,
+      subject,
+      body,
+      cc,
+      bcc,
+      threadId // Include threadId if this is a reply
+    };
+
+    const response = await fetch('/api/gmail/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to send email');
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Error sending email:', error);
+    throw error;
+  }
+}
+
+// Helper function to create email headers for reply/forward
+const createEmailHeaders = (originalMail, type) => {
+  const headers = {
+    subject: '',
+    to: '',
+    cc: '',
+    references: originalMail.id,
+    inReplyTo: originalMail.id,
+  };
+
+  if (type === 'reply') {
+    // For reply, set subject with Re: prefix if not already present
+    headers.subject = originalMail.subject.startsWith('Re:') 
+      ? originalMail.subject 
+      : `Re: ${originalMail.subject}`;
+    
+    // Reply to the sender
+    headers.to = originalMail.from;
+  } else if (type === 'forward') {
+    // For forward, set subject with Fwd: prefix if not already present
+    headers.subject = originalMail.subject.startsWith('Fwd:') 
+      ? originalMail.subject 
+      : `Fwd: ${originalMail.subject}`;
+    
+    // Forward to empty (user will fill in)
+    headers.to = '';
+  }
+
+  return headers;
+};
+
+// Function to prepare a reply email
+export const prepareReply = (originalMail) => {
+  const headers = createEmailHeaders(originalMail, 'reply');
+  
+  // Format the original message for the reply
+  const originalContent = `
+On ${new Date(originalMail.date).toLocaleString()}, ${originalMail.from} wrote:
+
+${originalMail.body}
+`;
+
+  return {
+    to: headers.to,
+    subject: headers.subject,
+    body: originalContent,
+    references: headers.references,
+    inReplyTo: headers.inReplyTo,
+  };
+};
+
+// Function to prepare a forward email
+export const prepareForward = (originalMail) => {
+  const headers = createEmailHeaders(originalMail, 'forward');
+  
+  // Format the original message for forwarding
+  const originalContent = `
+---------- Forwarded message ---------
+From: ${originalMail.from}
+Date: ${new Date(originalMail.date).toLocaleString()}
+Subject: ${originalMail.subject}
+To: ${originalMail.to}
+
+${originalMail.body}
+`;
+
+  return {
+    to: headers.to,
+    subject: headers.subject,
+    body: originalContent,
+  };
+};
+
+// Function to modify labels on a message
+export const modifyMessageLabels = async (messageId, addLabels = [], removeLabels = []) => {
   try {
     await ensureGmailAuth();
-
-    // Process attachments
-    const processedAttachments = await Promise.all(
-      attachments.map(async (file) => ({
-        name: file.name,
-        type: file.type,
-        content: await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            // Get base64 content without the data URL prefix
-            const base64Content = reader.result.split(',')[1];
-            resolve(base64Content);
-          };
-          reader.readAsDataURL(file);
-        })
-      }))
-    );
-
-    const encodedMessage = await createEmail(to, subject, body, { cc, bcc }, processedAttachments);
-
-    const response = await gapi.client.gmail.users.messages.send({
+    
+    const response = await gapi.client.gmail.users.messages.modify({
       userId: 'me',
+      id: messageId,
       resource: {
-        raw: encodedMessage
+        addLabelIds: addLabels,
+        removeLabelIds: removeLabels
       }
     });
 
     return response.result;
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error modifying message labels:', error);
+    throw error;
+  }
+};
+
+// Function to toggle star status
+export const toggleStarred = async (messageId, isStarred) => {
+  try {
+    return await modifyMessageLabels(
+      messageId,
+      isStarred ? ['STARRED'] : [],
+      isStarred ? [] : ['STARRED']
+    );
+  } catch (error) {
+    console.error('Error toggling star:', error);
+    throw error;
+  }
+};
+
+// Function to toggle important status
+export const toggleImportant = async (messageId, isImportant) => {
+  try {
+    return await modifyMessageLabels(
+      messageId,
+      isImportant ? ['IMPORTANT'] : [],
+      isImportant ? [] : ['IMPORTANT']
+    );
+  } catch (error) {
+    console.error('Error toggling important:', error);
     throw error;
   }
 }; 
