@@ -745,7 +745,7 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
       console.log("Reaction added");
 
       await createChatNotificationForReaction(conversationId, messageId, userId, emoji);
-      
+
     }
 
     // ✅ Trigger a real-time UI update
@@ -836,6 +836,7 @@ async function createChatNotificationForReply(conversationId, insertedMessage, s
         message_id: insertedMessage.id,
         notification_type: "reply",
         body: insertedMessage.body || "",
+        original_body: parentMsg.body,
       });
 
     if (insertError) {
@@ -888,4 +889,161 @@ async function createChatNotificationForReaction(conversationId, messageId, reac
   } catch (err) {
     console.error("createChatNotificationForReaction error:", err);
   }
+}
+
+
+export function useChatNotifications(userId) {
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (!userId) {
+      // If there's no user ID, do nothing
+      return undefined; 
+      // Returning undefined explicitly satisfies some ESLint "consistent-return" rules
+    }
+
+    let mounted = true;
+
+    // -------------------------------------------
+    // 1) INITIAL FETCH
+    // -------------------------------------------
+    const fetchNotifications = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('chat_notifications')
+          .select(`
+            *,
+            actor:user_info!chat_notifications_actor_id_fkey (
+              id,
+              full_name,
+              avatar_url
+            )
+          `)
+          .eq('user_id', userId)
+          .eq('is_read', false) // Only fetch unread
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching chat notifications:', error);
+          return; // just return to stop here
+        }
+
+        if (mounted) {
+          setNotifications(data || []);
+        }
+      } catch (err) {
+        console.error('Error in fetchChatNotifications:', err);
+      }
+    };
+
+    fetchNotifications();
+
+    // -------------------------------------------
+    // 2) REALTIME SUBSCRIPTION
+    // -------------------------------------------
+    const subscription = supabase
+      .channel(`chat_notifications_${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_notifications',
+        filter: `user_id=eq.${userId}`
+      }, async (payload) => {
+        // No partial return statements => if not mounted, do nothing
+        if (!mounted) {
+          console.log("not mounted");
+          return;
+        }
+
+        if (payload.eventType === 'INSERT') {
+          // Re-fetch the new row so we get the relationship data
+          try {
+            const { data: newRow, error } = await supabase
+              .from('chat_notifications')
+              .select(`
+                *,
+                actor:user_info!chat_notifications_actor_id_fkey (
+                  id,
+                  full_name,
+                  avatar_url
+                )
+              `)
+              .eq('id', payload.new.id)
+              .single();
+            console.log(newRow);
+            if (!error && newRow && mounted) {
+              // Prepend the new item
+              setNotifications((prev) => [newRow, ...prev]);
+              console.log(newRow);
+            }
+          } catch (err) {
+            console.error('Error fetching new chat notification row:', err);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          // Remove from local state
+          setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+        }
+        // If there's an UPDATE, you can decide how to handle it
+      })
+      .subscribe();
+
+    // -------------------------------------------
+    // 3) CLEANUP
+    // -------------------------------------------
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [userId]); // eslint expects a consistent return from useEffect => we do return the cleanup or undefined
+
+  // -------------------------------------------
+  // 4) DELETE NOTIFICATION
+  // -------------------------------------------
+  const deleteNotification = async (notificationId) => {
+    try {
+      // Remove locally
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+
+      const { error } = await supabase
+        .from('chat_notifications')
+        .delete()
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error deleting chat notification:', error);
+        // optionally revert local state or re-fetch
+      }
+    } catch (err) {
+      console.error('deleteNotification error:', err);
+    }
+  };
+
+  // -------------------------------------------
+  // 5) MARK AS READ
+  // -------------------------------------------
+  const markNotificationAsRead = async (notificationId) => {
+    try {
+      // Mark local state
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+      );
+
+      const { error } = await supabase
+        .from('chat_notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
+
+      if (error) {
+        console.error('Error marking chat notification as read:', error);
+        // revert or re-fetch
+      }
+    } catch (err) {
+      console.error('markNotificationAsRead error:', err);
+    }
+  };
+
+  return {
+    notifications,
+    deleteNotification,
+  };
 }
