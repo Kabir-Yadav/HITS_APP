@@ -12,14 +12,15 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { paths } from 'src/routes/paths';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { fIsAfter, fIsBetween } from 'src/utils/format-time';
 
 import { CONFIG } from 'src/global-config';
-import { deleteEntities } from 'src/actions/filemanager';
 import { DashboardContent } from 'src/layouts/dashboard';
-import useGetFiles, { createFolder } from 'src/actions/filemanager';
 import { _allFiles, FILE_TYPE_OPTIONS, _files, _folders } from 'src/_mock';
+import { deleteEntities, getFolderContents } from 'src/actions/filemanager';
+import useGetFiles, { createFolder, removeFilesFromFolder } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -37,6 +38,7 @@ import { FileManagerTable } from '../file-manager-table';
 import { FileManagerFilters } from '../file-manager-filters';
 import { FileStorageOverview } from '../file-storage-overview';
 import { FileManagerGridView } from '../file-manager-grid-view';
+import { FileManagerFolderView } from '../file-manager-folder-view';
 import { FileManagerFolderItem } from '../file-manager-folder-item';
 import { FileManagerFiltersResult } from '../file-manager-filters-result';
 import { FileManagerNewFolderDialog } from '../file-manager-new-folder-dialog';
@@ -48,7 +50,34 @@ export function FileManagerView() {
   const { user } = useMockedUser()
   const dateRange = useBoolean();
   const confirmDialog = useBoolean();
+  const removeDialog = useBoolean();
   const newFilesDialog = useBoolean();
+
+  const searchParams = useSearchParams();
+  const folderId = searchParams.get('folderId') || '';
+  const [folderContent, setFolderContent] = useState([]);
+  const [foldername, setFolderName] = useState('');
+  const [isFolderLoading, setIsFolderLoading] = useState(false);
+
+  const fectchFolderContent = async (folder_Id) => {
+    try {
+      setIsFolderLoading(true);
+      setFolderContent([]);
+
+      const { data } = await getFolderContents(userId, folder_Id);
+
+      const name = data[0].name;
+      setFolderName(name);
+
+      const fc = data.filter((item) => item.id !== folder_Id);
+      setFolderContent(fc);
+    } catch (error) {
+      toast.error('Error fetching folder content');
+      console.error(error);
+    } finally {
+      setIsFolderLoading(false);           // 3) done loading
+    }
+  };
 
   const [displayMode, setDisplayMode] = useState('list');
 
@@ -63,7 +92,10 @@ export function FileManagerView() {
     if (data && JSON.stringify(data) !== JSON.stringify(tableData)) {
       setTableData(data);
     }
-  }, [data]);
+    if (folderId) {
+      fectchFolderContent(folderId);
+    }
+  }, [data, folderId]);
 
   const filters = useSetState({
     name: '',
@@ -80,7 +112,7 @@ export function FileManagerView() {
     comparator: () => { },
     filters: currentFilters,
     dateError,
-  });
+  }).filter((item) => item.isInFolder === false);
 
   const dataInPage = rowInPage(dataFiltered, table.page, table.rowsPerPage);
 
@@ -98,7 +130,6 @@ export function FileManagerView() {
   }, []);
 
   const handleDeleteItem = useCallback(async (item) => {
-    console.log(item, '<=')
     try {
       const result = await deleteEntities(userId, [item]); // API call with single file
 
@@ -216,6 +247,57 @@ export function FileManagerView() {
   const renderNewFilesDialog = () => (
     < FileManagerNewFolderDialog open={newFilesDialog.value} onClose={newFilesDialog.onFalse} userId={userId} />
   );
+  const handleRemoveFilefromFolder = useCallback(async () => {
+    if (!table.selected.length) {
+      toast.error('No files selected for deletion.');
+      return;
+    }
+
+    try {
+      const result = await removeFilesFromFolder(userId, folderId, table.selected);
+
+      if (result.success) {
+        toast.success('Files Removed successfully!');
+        table.setSelected([]);
+
+        // ✅ Remove deleted items from tableData
+        setTableData((prevData) => prevData.filter((row) => !table.selected.includes(row.id)));
+
+        // ✅ Update table pagination if needed
+        table.onUpdatePageDeleteRows(dataInPage.length, dataFiltered.length);
+      } else {
+        throw new Error('Failed to remove files.');
+      }
+    } catch (error) {
+      toast.error('Error removing files.');
+      console.error(error);
+    }
+  }, [userId, table.selected,]);
+
+  const renderRemoveConfirmDialog = () => (
+    <ConfirmDialog
+      open={removeDialog.value}
+      onClose={removeDialog.onFalse}
+      title="Delete"
+      content={
+        <>
+          Are you sure want to remove <strong> {table.selected.length} </strong> items?
+        </>
+      }
+      action={
+        <Button
+          variant="contained"
+          color="error"
+          onClick={() => {
+            handleRemoveFilefromFolder();
+            removeDialog.onFalse();
+          }}
+        >
+          Remove
+        </Button>
+      }
+    />
+  );
 
   const renderConfirmDialog = () => (
     <ConfirmDialog
@@ -246,7 +328,6 @@ export function FileManagerView() {
       toast.error("User ID and folder name are required");
       return;
     }
-    console.log(selectedFiles)
     try {
       const result = await createFolder(user_Id, folderName, selectedFiles);
 
@@ -261,27 +342,41 @@ export function FileManagerView() {
       toast.error("Error creating folder");
     }
   };
-
   const renderList = () =>
-    displayMode === 'list' ? (
-      <FileManagerTable
+    folderId ? (
+      <FileManagerFolderView
         userId={user.id}
         table={table}
         onCreateFolder={handleCreateFolder}
-        dataFiltered={dataFiltered}
+        dataFiltered={folderContent}
+        folderId={folderId}
         onDeleteRow={handleDeleteItem}
         notFound={notFound}
         onOpenConfirm={confirmDialog.onTrue}
+        onRemoveFiles={removeDialog.onTrue}
+        isLoading={isFolderLoading}
+        exisitingFolderName={foldername}
       />
-    ) : (
-      <FileManagerGridView
-        table={table}
-        userId={userId}
-        dataFiltered={dataFiltered}
-        onDeleteItem={handleDeleteItem}
-        onOpenConfirm={confirmDialog.onTrue}
-      />
-    );
+    ) :
+      (displayMode === 'list') ? (
+        <FileManagerTable
+          userId={user.id}
+          table={table}
+          onCreateFolder={handleCreateFolder}
+          dataFiltered={dataFiltered}
+          onDeleteRow={handleDeleteItem}
+          notFound={notFound}
+          onOpenConfirm={confirmDialog.onTrue}
+        />
+      ) : (
+        <FileManagerGridView
+          table={table}
+          userId={userId}
+          dataFiltered={dataFiltered}
+          onDeleteItem={handleDeleteItem}
+          onOpenConfirm={confirmDialog.onTrue}
+        />
+      );
   if (isError) {
     return (
       <DashboardContent>
@@ -477,6 +572,7 @@ export function FileManagerView() {
       </DashboardContent>
 
       {renderNewFilesDialog()}
+      {renderRemoveConfirmDialog()}
       {renderConfirmDialog()}
     </>
   );

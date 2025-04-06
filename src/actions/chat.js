@@ -127,23 +127,8 @@ const fetchConversations = async (userId) => {
 
   // 🔹 Step 4: Structure the data properly
   const formattedConversations = await Promise.all(
-    userConversations.map(async (conv) => ({
-      id: conv.conversations.id,
-      name: conv.conversations.name,
-      type: conv.conversations.is_group ? "GROUP" : "ONE_TO_ONE",
-      unreadCount: 0,
-      participants: participantsData
-        .filter((p) => p.conversation_id === conv.conversations.id)
-        .map((p) => ({
-          id: p.user_info?.id || "",
-          role: p.user_info?.role || "participant",
-          status: "offline",
-          name: `${p.user_info?.full_name}`.trim(),
-          email: p.user_info?.email || "",
-          phoneNumber: p.user_info?.phone_number || "",
-          avatarUrl: p.user_info?.avatar_url || "",
-        })),
-      messages: await Promise.all(
+    userConversations.map(async (conv) => {
+      const messages = await Promise.all(
         messagesData
           .filter((msg) => msg.conversation_id === conv.conversations.id)
           .map(async (msg) => ({
@@ -156,11 +141,37 @@ const fetchConversations = async (userId) => {
             attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
             reactions: msg.reactions || [],
           }))
-      ),
-    }))
+      );
+
+      return {
+        id: conv.conversations.id,
+        name: conv.conversations.name,
+        type: conv.conversations.is_group ? "GROUP" : "ONE_TO_ONE",
+        unreadCount: 0,
+        participants: participantsData
+          .filter((p) => p.conversation_id === conv.conversations.id)
+          .map((p) => ({
+            id: p.user_info?.id || "",
+            role: p.user_info?.role || "participant",
+            status: "offline",
+            name: `${p.user_info?.full_name}`.trim(),
+            email: p.user_info?.email || "",
+            phoneNumber: p.user_info?.phone_number || "",
+            avatarUrl: p.user_info?.avatar_url || "",
+          })),
+        messages,
+        latestMessageTime: messages.length ? new Date(messages[messages.length - 1].createdAt).getTime() : 0,
+      };
+    })
   );
 
-  return formattedConversations;
+  // ✅ Sort by most recent message time (descending)
+  formattedConversations.sort((a, b) => b.latestMessageTime - a.latestMessageTime);
+
+  // ✅ Remove helper property if not needed
+  const finalFormattedConversations = formattedConversations.map(({ latestMessageTime, ...rest }) => rest);
+
+  return finalFormattedConversations;
 };
 
 export function useGetConversations(userId) {
@@ -516,11 +527,11 @@ export async function sendMessage(conversationId, senderId, body, parentId = nul
 
   // [NEW] Only if insertedMessage is truthy:
   if (insertedMessage) {
-  // If it's a reply, parent_id is set, so we notify the original message's sender
+    // If it's a reply, parent_id is set, so we notify the original message's sender
     if (parentId) {
       await createChatNotificationForReply(conversationId, insertedMessage, senderId);
     } else {
-    // Otherwise, it's a brand-new message, notify all participants except the sender
+      // Otherwise, it's a brand-new message, notify all participants except the sender
       await createChatNotificationForNewMessage(conversationId, insertedMessage, senderId);
     }
   }

@@ -52,11 +52,12 @@ export default function useGetFiles(user_id) {
 
       if (sharedFilesError) throw sharedFilesError;
 
-      // 3) Fetch file-sharing records (who has access to each file)
+      // 3) Gather all file IDs to fetch sharing data
       const fileIds = [
         ...ownedFiles.map((f) => f.id),
         ...sharedFilesData.map((s) => s.file_id),
       ];
+
       let sharingData = [];
       if (fileIds.length) {
         const { data: sharingRows, error: sharingError } = await supabase
@@ -75,7 +76,7 @@ export default function useGetFiles(user_id) {
         sharedUsers = await fetchUsersByIds(sharedUserIds);
       }
 
-      // 5) Create a map: file_id -> shared users array
+      // 5) Build map: file_id -> shared users
       const sharedMap = {};
       for (const share of sharingData) {
         const user = sharedUsers.find((u) => u.id === share.shared_with);
@@ -122,26 +123,27 @@ export default function useGetFiles(user_id) {
         }
       }
 
-      // 9) Format Folders with computed size & file count
+      // 9) Format Folders
       const folders = foldersData.map((folder) => ({
         id: folder.id,
         name: folder.folder_name,
         url: '',
         type: 'folder',
-        size: folderMap[folder.id]?.totalSize || 0, // Total size of files in this folder
-        totalFiles: folderMap[folder.id]?.totalFiles || 0, // Number of files in this folder
+        size: folderMap[folder.id]?.totalSize || 0,
+        totalFiles: folderMap[folder.id]?.totalFiles || 0,
         createdAt: folder.created_at,
         modifiedAt: folder.created_at,
         isFavorited: favoriteFolderIds.has(folder.id),
         tags: [],
         shared: [],
         accessType: 'owner',
+        isInFolder: false, // Folders are always top-level in your DB
       }));
 
-      // 10) Format Owned Files (only those that are NOT inside a folder => folder_id == null)
-      const ownedFilesFormatted = ownedFiles
-        .filter((file) => !file.folder_id) // skip if file is in a folder
-        .map((file) => ({
+      // 10) Format Owned Files (**do not** skip those inside folders)
+      const ownedAllFiles = ownedFiles.map((file) => {
+        const isRoot = !file.folder_id;
+        return {
           id: file.id,
           name: file.file_name,
           url: supabase.storage
@@ -156,14 +158,16 @@ export default function useGetFiles(user_id) {
           shared: sharedMap[file.id] || [],
           isShared: false,
           accessType: 'owner',
-        }));
+          isInFolder: !isRoot, // If folder_id != null => true
+        };
+      });
 
-      // 11) Format Shared Files (skip those that are in a folder => folder_id != null)
-      const sharedFilesFormatted = sharedFilesData
+      // 11) Format Shared Files (also do not skip folder_id)
+      const sharedAllFiles = sharedFilesData
         .map((record) => {
           const file = record.files;
           if (!file) return null;
-          if (file.folder_id) return null; // skip if file is inside a folder
+          const isRoot = !file.folder_id;
           return {
             id: file.id,
             name: file.file_name,
@@ -178,15 +182,16 @@ export default function useGetFiles(user_id) {
             tags: [],
             shared: sharedMap[file.id] || [],
             isShared: true,
-            accessType: record.access_type,
+            accessType: record.access_type, // 'view' or 'edit'
             ownerId: file.user_id,
+            isInFolder: !isRoot, // If folder_id != null => true
           };
         })
-        .filter(Boolean); // remove nulls
+        .filter(Boolean); // remove null
 
-      // 12) Merge Everything => folders first, then root-level files
-      // (so the user sees folders at the top, files below)
-      return [...folders, ...ownedFilesFormatted, ...sharedFilesFormatted];
+      // 12) Merge Everything => folders + all files
+      // => So the "Favorites" can see files inside folders as well.
+      return [...folders, ...ownedAllFiles, ...sharedAllFiles];
     }
   );
 
@@ -450,14 +455,109 @@ export async function createFolder(userId, folderName, selectedFiles = []) {
 
 export async function getFolderContents(userId, folderId) {
   try {
-    const { data, error } = await supabase
+    // 1) Fetch Files inside the Folder
+    const { data: files, error: filesError } = await supabase
       .from('files')
       .select('id, user_id, file_name, file_size, file_type, storage_url, created_at, folder_id')
-      .eq('folder_id', folderId);
+      .eq('folder_id', folderId)
+      .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (filesError) throw filesError;
 
-    return { success: true, data };
+    // 2) Fetch File Sharing Data for Shared Files in the Folder
+    const fileIds = files.map((f) => f.id);
+    let sharingData = [];
+    if (fileIds.length) {
+      const { data: sharingRows, error: sharingError } = await supabase
+        .from('file_sharing')
+        .select('file_id, shared_with, access_type')
+        .in('file_id', fileIds);
+
+      if (sharingError) throw sharingError;
+      sharingData = sharingRows;
+    }
+
+    // 3) Fetch User Details for Shared Users
+    const sharedUserIds = [...new Set(sharingData.map((s) => s.shared_with))];
+    let sharedUsers = [];
+    if (sharedUserIds.length) {
+      sharedUsers = await fetchUsersByIds(sharedUserIds);
+    }
+
+    // 4) Create a Map: file_id -> shared users array
+    const sharedMap = {};
+    for (const share of sharingData) {
+      const user = sharedUsers.find((u) => u.id === share.shared_with);
+      if (!sharedMap[share.file_id]) {
+        sharedMap[share.file_id] = [];
+      }
+      sharedMap[share.file_id].push({
+        id: user?.id,
+        name: user?.full_name || 'Unknown',
+        email: user?.email || '',
+        avatarUrl: user?.avatar_url || '',
+        permission: share.access_type, // 'view' or 'edit'
+      });
+    }
+
+    // 5) Fetch User's Favorites
+    const { data: favoritesData, error: favoritesError } = await supabase
+      .from('file_favorites')
+      .select('file_id, folder_id')
+      .eq('user_id', userId);
+
+    if (favoritesError) throw favoritesError;
+    const favoriteFileIds = new Set(favoritesData.map((fav) => fav.file_id));
+
+    // 6) Compute Folder Size & File Count
+    const totalSize = files.reduce((acc, file) => acc + file.file_size, 0);
+    const totalFiles = files.length;
+
+    // 7) Format Files inside the Folder
+    const formattedFiles = files.map((file) => ({
+      id: file.id,
+      name: file.file_name,
+      url: supabase.storage
+        .from('file_attachments')
+        .getPublicUrl(file.storage_url)?.data.publicUrl || '',
+      type: file.file_type,
+      size: file.file_size,
+      createdAt: file.created_at,
+      modifiedAt: file.created_at,
+      isFavorited: favoriteFileIds.has(file.id),
+      tags: [],
+      shared: sharedMap[file.id] || [],
+      isShared: sharedMap[file.id]?.length > 0,
+      accessType: userId === file.user_id ? 'owner' : 'shared',
+    }));
+
+    // 8) Fetch Folder Info
+    const { data: folderData, error: folderError } = await supabase
+      .from('folders')
+      .select('id, folder_name, created_at')
+      .eq('id', folderId)
+      .single();
+
+    if (folderError) throw folderError;
+
+    // 9) Format Folder Info
+    const folder = {
+      id: folderData.id,
+      name: folderData.folder_name,
+      url: '',
+      type: 'folder',
+      size: totalSize,
+      totalFiles: totalFiles,
+      createdAt: folderData.created_at,
+      modifiedAt: folderData.created_at,
+      isFavorited: favoriteFileIds.has(folderId),
+      tags: [],
+      shared: [],
+      accessType: 'owner',
+    };
+
+    // 10) Merge Folder Info and Files
+    return { success: true, data: [folder, ...formattedFiles] };
   } catch (error) {
     console.error('Error fetching folder contents:', error);
     return { success: false, error };

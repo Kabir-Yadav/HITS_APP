@@ -257,12 +257,21 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
   );
   const [folderContent, setFolderContent] = useState([])
   const fetchData = async () => {
-    console.log("fetching again")
+    console.log("fetching again");
     if (isFolder) {
       try {
         const data = await getFolderContents(userId, folder.id);
+        console.log("data", data);
         if (data?.data) {
-          setFolderContent(data.data);
+          const fc = data.data
+            .filter((f) => f.id !== folder.id) // Exclude entry with the same folder.id
+            .map((f) => ({
+              id: f.id,
+              file_name: f.name,
+              file_size: f.size,
+              file_type: f.type,
+            }));
+          setFolderContent(fc);
         }
       } catch (error) {
         console.error('Error fetching folder contents:', error);
@@ -294,7 +303,7 @@ export function FileManagerFolderItem({ sx, folder, userId, isFolder = true, sel
       }}
       folderName={folderName}
       onChangeFolderName={handleChangeFolderName}
-      selectedfiles={folderContent ?? []}
+      selectedfiles={folderContent}
     />
   );
 

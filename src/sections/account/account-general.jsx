@@ -72,16 +72,16 @@ export function AccountGeneral() {
   useEffect(() => {
     const fetchDates = async () => {
       const { data: { user: currentUser }, error } = await supabase.auth.getUser();
-      
+
       if (!error && currentUser) {
         setJoiningDate(
-          currentUser.user_metadata?.date_of_joining 
-            ? new Date(currentUser.user_metadata.date_of_joining) 
+          currentUser.user_metadata?.date_of_joining
+            ? new Date(currentUser.user_metadata.date_of_joining)
             : null
         );
         setLeavingDate(
-          currentUser.user_metadata?.date_of_leaving 
-            ? new Date(currentUser.user_metadata.date_of_leaving) 
+          currentUser.user_metadata?.date_of_leaving
+            ? new Date(currentUser.user_metadata.date_of_leaving)
             : null
         );
       }
@@ -163,23 +163,23 @@ export function AccountGeneral() {
   const onSubmit = handleSubmit(async (data) => {
     try {
       let avatarUrl = user?.user_metadata?.avatar_url;
-      
+
       // Upload avatar to Supabase Storage if provided
       if (data.avatarUrl instanceof File) {
         const fileExt = data.avatarUrl.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
-        
+
         const { error: uploadError, data: uploadData } = await supabase.storage
           .from('avatars')
           .upload(fileName, data.avatarUrl);
-          
+
         if (uploadError) throw uploadError;
-        
+
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
-          
+
         avatarUrl = publicUrl;
       }
 
@@ -255,8 +255,8 @@ export function AccountGeneral() {
               <Field.Text name="lastName" label="Last name" />
               <Field.Text name="email" label="Email address" />
               <Field.Phone name="phoneNumber" label="Phone number" />
-              <Field.Select 
-                name="role" 
+              <Field.Select
+                name="role"
                 label="Role"
                 placeholder="Select role"
                 disabled
@@ -275,8 +275,8 @@ export function AccountGeneral() {
                 maxDate={dayjs()}
               />
 
-              <Field.Text 
-                name="designation" 
+              <Field.Text
+                name="designation"
                 label="Designation"
                 placeholder="Enter designation"
               />

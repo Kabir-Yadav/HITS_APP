@@ -177,6 +177,7 @@ export function CalendarView() {
         end: event.end?.dateTime || event.end?.date,
         allDay: !event.start?.dateTime,
         color: event.colorId === '1' ? theme.vars.palette.primary.main : theme.vars.palette.secondary.main,
+        hangoutLink: event.hangoutLink,
         extendedProps: {
           source: 'google',
           description: event.description,
