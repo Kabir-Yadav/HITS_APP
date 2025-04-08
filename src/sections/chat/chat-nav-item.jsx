@@ -31,7 +31,7 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up('md'));
 
-  const { group, displayName, displayText, participants, lastActivity, hasOnlineInGroup } =
+  const { group, displayName, displayText, participants, groupAvatar, lastActivity, hasOnlineInGroup } =
     getNavItem({ conversation, currentUserId: `${user?.id}` });
 
   const singleParticipant = participants[0];
@@ -54,11 +54,18 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
 
   const renderGroup = () => (
     <Badge variant={hasOnlineInGroup ? 'online' : 'invisible'} badgeContent="">
-      <AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
-        {participants.slice(0, 2).map((participant) => (
-          <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
-        ))}
-      </AvatarGroup>
+      {groupAvatar ?
+        (<Avatar
+          alt={displayName??"Unamed Group"}
+          src={groupAvatar}
+          sx={{ width: 48, height: 48 }}
+        />)
+        :
+        (<AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
+          {participants.slice(0, 2).map((participant) => (
+            <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
+          ))}
+        </AvatarGroup>)}
     </Badge>
   );
 
