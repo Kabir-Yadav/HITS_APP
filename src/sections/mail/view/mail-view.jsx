@@ -1,5 +1,5 @@
 import { useBoolean } from 'minimal-shared/hooks';
-import { useEffect, useCallback, startTransition } from 'react';
+import { useEffect, useCallback, useState, startTransition } from 'react';
 
 import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
@@ -11,8 +11,8 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetMail, useGetMails, useGetLabels } from 'src/actions/mail';
 
+import MailLayout from '../layout';
 import { MailNav } from '../mail-nav';
-import { MailLayout } from '../layout';
 import { MailList } from '../mail-list';
 import { MailHeader } from '../mail-header';
 import { MailCompose } from '../mail-compose';
@@ -42,12 +42,20 @@ export function MailView() {
 
   const firstMailId = mails.allIds[0] || '';
 
-  const handleToggleCompose = useCallback(() => {
+  const [composeData, setComposeData] = useState(null);
+
+  const handleCompose = useCallback((initialData = {}) => {
     if (openNav.value) {
       openNav.onFalse();
     }
-    openCompose.onToggle();
-  }, [openCompose, openNav]);
+    setComposeData(initialData);
+    openCompose.onTrue();
+  }, [openNav]);
+
+  const handleCloseCompose = useCallback(() => {
+    setComposeData(null);
+    openCompose.onFalse();
+  }, []);
 
   const handleClickLabel = useCallback(
     (labelId) => {
@@ -127,7 +135,7 @@ export function MailView() {
                 onCloseNav={openNav.onFalse}
                 selectedLabelId={selectedLabelId}
                 onClickLabel={handleClickLabel}
-                onToggleCompose={handleToggleCompose}
+                onToggleCompose={handleCompose}
               />
             ),
             list: (
@@ -149,13 +157,19 @@ export function MailView() {
                 error={mailError?.message}
                 loading={mailsLoading || mailLoading}
                 renderLabel={(id) => labels.find((label) => label.id === id)}
+                onCompose={handleCompose}
               />
             ),
           }}
         />
       </DashboardContent>
 
-      {openCompose.value && <MailCompose onCloseCompose={openCompose.onFalse} />}
+      {openCompose.value && (
+        <MailCompose 
+          onCloseCompose={handleCloseCompose}
+          initialData={composeData}
+        />
+      )}
     </>
   );
 }

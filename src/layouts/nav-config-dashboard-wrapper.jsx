@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react';
 import Box from '@mui/material/Box';
 
 import { useGetBoard } from 'src/actions/kanban';
+import { useGetUnreadCount } from 'src/actions/mail';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -22,20 +23,21 @@ const Counter = (count) => (
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
-      bgcolor: 'warning.lighter',
-      color: 'warning.darker',
+      bgcolor: 'info.lighter',
+      color: 'info.darker',
       px: 1,
       fontSize: 12,
       fontWeight: 'bold',
     }}
   >
-    {`+${count}`}
+    {count}
   </Box>
 );
 
 export function useNavData() {
   const { user } = useAuthContext();
   const { board } = useGetBoard();
+  const { unreadCount } = useGetUnreadCount();
 
   // Calculate total tasks assigned to user across all columns (except Archive)
   const totalAssignedTasks = useMemo(() => {
@@ -68,13 +70,18 @@ export function useNavData() {
       // Find and update the Kanban item
       const kanbanItem = servicesSection.items.find(item => item.title === 'Kanban');
       if (kanbanItem && totalAssignedTasks > 0) {
-        // Apply the styled counter
         kanbanItem.info = Counter(totalAssignedTasks);
+      }
+
+      // Find and update the Mail item with unread count
+      const mailItem = servicesSection.items.find(item => item.title === 'Mail');
+      if (mailItem && unreadCount > 0) {
+        mailItem.info = Counter(unreadCount);
       }
     }
 
     return newNavData;
-  }, [totalAssignedTasks]);
+  }, [totalAssignedTasks, unreadCount]);
 
   return navData;
 } 
