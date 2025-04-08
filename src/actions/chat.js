@@ -572,7 +572,25 @@ export async function createConversation(conversationData, userid) {
   }
   console.log("conversation added", newConversation.id)
 
-  // Step 2️⃣: Insert participants into `conversation_participants`
+  console.log(is_group)
+  // Step 2️⃣: If it's a group, insert group details into the `groups` table
+  if (is_group) {
+    const { error: groupError } = await supabase
+      .from("groups")
+      .insert({
+        conversation_id: newConversation.id, // Link to the conversation
+        group_name: null, // Default to null if no name is provided
+        group_icon: null // Default to null for the group icon
+      });
+
+    if (groupError) {
+      console.error("Error inserting group details:", groupError);
+      throw groupError;
+    }
+    console.log("Group details added for conversation:", newConversation.id);
+  }
+
+  // Step 3️⃣: Insert participants into `conversation_participants`
   const participantsData = participants.map((participant) => ({
     conversation_id: newConversation.id,
     participant_id: participant.id,
