@@ -3,11 +3,11 @@ import { useBoolean } from 'minimal-shared/hooks';
 import { useState, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
-import Divider from '@mui/material/Divider';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Checkbox from '@mui/material/Checkbox';
@@ -19,7 +19,7 @@ import { darken, lighten, alpha as hexAlpha } from '@mui/material/styles';
 
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
-import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant, sendCalendarResponse } from 'src/utils/gmail';
+import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant, isCalendarEvent, parseCalendarEvent, respondToCalendarEvent } from 'src/utils/gmail';
 
 import { CONFIG } from 'src/global-config';
 
@@ -34,65 +34,170 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
 
-// Helper function to check if email is a calendar invite
-const isCalendarInvite = (mail) => {
-  if (!mail) return false;
-  return mail.subject?.startsWith('Invitation:') || 
-         mail.subject?.startsWith('Updated invitation:');
-};
-
-// Helper function to get current response status
-const getResponseStatus = (mail) => {
-  if (!mail?.labelIds) return 'none';
-  if (mail.labelIds.includes('ACCEPTED')) return 'yes';
-  if (mail.labelIds.includes('TENTATIVE')) return 'maybe';
-  if (mail.labelIds.includes('DECLINED')) return 'no';
-  return 'none';
-};
-
-// Helper function to parse calendar event details from email body
-const parseCalendarEvent = (body) => {
-  if (!body) return null;
-
-  // Extract event details using regex
-  const meetLinkMatch = body.match(/meet\.google\.com\/[a-z-]+/);
-  const whenMatch = body.match(/When\s*([^\n]+)/);
-  const phoneMatch = body.match(/Join by phone[^\n]*\n([^P]+)PIN: ([0-9]+)/);
-  const organizerMatch = body.match(/Organizer\s*([^\n]+)/);
-
-  // Parse the date from the whenMatch
-  let eventDate = null;
-  if (whenMatch) {
-    const dateStr = whenMatch[1].trim();
-    // Try to parse the date string
-    const parsedDate = new Date(dateStr);
-    if (!isNaN(parsedDate.getTime())) {
-      eventDate = parsedDate;
-    } else {
-      // If direct parsing fails, try to extract date components
-      const dateComponents = dateStr.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i);
-      if (dateComponents) {
-        const [_, day, month, year] = dateComponents;
-        const monthMap = {
-          'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
-          'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-        };
-        eventDate = new Date(year, monthMap[month.toLowerCase()], parseInt(day, 10));
-      }
+// Calendar Event Component
+function CalendarEventView({ eventDetails, mailId }) {
+  const { type, title, date, time, location, attendees, organizer, status } = eventDetails;
+  const [isResponding, setIsResponding] = useState(false);
+  const [responseStatus, setResponseStatus] = useState(status);
+  
+  // Determine status color
+  const getStatusColor = () => {
+    switch (responseStatus) {
+      case 'accepted': return 'success.main';
+      case 'declined': return 'error.main';
+      case 'tentative': return 'warning.main';
+      default: return 'info.main';
     }
-  }
-
-  return {
-    meetLink: meetLinkMatch ? `https://${meetLinkMatch[0]}` : null,
-    when: whenMatch ? whenMatch[1].trim() : null,
-    eventDate: eventDate,
-    phone: phoneMatch ? {
-      number: phoneMatch[1].trim(),
-      pin: phoneMatch[2].trim()
-    } : null,
-    organizer: organizerMatch ? organizerMatch[1].trim() : null
   };
-};
+  
+  // Determine status text
+  const getStatusText = () => {
+    switch (responseStatus) {
+      case 'accepted': return 'Accepted';
+      case 'declined': return 'Declined';
+      case 'tentative': return 'Maybe';
+      default: return 'Pending';
+    }
+  };
+  
+  // Handle response to calendar event
+  const handleRespond = useCallback(async (response) => {
+    if (!mailId || isResponding) return;
+    
+    try {
+      setIsResponding(true);
+      await respondToCalendarEvent(mailId, response);
+      setResponseStatus(response);
+      
+      // Show success message
+      // You can implement a toast or notification system here
+      console.log(`Successfully responded with: ${response}`);
+    } catch (error) {
+      console.error('Error responding to calendar event:', error);
+      // Show error message
+    } finally {
+      setIsResponding(false);
+    }
+  }, [mailId, isResponding]);
+  
+  return (
+    <Box
+      sx={{
+        p: 2,
+        mb: 2,
+        borderRadius: 1,
+        bgcolor: 'background.neutral',
+        border: (theme) => `1px solid ${theme.palette.divider}`,
+      }}
+    >
+      <Stack spacing={2}>
+        {/* Event Title */}
+        <Typography variant="h6">{title}</Typography>
+        
+        {/* Event Status */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              bgcolor: getStatusColor(),
+            }}
+          />
+          <Typography variant="body2" color={getStatusColor()}>
+            {getStatusText()}
+          </Typography>
+        </Box>
+        
+        {/* Event Details */}
+        <Stack spacing={1}>
+          {/* Date & Time */}
+          {(date || time) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Iconify icon="mdi:calendar-clock" width={20} />
+              <Typography variant="body2">
+                {date} {time}
+              </Typography>
+            </Box>
+          )}
+          
+          {/* Location */}
+          {location && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Iconify icon="mdi:map-marker" width={20} />
+              <Typography variant="body2">{location}</Typography>
+            </Box>
+          )}
+          
+          {/* Organizer */}
+          {organizer && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Iconify icon="mdi:account" width={20} />
+              <Typography variant="body2">Organizer: {organizer}</Typography>
+            </Box>
+          )}
+          
+          {/* Attendees */}
+          {attendees.length > 0 && (
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+              <Iconify icon="mdi:account-group" width={20} sx={{ mt: 0.5 }} />
+              <Box>
+                <Typography variant="body2" sx={{ mb: 0.5 }}>
+                  Attendees:
+                </Typography>
+                <Stack direction="row" flexWrap="wrap" spacing={1}>
+                  {attendees.map((attendee, index) => (
+                    <Chip
+                      key={index}
+                      label={attendee}
+                      size="small"
+                      variant="outlined"
+                    />
+                  ))}
+                </Stack>
+              </Box>
+            </Box>
+          )}
+        </Stack>
+        
+        {/* Action Buttons for Invitations */}
+        {type === 'invitation' && (
+          <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+            <Button
+              variant={responseStatus === 'accepted' ? "contained" : "outlined"}
+              color="success"
+              startIcon={<Iconify icon="mdi:check" />}
+              size="small"
+              onClick={() => handleRespond('accepted')}
+              disabled={isResponding || responseStatus === 'accepted'}
+            >
+              Yes
+            </Button>
+            <Button
+              variant={responseStatus === 'declined' ? "contained" : "outlined"}
+              color="error"
+              startIcon={<Iconify icon="mdi:close" />}
+              size="small"
+              onClick={() => handleRespond('declined')}
+              disabled={isResponding || responseStatus === 'declined'}
+            >
+              No
+            </Button>
+            <Button
+              variant={responseStatus === 'tentative' ? "contained" : "outlined"}
+              startIcon={<Iconify icon="mdi:clock-outline" />}
+              size="small"
+              onClick={() => handleRespond('tentative')}
+              disabled={isResponding || responseStatus === 'tentative'}
+            >
+              Maybe
+            </Button>
+          </Stack>
+        )}
+      </Stack>
+    </Box>
+  );
+}
 
 export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onCompose }) {
   const showAttachments = useBoolean(true);
@@ -116,13 +221,9 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
   const [downloadingAttachments, setDownloadingAttachments] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [rsvpStatus, setRsvpStatus] = useState(getResponseStatus(mail));
-  const [isRsvpLoading, setIsRsvpLoading] = useState(false);
-
-  // Update RSVP status when mail changes
-  useEffect(() => {
-    setRsvpStatus(getResponseStatus(mail));
-  }, [mail]);
+  // Check if this is a calendar event
+  const isEvent = isCalendarEvent(mail);
+  const eventDetails = isEvent ? parseCalendarEvent(mail) : null;
 
   const handleRefresh = useCallback(async () => {
     if (!mail?.id) return;
@@ -270,29 +371,6 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
     }
   }, [mail?.attachments, handleDownloadAttachment]);
 
-  const handleRsvp = useCallback(async (response) => {
-    if (!mail?.id || isRsvpLoading) return;
-
-    try {
-      setIsRsvpLoading(true);
-      await sendCalendarResponse(mail.id, response);
-      setRsvpStatus(response);
-      
-      // Refresh both the current mail and the mail list
-      await Promise.all([
-        mutate(`gmail-message-${mail.id}`),
-        mutate(['gmail-messages', 'inbox']),
-        mutate(['gmail-messages', 'sent']),
-      ]);
-    } catch (rsvperror) {
-      console.error('Error sending RSVP:', rsvperror);
-      // Revert the status if there was an error
-      setRsvpStatus(getResponseStatus(mail));
-    } finally {
-      setIsRsvpLoading(false);
-    }
-  }, [mail?.id, isRsvpLoading]);
-
   if (loading) {
     return <LoadingScreen />;
   }
@@ -418,14 +496,14 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <Tooltip title="Reply">
             <IconButton size="small" onClick={handleReply}>
-            <Iconify width={18} icon="solar:reply-bold" />
-          </IconButton>
+              <Iconify width={18} icon="solar:reply-bold" />
+            </IconButton>
           </Tooltip>
 
           <Tooltip title="Forward">
             <IconButton size="small" onClick={handleForward}>
-            <Iconify width={18} icon="solar:forward-bold" />
-          </IconButton>
+              <Iconify width={18} icon="solar:forward-bold" />
+            </IconButton>
           </Tooltip>
         </Box>
 
@@ -511,226 +589,62 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
     </Stack>
   );
 
-  const renderCalendarInvite = () => {
-    if (!mail?.body) return null;
-
-    const eventDetails = parseCalendarEvent(mail.body);
-    if (!eventDetails) return null;
-
-    const showRsvpButtons = isCalendarInvite(mail);
-
-    return (
-      <Box
-        sx={{
-          p: 3,
-          gap: 2,
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: 1,
-          bgcolor: 'background.neutral'
-        }}
-      >
-        {/* Event Time */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 1,
-              bgcolor: 'background.paper',
-              textAlign: 'center',
-              minWidth: 80
-            }}
-          >
-            {eventDetails.eventDate && (
-              <>
-                <Typography variant="h6" sx={{ lineHeight: 1 }}>
-                  {eventDetails.eventDate.getDate()}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  {eventDetails.eventDate.toLocaleString('default', { month: 'short' })}
-                </Typography>
-              </>
-            )}
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1">
-              {mail.subject.replace(/^(Invitation: |Accepted: |Declined: |Tentative: )/, '')}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {eventDetails.when}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* RSVP Buttons - only show for invitations */}
-        {showRsvpButtons && (
-          <Stack direction="row" spacing={1}>
-            <Button
-              variant={rsvpStatus === 'yes' ? 'contained' : 'outlined'}
-              color="success"
-              disabled={isRsvpLoading}
-              onClick={() => handleRsvp('yes')}
-              startIcon={<Iconify icon="ic:round-check-circle" />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500
-              }}
-            >
-              Yes
-            </Button>
-            <Button
-              variant={rsvpStatus === 'maybe' ? 'contained' : 'outlined'}
-              color="warning"
-              disabled={isRsvpLoading}
-              onClick={() => handleRsvp('maybe')}
-              startIcon={<Iconify icon="ic:round-help" />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500
-              }}
-            >
-              Maybe
-            </Button>
-            <Button
-              variant={rsvpStatus === 'no' ? 'contained' : 'outlined'}
-              color="error"
-              disabled={isRsvpLoading}
-              onClick={() => handleRsvp('no')}
-              startIcon={<Iconify icon="ic:round-cancel" />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500
-              }}
-            >
-              No
-            </Button>
-          </Stack>
-        )}
-
-        <Divider />
-
-        {/* Meet Link */}
-        {eventDetails.meetLink && (
-          <Button
-            variant="contained"
-            href={eventDetails.meetLink}
-            target="_blank"
-            startIcon={
-              <Iconify 
-                icon="logos:google-meet" 
-                sx={{ 
-                  width: 20, 
-                  height: 20,
-                  mr: 0.5 
-                }} 
-              />
-            }
-            sx={{
-              alignSelf: 'flex-start',
-              bgcolor: '#00796b',
-              color: '#fff',
-              px: 2.5,
-              py: 1,
-              borderRadius: '100px',
-              textTransform: 'none',
-              fontSize: '0.9375rem',
-              fontWeight: 500,
-              letterSpacing: '0.25px',
-              boxShadow: '0 1px 2px 0 rgba(60,64,67,0.302), 0 1px 3px 1px rgba(60,64,67,0.149)',
-              '&:hover': {
-                bgcolor: '#00695c',
-                boxShadow: '0 1px 3px 0 rgba(60,64,67,0.302), 0 4px 8px 3px rgba(60,64,67,0.149)'
-              }
-            }}
-          >
-            Join with Google Meet
-          </Button>
-        )}
-
-        {/* Phone Details */}
-        {eventDetails.phone && (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 0.5,
-            mt: 2 
-          }}>
-            <Typography variant="subtitle2" sx={{ color: 'text.primary' }}>
-              Join by phone
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              {eventDetails.phone.number}
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              PIN: {eventDetails.phone.pin}
-            </Typography>
-          </Box>
-        )}
-
-        {/* Organizer */}
-        {eventDetails.organizer && (
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-            Organized by {eventDetails.organizer}
-          </Typography>
-        )}
-      </Box>
-    );
-  };
-
-  const renderContent = () => {
-    if (!mail?.body) return null;
-
-    if (isCalendarInvite(mail)) {
-      return renderCalendarInvite();
-    }
-
-    return (
-      <Box sx={{ p: 3 }}>
-        <Markdown children={mail?.body || mail?.snippet || ''} />
-      </Box>
+  const renderContent = () => (
+    <Box sx={{ p: 3 }}>
+      {/* Show calendar event view if this is an event email */}
+      {isEvent && eventDetails && (
+        <CalendarEventView 
+          eventDetails={eventDetails} 
+          mailId={mail?.id}
+        />
+      )}
+      
+      {/* Show regular email content */}
+      <Markdown children={mail?.body || mail?.snippet || ''} />
+    </Box>
   );
-  };
 
   return (
-      <>
-        <Box
-          sx={{
+    <>
+      <Box
+        sx={{
           p: 2,
           gap: 2,
-            display: 'flex',
-            alignItems: 'center',
+          display: 'flex',
+          alignItems: 'center',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
-          }}
-        >
-          {renderHead()}
-        </Box>
+        }}
+      >
+        {renderHead()}
+      </Box>
 
-        <Box
+      <Box
         sx={{
-              p: 2,
-              gap: 2,
-              display: 'flex',
+          p: 2,
+          gap: 2,
+          display: 'flex',
           alignItems: 'flex-start',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
         }}
-        >
-          {renderSubject()}
-        </Box>
+      >
+        {renderSubject()}
+      </Box>
 
-        <Box
-          sx={{
+      <Box
+        sx={{
           p: 2,
           gap: 2,
-            display: 'flex',
+          display: 'flex',
           alignItems: 'flex-start',
           borderBottom: (theme) => `solid 1px ${theme.palette.divider}`,
-          }}
-        >
-          {renderSender()}
-        </Box>
+        }}
+      >
+        {renderSender()}
+      </Box>
 
       <Scrollbar>
         {!!mail?.attachments?.length && renderAttachments()}
+
         {renderContent()}
       </Scrollbar>
     </>
@@ -791,7 +705,7 @@ function FileItem({ file, downloading, onDownload }) {
         <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
           {fData(file.size)}
         </Typography>
-        </Stack>
+      </Stack>
     </Box>
   );
 }

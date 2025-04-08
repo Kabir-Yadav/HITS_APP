@@ -175,35 +175,6 @@ const processAttachments = async (messageId, payload) => {
   return attachments;
 };
 
-// Helper function to find the best content part from a message
-const findMessageContent = (part) => {
-  // For calendar invites, prefer HTML content
-  if (part.mimeType === 'text/html' && part.body?.data) {
-    return {
-      content: decodeBase64Url(part.body.data),
-      isHtml: true
-    };
-  }
-  
-  // For plain text content
-  if (part.mimeType === 'text/plain' && part.body?.data) {
-    return {
-      content: decodeBase64Url(part.body.data),
-      isHtml: false
-    };
-  }
-  
-  // Recursively check parts
-  if (part.parts) {
-    for (const subPart of part.parts) {
-      const content = findMessageContent(subPart);
-      if (content) return content;
-    }
-  }
-  
-  return null;
-};
-
 // Helper function to process a Gmail message into our format
 const processGmailMessage = async (messageId) => {
   const details = await gapi.client.gmail.users.messages.get({
@@ -219,37 +190,31 @@ const processGmailMessage = async (messageId) => {
   const date = headers.find(h => h.name === 'Date')?.value || '';
   
   let body = '';
-  let isHtmlContent = false;
   const payload = details.result.payload;
 
-  // Try to find content in the message
-  if (payload.parts) {
-    const content = findMessageContent(payload);
-    if (content) {
-      body = content.content;
-      isHtmlContent = content.isHtml;
+  // Function to find text content in message parts
+  const findTextContent = (part) => {
+    if (part.mimeType === 'text/plain' && part.body?.data) {
+      return decodeBase64Url(part.body.data);
     }
+    if (part.parts) {
+      for (const subPart of part.parts) {
+        const content = findTextContent(subPart);
+        if (content) return content;
+      }
+    }
+    return null;
+  };
+
+  // Try to find text content in the message
+  if (payload.parts) {
+    body = findTextContent(payload) || '';
   } else if (payload.body?.data) {
     body = decodeBase64Url(payload.body.data);
-    isHtmlContent = payload.mimeType === 'text/html';
   }
 
   // Process attachments
   const attachments = await processAttachments(messageId, payload);
-
-  // Check if this is a calendar invite
-  const isCalendarInvite = subject.startsWith('Invitation:') || 
-                          subject.startsWith('Updated invitation:') ||
-                          subject.startsWith('Accepted:') ||
-                          subject.startsWith('Declined:') ||
-                          subject.startsWith('Tentative:');
-
-  // For calendar invites, always preserve HTML content
-  if (isCalendarInvite && !isHtmlContent) {
-    // If we only have plain text for a calendar invite, wrap it in pre tags
-    body = `<pre>${body}</pre>`;
-    isHtmlContent = true;
-  }
 
   return {
     id: messageId,
@@ -259,7 +224,6 @@ const processGmailMessage = async (messageId) => {
     to,
     date,
     body,
-    isHtmlContent,
     snippet: details.result.snippet,
     isRead: !details.result.labelIds.includes('UNREAD'),
     labelIds: details.result.labelIds || [],
@@ -531,75 +495,170 @@ export const toggleImportant = async (messageId, isImportant) => {
   }
 };
 
-// Function to send calendar response
-export const sendCalendarResponse = async (messageId, response) => {
+// Function to detect if an email is a calendar event
+export const isCalendarEvent = (mail) => {
+  if (!mail) return false;
+  
+  // Check for common calendar event indicators
+  const isEvent = mail.subject?.toLowerCase().includes('invitation') ||
+                 mail.subject?.toLowerCase().includes('calendar event') ||
+                 mail.subject?.toLowerCase().includes('accepted') ||
+                 mail.subject?.toLowerCase().includes('declined');
+                 
+  // Check for calendar attachment
+  const hasCalendarAttachment = mail.attachments?.some(
+    attachment => attachment.mimeType === 'text/calendar' || 
+                 attachment.filename?.endsWith('.ics')
+  );
+  
+  return isEvent || hasCalendarAttachment;
+};
+
+// Function to parse calendar event details from email
+export const parseCalendarEvent = (mail) => {
+  if (!mail) return null;
+  
+  // Extract event details from the email body
+  const eventDetails = {
+    type: 'unknown',
+    title: mail.subject,
+    date: null,
+    time: null,
+    location: null,
+    attendees: [],
+    organizer: null,
+    status: 'pending'
+  };
+  
+  // Check for response status
+  if (mail.subject?.toLowerCase().includes('accepted')) {
+    eventDetails.type = 'response';
+    eventDetails.status = 'accepted';
+  } else if (mail.subject?.toLowerCase().includes('declined')) {
+    eventDetails.type = 'response';
+    eventDetails.status = 'declined';
+  } else if (mail.subject?.toLowerCase().includes('invitation')) {
+    eventDetails.type = 'invitation';
+  }
+  
+  // Try to extract event details from the body
+  const body = mail.body || '';
+  
+  // Extract date and time
+  const dateMatch = body.match(/When:?\s*([^\n]+)/i);
+  if (dateMatch) {
+    const dateTimeStr = dateMatch[1].trim();
+    const [date, time] = dateTimeStr.split(/\s+/);
+    eventDetails.date = date;
+    eventDetails.time = time;
+  }
+  
+  // Extract location
+  const locationMatch = body.match(/Where:?\s*([^\n]+)/i);
+  if (locationMatch) {
+    eventDetails.location = locationMatch[1].trim();
+  }
+  
+  // Extract attendees
+  const attendeesMatch = body.match(/Attendees:?\s*([^\n]+)/i);
+  if (attendeesMatch) {
+    eventDetails.attendees = attendeesMatch[1]
+      .split(',')
+      .map(email => email.trim())
+      .filter(Boolean);
+  }
+  
+  // Extract organizer
+  const organizerMatch = body.match(/Organizer:?\s*([^\n]+)/i);
+  if (organizerMatch) {
+    eventDetails.organizer = organizerMatch[1].trim();
+  }
+  
+  return eventDetails;
+};
+
+// Function to respond to a calendar event
+export const respondToCalendarEvent = async (messageId, response) => {
   try {
     await ensureGmailAuth();
     
-    // Get the original message to get event details
-    const message = await fetchGmailMessage(messageId);
-    if (!message) throw new Error('Message not found');
-
-    // Parse the event details
-    const eventDetails = parseCalendarEvent(message.body);
-    if (!eventDetails) throw new Error('Event details not found');
-
-    // Create response email
-    const responseText = {
-      'yes': 'Yes, I will attend',
-      'no': 'No, I cannot attend',
-      'maybe': 'I might attend'
-    }[response];
-
-    const subject = `${responseText}: ${message.subject.replace(/^Invitation: /, '')}`;
+    // Get the event details from the message
+    const message = await gapi.client.gmail.users.messages.get({
+      userId: 'me',
+      id: messageId,
+      format: 'full',
+    });
     
-    // Send the response
-    await sendEmail(
-      message.from,  // Send to the organizer
-      subject,
-      `I am responding ${responseText.toLowerCase()} to the event:\n\n${eventDetails.when}`,
-      {},  // No CC/BCC
-      [],   // No attachments
-      message.threadId  // Keep in same thread
-    );
-
-    // Update the message with appropriate label
-    const labelMap = {
-      'yes': 'ACCEPTED',
-      'no': 'DECLINED',
-      'maybe': 'TENTATIVE'
+    // Extract the event ID from the message
+    const eventId = extractEventId(message.result);
+    if (!eventId) {
+      throw new Error('Could not find event ID in the message');
+    }
+    
+    // Send the response to the calendar API
+    const responseData = {
+      responseStatus: response, // 'accepted', 'declined', or 'tentative'
     };
-
+    
+    const calendarResponse = await gapi.client.calendar.events.patch({
+      calendarId: 'primary',
+      eventId: eventId,
+      resource: responseData,
+      sendUpdates: 'all', // Notify all attendees
+    });
+    
+    // Update the email labels to reflect the response
+    const labelUpdates = {
+      accepted: ['CATEGORY_EVENTS', 'CATEGORY_PERSONAL'],
+      declined: ['CATEGORY_EVENTS', 'CATEGORY_PERSONAL'],
+      tentative: ['CATEGORY_EVENTS', 'CATEGORY_PERSONAL'],
+    };
+    
     await modifyMessageLabels(
       messageId,
-      [labelMap[response]],  // Add new response label
-      ['ACCEPTED', 'DECLINED', 'TENTATIVE'].filter(l => l !== labelMap[response])  // Remove other response labels
+      labelUpdates[response] || [],
+      []
     );
-
-    return true;
+    
+    return calendarResponse.result;
   } catch (error) {
-    console.error('Error sending calendar response:', error);
+    console.error('Error responding to calendar event:', error);
     throw error;
   }
 };
 
-// Helper function to parse calendar event details
-const parseCalendarEvent = (body) => {
-  if (!body) return null;
-
-  // Extract event details using regex
-  const meetLinkMatch = body.match(/meet\.google\.com\/[a-z-]+/);
-  const whenMatch = body.match(/When\s*([^\n]+)/);
-  const phoneMatch = body.match(/Join by phone[^\n]*\n([^P]+)PIN: ([0-9]+)/);
-  const organizerMatch = body.match(/Organizer\s*([^\n]+)/);
-
-  return {
-    meetLink: meetLinkMatch ? `https://${meetLinkMatch[0]}` : null,
-    when: whenMatch ? whenMatch[1].trim() : null,
-    phone: phoneMatch ? {
-      number: phoneMatch[1].trim(),
-      pin: phoneMatch[2].trim()
-    } : null,
-    organizer: organizerMatch ? organizerMatch[1].trim() : null
-  };
+// Helper function to extract event ID from a Gmail message
+const extractEventId = (message) => {
+  // Look for the event ID in the message body
+  const body = message.payload?.body?.data 
+    ? decodeBase64Url(message.payload.body.data) 
+    : '';
+  
+  // Common patterns for event IDs in calendar invitations
+  const eventIdMatch = body.match(/eventid=([^&]+)/i) || 
+                      body.match(/event_id=([^&]+)/i) ||
+                      body.match(/eid=([^&]+)/i);
+  
+  if (eventIdMatch && eventIdMatch[1]) {
+    return decodeURIComponent(eventIdMatch[1]);
+  }
+  
+  // If not found in body, check attachments
+  if (message.payload?.parts) {
+    for (const part of message.payload.parts) {
+      if (part.mimeType === 'text/calendar' || part.filename?.endsWith('.ics')) {
+        const icsContent = part.body?.data 
+          ? decodeBase64Url(part.body.data) 
+          : '';
+        
+        // Look for UID in ICS file
+        const uidMatch = icsContent.match(/UID:([^\r\n]+)/i);
+        if (uidMatch && uidMatch[1]) {
+          return uidMatch[1].trim();
+        }
+      }
+    }
+  }
+  
+  return null;
 }; 
