@@ -76,7 +76,7 @@ export function ChatView() {
   };
 
   const hasConversation = selectedConversationId && conversation;
-
+  console.log(selectedConversationId);
   return (
     <DashboardContent
       maxWidth={false}
@@ -156,6 +156,7 @@ export function ChatView() {
               participants={filteredParticipants}
               loading={conversationLoading}
               messages={conversation?.messages ?? []}
+              conversationId={selectedConversationId}
             />
           ),
         }}

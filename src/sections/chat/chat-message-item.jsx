@@ -393,7 +393,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
 
 
   return (
-    <Box sx={{ mb: 5, display: 'flex', justifyContent: me ? 'flex-end' : 'unset' }}>
+    <Box sx={{ mb: 3, display: 'flex', justifyContent: me ? 'flex-end' : 'unset' }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>

@@ -61,13 +61,25 @@ const fetchConversations = async (userId) => {
       conversations ( id, name, is_group, created_at )
     `)
     .eq("participant_id", userId);
-
   if (convError) throw convError;
   if (!userConversations.length) return [];
 
+  // Get all conversation IDs
   const conversationIds = userConversations.map((c) => c.conversations.id);
 
-  // 🔹 Step 2: Fetch participants for each conversation
+  // 🔹 Step 2: Fetch groups for these conversations (if any)
+  const { data: groupsData, error: groupsError } = await supabase
+    .from("groups")
+    .select("conversation_id, group_name, group_icon")
+    .in("conversation_id", conversationIds);
+  if (groupsError) throw groupsError;
+  // Create a lookup by conversation_id for quick access
+  const groupsByConversation = groupsData.reduce((acc, group) => {
+    acc[group.conversation_id] = group;
+    return acc;
+  }, {});
+
+  // 🔹 Step 3: Fetch participants for each conversation
   const { data: participantsData, error: participantsError } = await supabase
     .from("conversation_participants")
     .select(`
@@ -83,10 +95,9 @@ const fetchConversations = async (userId) => {
       )
     `)
     .in("conversation_id", conversationIds);
-
   if (participantsError) throw participantsError;
 
-  // 🔹 Step 3: Fetch messages and attachments
+  // 🔹 Step 4: Fetch messages and attachments
   const { data: messagesData, error: messagesError } = await supabase
     .from("messages")
     .select(`
@@ -116,21 +127,24 @@ const fetchConversations = async (userId) => {
 
   if (messagesError) throw messagesError;
 
-  // 🔹 Generate Public URLs for attachments
+  // 🔹 Helper: Generate Public URLs for attachments
   const fetchPublicUrls = async (attachments) =>
     Promise.all(
       attachments.map(async (attachment) => {
-        const { data } = supabase.storage.from("chat_attachment").getPublicUrl(attachment.path);
+        const { data } = supabase
+          .storage.from("chat_attachment")
+          .getPublicUrl(attachment.path);
         return { ...attachment, path: data.publicUrl };
       })
     );
 
-  // 🔹 Step 4: Structure the data properly
+  // 🔹 Step 5: Structure the data properly
   const formattedConversations = await Promise.all(
     userConversations.map(async (conv) => {
+      const convId = conv.conversations.id;
       const messages = await Promise.all(
         messagesData
-          .filter((msg) => msg.conversation_id === conv.conversations.id)
+          .filter((msg) => msg.conversation_id === convId)
           .map(async (msg) => ({
             id: msg.id,
             senderId: msg.sender_id,
@@ -143,13 +157,17 @@ const fetchConversations = async (userId) => {
           }))
       );
 
+      // Merge in group details if this is a group conversation
+      const groupDetails = conv.conversations.is_group ? groupsByConversation[convId] : null;
+
       return {
-        id: conv.conversations.id,
+        id: convId,
+        // For one-to-one chats, you still use conversation.name if needed.
         name: conv.conversations.name,
         type: conv.conversations.is_group ? "GROUP" : "ONE_TO_ONE",
         unreadCount: 0,
         participants: participantsData
-          .filter((p) => p.conversation_id === conv.conversations.id)
+          .filter((p) => p.conversation_id === convId)
           .map((p) => ({
             id: p.user_info?.id || "",
             role: p.user_info?.role || "participant",
@@ -160,17 +178,18 @@ const fetchConversations = async (userId) => {
             avatarUrl: p.user_info?.avatar_url || "",
           })),
         messages,
+        // Attach group details here (if any)
+        groups: groupDetails,
         latestMessageTime: messages.length ? new Date(messages[messages.length - 1].createdAt).getTime() : 0,
       };
     })
   );
 
-  // ✅ Sort by most recent message time (descending)
+  // Sort by most recent message time (descending)
   formattedConversations.sort((a, b) => b.latestMessageTime - a.latestMessageTime);
 
-  // ✅ Remove helper property if not needed
+  // Remove the helper property if not needed
   const finalFormattedConversations = formattedConversations.map(({ latestMessageTime, ...rest }) => rest);
-
   return finalFormattedConversations;
 };
 
@@ -221,9 +240,27 @@ export function useGetConversations(userId) {
       )
       .subscribe();
 
+    const groupSubscription = supabase
+      .channel(`group_updates`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "groups",
+        },
+        (payload) => {
+          console.log("Global group update:", payload);
+          // Trigger a revalidation of the conversations list.
+          mutate(["conversations", userId]);
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(conversationSubscription);
       supabase.removeChannel(messageSubscription);
+      supabase.removeChannel(groupSubscription);
     };
   }, [userId, data]);
 
@@ -572,7 +609,25 @@ export async function createConversation(conversationData, userid) {
   }
   console.log("conversation added", newConversation.id)
 
-  // Step 2️⃣: Insert participants into `conversation_participants`
+  console.log(is_group)
+  // Step 2️⃣: If it's a group, insert group details into the `groups` table
+  if (is_group) {
+    const { error: groupError } = await supabase
+      .from("groups")
+      .insert({
+        conversation_id: newConversation.id, // Link to the conversation
+        group_name: null, // Default to null if no name is provided
+        group_icon: null // Default to null for the group icon
+      });
+
+    if (groupError) {
+      console.error("Error inserting group details:", groupError);
+      throw groupError;
+    }
+    console.log("Group details added for conversation:", newConversation.id);
+  }
+
+  // Step 3️⃣: Insert participants into `conversation_participants`
   const participantsData = participants.map((participant) => ({
     conversation_id: newConversation.id,
     participant_id: participant.id,
@@ -909,7 +964,7 @@ export function useChatNotifications(userId) {
   useEffect(() => {
     if (!userId) {
       // If there's no user ID, do nothing
-      return undefined; 
+      return undefined;
       // Returning undefined explicitly satisfies some ESLint "consistent-return" rules
     }
 

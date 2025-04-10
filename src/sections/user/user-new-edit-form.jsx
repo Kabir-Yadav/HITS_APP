@@ -193,20 +193,20 @@ export function UserNewEditForm({ currentUser }) {
         if (signUpError) throw signUpError;
 
         // ✅ Get newly created user from the signup response
-        if (signUpData?.user?.id) {
-          await axios.post('https://apiemployeeos.duckdns.org:8443/api/chat/create', {
-            id: signUpData.user.id,
-            name: `${data.firstName}${data.lastName}`,
-            email: data.email,
-            role: data.role,
-            phone_number: data.phoneNumber,
-            avatar_url: avatarUrl,
-            address: '',
-            status: 'offline',
-          }).catch((error) => {
-            console.error('Failed to save user in DB:', error);
-          });
-        }
+        // if (signUpData?.user?.id) {
+        //   await axios.post('https://apiemployeeos.duckdns.org:8443/api/chat/create', {
+        //     id: signUpData.user.id,
+        //     name: `${data.firstName}${data.lastName}`,
+        //     email: data.email,
+        //     role: data.role,
+        //     phone_number: data.phoneNumber,
+        //     avatar_url: avatarUrl,
+        //     address: '',
+        //     status: 'offline',
+        //   }).catch((error) => {
+        //     console.error('Failed to save user in DB:', error);
+        //   });
+        // }
       }
 
       reset();

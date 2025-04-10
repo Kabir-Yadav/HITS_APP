@@ -78,7 +78,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
       onClose={menuActions.onClose}
     >
       <MenuList>
-        <MenuItem onClick={() => menuActions.onClose()}>
+        {/* <MenuItem onClick={() => menuActions.onClose()}>
           <Iconify icon="solar:bell-off-bold" />
           Hide notifications
         </MenuItem>
@@ -93,7 +93,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
           Report
         </MenuItem>
 
-        <Divider sx={{ borderStyle: 'dashed' }} />
+        <Divider sx={{ borderStyle: 'dashed' }} /> */}
 
         <MenuItem onClick={() => menuActions.onClose()} sx={{ color: 'error.main' }}>
           <Iconify icon="solar:trash-bin-trash-bold" />
@@ -108,13 +108,13 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
       {isGroup ? renderGroup() : renderSingle()}
 
       <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
-        <IconButton>
+        {/* <IconButton>
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
         <IconButton>
           <Iconify icon="solar:videocamera-record-bold" />
-        </IconButton>
+        </IconButton> */}
 
         <IconButton onClick={handleToggleNav}>
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
