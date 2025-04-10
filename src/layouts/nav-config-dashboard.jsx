@@ -96,6 +96,17 @@ export const navData = [
         roles: ['ADMIN', 'HR']
       },
       {
+        title: 'Invoice',
+        path: paths.dashboard.invoice.root,
+        icon: ICONS.invoice,
+        children: [
+          { title: 'List', path: paths.dashboard.invoice.root },
+          { title: 'Details', path: paths.dashboard.invoice.demo.details },
+          { title: 'Create', path: paths.dashboard.invoice.new },
+          { title: 'Edit', path: paths.dashboard.invoice.demo.edit },
+        ],
+      },
+      {
         title: 'User Management',
         path: paths.dashboard.user.root,
         icon: ICONS.userManagement,
