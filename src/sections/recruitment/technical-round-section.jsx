@@ -126,7 +126,7 @@ export function TechnicalRoundSection({ filters, candidate }) {
         // Open calendar in new window
         const calendarWindow = window.open(eventUrl, '_blank');
         
-        // Listen for event creation
+        // Listen for tab switching
         const eventCreated = await listenForCalendarEventCreation(calendarWindow);
 
         if (eventCreated) {
