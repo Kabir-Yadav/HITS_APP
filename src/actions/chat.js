@@ -1079,6 +1079,7 @@ export function useChatNotifications(userId) {
         console.error('Error deleting chat notification:', error);
         // optionally revert local state or re-fetch
       }
+      mutate(['unreadChat', userId])
     } catch (err) {
       console.error('deleteNotification error:', err);
     }
@@ -1111,5 +1112,24 @@ export function useChatNotifications(userId) {
   return {
     notifications,
     deleteNotification,
+  };
+}
+
+async function fetchUnreadChat(userId) {
+  const { data, error } = await supabase
+    .from('chat_notifications')
+    .select('id, body, is_read')
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  if (error) throw error;
+  return Array.isArray(data) ? data.length : 0;
+}
+
+export function useUnreadChat(userId) {
+  const { data, error } = useSWR(userId ? ['unreadChat', userId] : null, () => fetchUnreadChat(userId));
+  return {
+    unreadChatCount: data || 0,
+    isLoading: !data && !error,
+    error,
   };
 }

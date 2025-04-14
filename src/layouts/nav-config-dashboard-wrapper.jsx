@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 
 import Box from '@mui/material/Box';
 
+import { useUnreadChat } from 'src/actions/chat';
 import { useGetBoard } from 'src/actions/kanban';
 import { useGetUnreadCount } from 'src/actions/mail';
 
@@ -38,6 +39,7 @@ export function useNavData() {
   const { user } = useAuthContext();
   const { board } = useGetBoard();
   const { unreadCount } = useGetUnreadCount();
+  const { unreadChatCount, isLoading, error } = useUnreadChat(user.id);
 
   // Calculate total tasks assigned to user across all columns (except Archive)
   const totalAssignedTasks = useMemo(() => {
@@ -71,6 +73,11 @@ export function useNavData() {
       const kanbanItem = servicesSection.items.find(item => item.title === 'Kanban');
       if (kanbanItem && totalAssignedTasks > 0) {
         kanbanItem.info = Counter(totalAssignedTasks);
+      }
+
+      const chatItem = servicesSection.items.find(item => item.title === 'Chat');
+      if (chatItem && unreadChatCount > 0) {
+        chatItem.info = Counter(unreadChatCount);
       }
 
       // Find and update the Mail item with unread count
