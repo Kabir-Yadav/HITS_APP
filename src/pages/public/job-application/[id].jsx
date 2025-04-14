@@ -50,16 +50,20 @@ export default function PublicJobApplicationPage() {
 
   const handleCreateApplication = async (data) => {
     try {
-      const { error } = await supabase.from('applications').insert([{
+      const { data: application, error } = await supabase.from('applications').insert([{
         ...data,
         status: 'pending',
         current_stage: 'application_received'
-      }]);
+      }]).select().single();
 
       if (error) throw error;
 
-      // Show success message
-      return true;
+      // Show success message with application ID and timestamp
+      return {
+        success: true,
+        applicationId: application.id,
+        timestamp: application.created_at
+      };
     } catch (error) {
       console.error('Error creating application:', error);
       throw error;

@@ -40,7 +40,12 @@ export const NewJobSchema = zod.object({
   joining_months: zod.string().min(0),
   is_internship: zod.boolean(),
   duration_months: zod.string().min(0),
-  expected_ctc_range: zod.string().min(1, { message: 'CTC range is required!' }),
+  expected_ctc_range: zod.string().refine((val, ctx) => {
+    if (!ctx.parent.is_internship && !val) {
+      return false;
+    }
+    return true;
+  }, { message: 'CTC range is required for non-internship positions!' }),
   posted_by_name: zod.string(),
   posted_by_email: zod.string().email(),
 });

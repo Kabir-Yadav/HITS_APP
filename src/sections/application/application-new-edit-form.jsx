@@ -34,6 +34,7 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [resumeFile, setResumeFile] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submittedApplication, setSubmittedApplication] = useState(null);
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -125,13 +126,14 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
 
   const handleCreateApplication = async (data) => {
     try {
-      const success = await onSubmit(data);
+      const result = await onSubmit(data);
       reset();
-      if (success) {
+      if (result?.success) {
         if (!publicMode) {
           enqueueSnackbar(currentApplication ? 'Update success!' : 'Create success!');
           router.push(paths.dashboard.application.root);
         } else {
+          setSubmittedApplication(result);
           setSubmitSuccess(true);
         }
       }
@@ -146,6 +148,12 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
       <Card sx={{ p: 3, textAlign: 'center' }}>
         <Iconify icon="eva:checkmark-circle-2-fill" width={60} sx={{ color: 'success.main', mb: 2 }} />
         <Typography variant="h4" sx={{ mb: 2 }}>Application Submitted Successfully!</Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Your application ID is: <strong>{submittedApplication?.applicationId}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Submitted on: {new Date(submittedApplication?.timestamp).toLocaleString()}
+        </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Thank you for your application. We will review it and get back to you soon.
         </Typography>
