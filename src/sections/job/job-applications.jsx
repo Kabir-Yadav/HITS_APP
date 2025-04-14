@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
 import TableSortLabel from '@mui/material/TableSortLabel';
+import Button from '@mui/material/Button';
 
 import { fDate } from 'src/utils/format-time';
 
@@ -122,7 +123,7 @@ export function JobApplications({ jobId }) {
                   ) : null}
                 </TableSortLabel>
               </TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell align="right">Resume</TableCell>
             </TableRow>
           </TableHead>
 
@@ -157,16 +158,14 @@ export function JobApplications({ jobId }) {
                 <TableCell>{fDate(application.created_at)}</TableCell>
 
                 <TableCell align="right">
-                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Tooltip title="View Resume">
-                      <IconButton 
-                        onClick={() => handleViewResume(application.resume_url)}
-                        color="info"
-                      >
-                        <Iconify icon="solar:file-text-bold" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
+                  <Button
+                    variant="text"
+                    color="info"
+                    onClick={() => handleViewResume(application.resume_url)}
+                    startIcon={<Iconify icon="solar:file-text-bold" />}
+                  >
+                    View
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
