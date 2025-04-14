@@ -41,7 +41,6 @@ export function useNavData() {
   const { unreadCount } = useGetUnreadCount();
   const { unreadChatCount, isLoading, error } = useUnreadChat(user.id);
 
-  console.log(unreadChatCount, '<- Unread');
   // Calculate total tasks assigned to user across all columns (except Archive)
   const totalAssignedTasks = useMemo(() => {
     if (!board || !user) return 0;

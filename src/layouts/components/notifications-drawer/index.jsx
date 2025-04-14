@@ -88,7 +88,6 @@ export function NotificationsDrawer({ sx, ...other }) {
 
   // [MODIFIED for combined logic] totalUnRead uses the selected array
   const totalUnRead = selectedNotifications.length;
-  console.log(chatNotifications, '<-Chat Notification');
   // [MODIFIED for combined logic] Mark all as read => delete all in selected array
   const handleMarkAllAsRead = async () => {
     try {
