@@ -136,6 +136,12 @@ export function useGetBoard() {
         console.error('Error fetching board:', fetchError);
         throw fetchError;
       }
+    },
+    {
+      ...swrOptions,
+      refreshInterval: 2000, // Refresh every 2 seconds
+      revalidateOnFocus: true, // Revalidate when window regains focus
+      revalidateOnReconnect: true, // Revalidate when reconnected to network
     }
   );
 

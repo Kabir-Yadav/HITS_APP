@@ -209,7 +209,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Total Applications"
-            percent={0}
             total={stats.totalApplications}
             chart={{
               series: [stats.totalApplications],
@@ -220,7 +219,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Total Shortlisted"
-            percent={((stats.totalShortlisted / stats.totalApplications) * 100) || 0}
             total={stats.totalShortlisted}
             chart={{
               colors: [theme.palette.success.main],
@@ -232,7 +230,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Total Rejected"
-            percent={((stats.totalRejected / stats.totalApplications) * 100) || 0}
             total={stats.totalRejected}
             chart={{
               colors: [theme.palette.error.main],
@@ -244,7 +241,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Pending Applications"
-            percent={((stats.totalPending / stats.totalApplications) * 100) || 0}
             total={stats.totalPending}
             chart={{
               colors: [theme.palette.warning.main],
@@ -256,7 +252,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Total Jobs"
-            percent={0}
             total={stats.totalJobs}
             chart={{
               colors: [theme.palette.info.main],
@@ -268,7 +263,6 @@ export function OverviewAppView() {
         <Grid size={{ xs: 12, sm: 6, md: 4 }}>
           <AppWidgetSummary
             title="Total Positions"
-            percent={0}
             total={stats.totalPositions}
             chart={{
               colors: [theme.palette.primary.main],
