@@ -41,23 +41,25 @@ export function useNavData() {
   const { unreadCount } = useGetUnreadCount();
   const { unreadChatCount, isLoading, error } = useUnreadChat(user.id);
 
+  console.log(unreadChatCount, '<- Unread');
   // Calculate total tasks assigned to user across all columns (except Archive)
   const totalAssignedTasks = useMemo(() => {
     if (!board || !user) return 0;
 
     return Object.entries(board.tasks).reduce((total, [columnId, columnTasks]) => {
       // Find the column name for this columnId
-      const column = board.columns.find(col => col.id === columnId);
-      
+      const column = board.columns.find((col) => col.id === columnId);
+
       // Skip if column is Archive
       if (column?.name === 'Archive') return total;
 
       // Count tasks assigned to user in this column
-      const assignedTasks = columnTasks.filter(task => 
-        task.assignee?.some(assignee => assignee.id === user.id) || 
-        task.reporter?.id === user.id
+      const assignedTasks = columnTasks.filter(
+        (task) =>
+          task.assignee?.some((assignee) => assignee.id === user.id) ||
+          task.reporter?.id === user.id
       );
-      
+
       return total + assignedTasks.length;
     }, 0);
   }, [board, user]);
@@ -65,30 +67,30 @@ export function useNavData() {
   // Clone and modify the static nav data
   const navData = useMemo(() => {
     const newNavData = [...staticNavData];
-    
+
     // Find the services section
-    const servicesSection = newNavData.find(section => section.subheader === 'Services');
+    const servicesSection = newNavData.find((section) => section.subheader === 'Services');
     if (servicesSection) {
       // Find and update the Kanban item
-      const kanbanItem = servicesSection.items.find(item => item.title === 'Kanban');
+      const kanbanItem = servicesSection.items.find((item) => item.title === 'Kanban');
       if (kanbanItem && totalAssignedTasks > 0) {
         kanbanItem.info = Counter(totalAssignedTasks);
       }
 
-      const chatItem = servicesSection.items.find(item => item.title === 'Chat');
+      const chatItem = servicesSection.items.find((item) => item.title === 'Chat');
       if (chatItem && unreadChatCount > 0) {
         chatItem.info = Counter(unreadChatCount);
       }
 
       // Find and update the Mail item with unread count
-      const mailItem = servicesSection.items.find(item => item.title === 'Mail');
+      const mailItem = servicesSection.items.find((item) => item.title === 'Mail');
       if (mailItem && unreadCount > 0) {
         mailItem.info = Counter(unreadCount);
       }
     }
 
     return newNavData;
-  }, [totalAssignedTasks, unreadCount]);
+  }, [totalAssignedTasks, unreadCount,unreadChatCount]);
 
   return navData;
-} 
+}

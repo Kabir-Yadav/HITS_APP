@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
 
+import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { Label } from 'src/components/label';
@@ -27,7 +28,7 @@ const formatDueDate = (startDate, endDate) => {
 
     const start = isValidDate(startDate) ? format(new Date(startDate), 'MMM d, yyyy') : '';
     const end = isValidDate(endDate) ? format(new Date(endDate), 'MMM d, yyyy') : '';
-    
+
     if (start && end) {
       return `Due: ${start} - ${end}`;
     }
@@ -70,10 +71,7 @@ export function NotificationItem({ notification, onDelete }) {
   const router = useRouter();
 
   const renderAvatar = (
-    <Avatar 
-      src={notification.task?.reporter?.avatar_url} 
-      sx={{ width: 40, height: 40 }}
-    >
+    <Avatar src={notification.task?.reporter?.avatar_url} sx={{ width: 40, height: 40 }}>
       {notification.task?.reporter?.name?.charAt(0) || 'U'}
     </Avatar>
   );
@@ -85,7 +83,7 @@ export function NotificationItem({ notification, onDelete }) {
         if (onDelete) {
           await onDelete(notification.id);
         }
-        
+
         // Then navigate to kanban with the task ID
         router.push({
           pathname: '/dashboard/kanban',
@@ -296,7 +294,6 @@ export function NotificationItem({ notification, onDelete }) {
   );
 }
 
-
 // ==============================================================================
 //                        NEW CHAT NOTIFICATION ITEM
 // ==============================================================================
@@ -335,24 +332,18 @@ export function ChatNotificationItem({ notification, onDelete }) {
 
   // A minimal avatar (assuming we have actor info):
   const renderAvatar = (
-    <Avatar 
-      src={notification.actor?.avatar_url} 
-      sx={{ width: 40, height: 40 }}
-    >
+    <Avatar src={notification.actor?.avatar_url} sx={{ width: 40, height: 40 }}>
       {notification.actor?.full_name?.charAt(0) || 'U'}
     </Avatar>
   );
 
-  // We might want to navigate to the conversation. 
+  // We might want to navigate to the conversation.
   // e.g. /dashboard/chat?conversationId=xxxx
   const handleClick = async () => {
     if (onDelete) {
       await onDelete(notification.id);
     }
-    router.push({
-      pathname: '/dashboard/chat',
-      query: { conversationId: notification.conversation_id },
-    });
+    router.push(`${paths.dashboard.chat}?id=${notification.conversation_id}`);
   };
 
   // Render different text based on `notification_type`
@@ -437,9 +428,7 @@ export function ChatNotificationItem({ notification, onDelete }) {
         {renderUnReadBadge()}
         {renderAvatar}
 
-        <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
-          {renderText()}
-        </Box>
+        <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>{renderText()}</Box>
       </Stack>
     </ListItemButton>
   );

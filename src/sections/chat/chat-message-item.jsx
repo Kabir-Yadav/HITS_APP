@@ -65,7 +65,7 @@ export function ChatMessageItem({
 
   const deleteMessage = useDeleteMessage();
   const handleDeleteMessage = async () => {
-    await deleteMessage(message.id, conversationId);
+    await deleteMessage(message.id, conversationId, user.id);
     setOpenDialog(false);
   };
   //-----------------------------------Emoji function------------------------------------------

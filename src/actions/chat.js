@@ -227,7 +227,7 @@ export function useGetConversations(userId) {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
           filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(",")})`,
@@ -736,7 +736,7 @@ export async function clickConversation(conversationId) {
 }
 
 export function useDeleteMessage() {
-  return async (messageId, conversationId) => {
+  return async (messageId, conversationId, userId) => {
     try {
       const { error } = await supabase.from('messages').delete().eq('id', messageId);
 
@@ -749,6 +749,7 @@ export function useDeleteMessage() {
 
       // ✅ Re-fetch conversation messages after deletion
       mutate(["conversation", conversationId]);
+      mutate(['conversations', userId]);
 
     } catch (error) {
       console.error("Failed to delete message:", error);
@@ -1127,6 +1128,30 @@ async function fetchUnreadChat(userId) {
 
 export function useUnreadChat(userId) {
   const { data, error } = useSWR(userId ? ['unreadChat', userId] : null, () => fetchUnreadChat(userId));
+  useEffect(() => {
+    if (!userId) return () => { };
+
+    const unreadSubscription = supabase
+      .channel(`unread_subscription`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_notifications",
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          mutate(['unreadChat', userId]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(unreadSubscription);
+    };
+  }, [userId]);
+
   return {
     unreadChatCount: data || 0,
     isLoading: !data && !error,
