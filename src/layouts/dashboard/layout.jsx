@@ -110,7 +110,7 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
           <Searchbar data={navData} />
 
           {/** @slot Language popover */}
-          <LanguagePopover
+          {/* <LanguagePopover
             data={[
               { value: 'en', label: 'English', countryCode: 'GB' },
               { value: 'fr', label: 'French', countryCode: 'FR' },
@@ -118,7 +118,7 @@ export function DashboardLayout({ sx, cssVars, children, slotProps, layoutQuery 
               { value: 'cn', label: 'Chinese', countryCode: 'CN' },
               { value: 'ar', label: 'Arabic', countryCode: 'SA' },
             ]}
-          />
+          /> */}
 
           {/** @slot Notifications popover */}
           <NotificationsDrawer data={_notifications} />

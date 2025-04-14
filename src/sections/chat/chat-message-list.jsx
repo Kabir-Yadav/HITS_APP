@@ -18,7 +18,8 @@ export function ChatMessageList({ messages = [], conversationId, participants, l
       message.attachments
         ?.filter(
           (attachment) =>
-            attachment.type.startsWith("image/") || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(attachment.type.toLowerCase())
+            attachment.type.startsWith('image/') ||
+            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(attachment.type.toLowerCase())
         )
         .map((attachment) => ({ src: attachment.preview ?? attachment.path })) || []
   );
