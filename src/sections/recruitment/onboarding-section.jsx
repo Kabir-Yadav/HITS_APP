@@ -22,6 +22,7 @@ import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import MenuItem from '@mui/material/MenuItem';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useInterviews } from 'src/hooks/use-interviews';
@@ -31,6 +32,8 @@ import { fDate } from 'src/utils/format-time';
 import { Iconify } from 'src/components/iconify';
 import { TableNoData } from 'src/components/table';
 import { Scrollbar } from 'src/components/scrollbar';
+
+import { supabase } from 'src/lib/supabase';
 
 // ----------------------------------------------------------------------
 
@@ -44,11 +47,31 @@ export function OnboardingSection({ filters }) {
   const [interviewer, setInterviewer] = useState('');
   const [assignedBy, setAssignedBy] = useState('');
   const [duration, setDuration] = useState('');
+  const [hrUsers, setHrUsers] = useState([]);
 
   const statusDialog = useBoolean();
   const loading = useBoolean();
 
   const { interviews, applications, fetchInterviews, scheduleInterview, updateInterviewStatus } = useInterviews();
+
+  // Fetch HR users
+  useEffect(() => {
+    const fetchHrUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_info')
+          .select('id, full_name, email')
+          .eq('role', 'HR');
+
+        if (error) throw error;
+        setHrUsers(data || []);
+      } catch (error) {
+        console.error('Error fetching HR users:', error);
+      }
+    };
+
+    fetchHrUsers();
+  }, []);
 
   useEffect(() => {
     fetchInterviews('onboarding', filters);
@@ -277,12 +300,12 @@ export function OnboardingSection({ filters }) {
       open={scheduleDialog} 
       onClose={() => setScheduleDialog(false)}
     >
-      <DialogTitle>Schedule Onboarding</DialogTitle>
+      <DialogTitle>Schedule Onboarding Interview</DialogTitle>
 
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 2 }}>
           <DatePicker
-            label="Onboarding Date"
+            label="Interview Date"
             value={scheduleDate}
             onChange={(newValue) => setScheduleDate(newValue)}
             slotProps={{
@@ -294,7 +317,7 @@ export function OnboardingSection({ filters }) {
           />
 
           <TimePicker
-            label="Onboarding Time"
+            label="Interview Time"
             value={scheduleDate}
             onChange={(newValue) => setScheduleDate(newValue)}
             slotProps={{
@@ -305,21 +328,51 @@ export function OnboardingSection({ filters }) {
             }}
           />
 
-          <TextField
-            fullWidth
-            label="HR Representative"
-            value={interviewer}
-            onChange={(e) => setInterviewer(e.target.value)}
-            error={!interviewer}
-          />
+          <Stack spacing={2}>
+            <TextField
+              select
+              fullWidth
+              label="HR Representative"
+              value={interviewer}
+              onChange={(e) => setInterviewer(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  PaperProps: {
+                    sx: { maxHeight: 220 },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">Select HR Representative</MenuItem>
+              {hrUsers.map((hrUser) => (
+                <MenuItem key={hrUser.id} value={hrUser.full_name}>
+                  {hrUser.full_name}
+                </MenuItem>
+              ))}
+            </TextField>
 
-          <TextField
-            fullWidth
-            label="Assigned By"
-            value={assignedBy}
-            onChange={(e) => setAssignedBy(e.target.value)}
-            error={!assignedBy}
-          />
+            <TextField
+              select
+              fullWidth
+              label="Assigned By"
+              value={assignedBy}
+              onChange={(e) => setAssignedBy(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  PaperProps: {
+                    sx: { maxHeight: 220 },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="">Select Assigner</MenuItem>
+              {hrUsers.map((hrUser) => (
+                <MenuItem key={hrUser.id} value={hrUser.full_name}>
+                  {hrUser.full_name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
         </Stack>
       </DialogContent>
 
