@@ -68,7 +68,7 @@ export function UserDashboardView() {
                 <Grid size={{ xs: 12, md: 9 }}>
                     <AppWelcome
                         title={`Welcome back 👋 \n ${fullName}`}
-                        description="If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything."
+                        description="Let's see what is going on at F13 Technologies employee space"
                         img={<SeoIllustration hideBackground />}
                         action={
                             <Button variant="contained" color="primary">
@@ -82,7 +82,7 @@ export function UserDashboardView() {
                     <AppFeatured list={_appFeatured} />
                 </Grid>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                {/*<Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <AnalyticsWidgetSummary
                         title="Weekly sales"
                         percent={2.6}
@@ -155,7 +155,7 @@ export function UserDashboardView() {
                             series: [56, 30, 23, 54, 47, 40, 62, 73],
                         }}
                     />
-                </Grid>
+                </Grid>*/}
 
                 <Grid size={{ xs: 12, md: 6, lg: 8 }}>
                     <AnalyticsTasks title="Today's Tasks" />
