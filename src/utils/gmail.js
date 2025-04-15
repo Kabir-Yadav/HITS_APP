@@ -27,8 +27,8 @@ const getTokenFromStorage = () => {
   const { token, timestamp } = JSON.parse(stored);
   const now = new Date().getTime();
   
-  // Token expires after 1 hour
-  if (now - timestamp > 3600000) {
+  // Token expires after 7 days (604800000 ms)
+  if (now - timestamp > 604800000) {
     localStorage.removeItem('gmailToken');
     return null;
   }
@@ -99,24 +99,29 @@ export const ensureGmailAuth = async () => {
     }
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      tokenClient.callback = async (response) => {
-        if (response.error !== undefined) {
-          reject(response);
-          return;
-        }
-        saveTokenToStorage(response);
-        await gapi.client.gmail.users.getProfile({ userId: 'me' });
-        resolve({ status: 'new_token', response });
-      };
-      
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } catch (err) {
-      console.error('Auth error:', err);
-      reject(err);
-    }
-  });
+  // Only request new token if we don't have a valid one
+  if (!storedToken && !currentToken) {
+    return new Promise((resolve, reject) => {
+      try {
+        tokenClient.callback = async (response) => {
+          if (response.error !== undefined) {
+            reject(response);
+            return;
+          }
+          saveTokenToStorage(response);
+          await gapi.client.gmail.users.getProfile({ userId: 'me' });
+          resolve({ status: 'new_token', response });
+        };
+        
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      } catch (err) {
+        console.error('Auth error:', err);
+        reject(err);
+      }
+    });
+  }
+
+  return { status: 'no_token' };
 };
 
 // Helper function to decode base64url encoded strings
