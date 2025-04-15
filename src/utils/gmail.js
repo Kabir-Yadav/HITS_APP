@@ -350,28 +350,21 @@ const createEmail = async (to, subject, body, { cc = '', bcc = '' } = {}, attach
 // Send email with attachments
 export async function sendEmail(to, subject, body, { cc, bcc } = {}, attachments = [], threadId = null) {
   try {
-    const message = {
-      to,
-      subject,
-      body,
-      cc,
-      bcc,
-      threadId // Include threadId if this is a reply
-    };
-
-    const response = await fetch('/api/gmail/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
+    await ensureGmailAuth();
+    
+    // Create the email content
+    const raw = await createEmail(to, subject, body, { cc, bcc }, attachments);
+    
+    // Send the email using Gmail API
+    const response = await gapi.client.gmail.users.messages.send({
+      userId: 'me',
+      resource: {
+        raw,
+        threadId // Include threadId if this is a reply
+      }
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send email');
-    }
-
-    return response.json();
+    return response.result;
   } catch (error) {
     console.error('Error sending email:', error);
     throw error;
