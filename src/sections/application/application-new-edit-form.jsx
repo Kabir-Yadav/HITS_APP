@@ -209,18 +209,6 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Please stand by while we review your application and reach out to you.
         </Typography>
-        <Button
-          variant="contained"
-          onClick={() => {
-            if (publicMode) {
-              window.location.href = '/';
-            } else {
-              router.push(paths.dashboard.application.root);
-            }
-          }}
-        >
-          {publicMode ? 'Return to Home' : 'View Applications'}
-        </Button>
       </Card>
     );
   }
