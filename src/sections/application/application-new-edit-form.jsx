@@ -35,6 +35,7 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
   const [resumeFile, setResumeFile] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
+  const [existingApplication, setExistingApplication] = useState(null);
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -124,8 +125,39 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
     }
   };
 
+  const checkExistingApplication = async (jobId, email) => {
+    try {
+      const { data, error } = await supabase
+        .from('applications')
+        .select('id, created_at')
+        .eq('job_id', jobId)
+        .eq('email', email)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error checking existing application:', error);
+      return null;
+    }
+  };
+
   const handleCreateApplication = async (data) => {
     try {
+      // Check for existing application
+      const existing = await checkExistingApplication(data.job_id, data.email);
+      
+      if (existing) {
+        setExistingApplication({
+          applicationId: existing.id,
+          timestamp: existing.created_at,
+        });
+        return;
+      }
+
       const result = await onSubmit(data);
       reset();
       if (result?.success) {
@@ -142,6 +174,39 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
       enqueueSnackbar('Error occurred!', { variant: 'error' });
     }
   };
+
+  if (existingApplication) {
+    return (
+      <Card sx={{ p: 3, textAlign: 'center' }}>
+        <Iconify icon="eva:info-circle-fill" width={60} sx={{ color: 'info.main', mb: 2 }} />
+        <Typography variant="h4" sx={{ mb: 2 }}>Application Already Exists</Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          You have already applied for this position.
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Your application ID is: <strong>{existingApplication.applicationId}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Submitted on: {new Date(existingApplication.timestamp).toLocaleString()}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Please stand by while we review your application and reach out to you.
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() => {
+            if (publicMode) {
+              window.location.href = '/';
+            } else {
+              router.push(paths.dashboard.application.root);
+            }
+          }}
+        >
+          {publicMode ? 'Return to Home' : 'View Applications'}
+        </Button>
+      </Card>
+    );
+  }
 
   if (submitSuccess) {
     return (
