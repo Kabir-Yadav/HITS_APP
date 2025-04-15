@@ -74,7 +74,7 @@ export function useGetMails(labelId = 'inbox') {
     },
     {
       ...swrOptions,
-      refreshInterval: 1000, // Refresh every second
+      refreshInterval: 3000, // Changed from 1000 to 3000 (3 seconds)
       revalidateOnFocus: true,
       revalidateIfStale: true,
     }
@@ -161,7 +161,7 @@ export function useGetUnreadCount() {
     },
     {
       ...swrOptions,
-      refreshInterval: 1000, // Refresh every second
+      refreshInterval: 3000, // Changed from 1000 to 3000 (3 seconds)
       revalidateOnFocus: true,
       revalidateIfStale: true,
     }
