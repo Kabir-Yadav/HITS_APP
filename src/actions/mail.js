@@ -140,8 +140,9 @@ export function useGetUnreadCount() {
     },
     {
       ...swrOptions,
-      refreshInterval: 30000, // Refresh every 30 seconds
+      refreshInterval: 1000, // Refresh every second
       revalidateOnFocus: true, // Revalidate when window gets focus
+      revalidateIfStale: true, // Revalidate if data is stale
     }
   );
 

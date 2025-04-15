@@ -661,4 +661,50 @@ const extractEventId = (message) => {
   }
   
   return null;
-}; 
+};
+
+/**
+ * Mark a message as read by removing the UNREAD label
+ * @param {string} messageId - The ID of the message to mark as read
+ */
+export async function markAsRead(messageId) {
+  try {
+    await ensureGmailAuth();
+    
+    const response = await gapi.client.gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      resource: {
+        removeLabelIds: ['UNREAD']
+      }
+    });
+
+    return response.result;
+  } catch (error) {
+    console.error('Error marking message as read:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark a message as unread by adding the UNREAD label
+ * @param {string} messageId - The ID of the message to mark as unread
+ */
+export async function markAsUnread(messageId) {
+  try {
+    await ensureGmailAuth();
+    
+    const response = await gapi.client.gmail.users.messages.modify({
+      userId: 'me',
+      id: messageId,
+      resource: {
+        addLabelIds: ['UNREAD']
+      }
+    });
+
+    return response.result;
+  } catch (error) {
+    console.error('Error marking message as unread:', error);
+    throw error;
+  }
+} 

@@ -1,4 +1,5 @@
 import { mutate } from 'swr';
+import { useSnackbar } from 'notistack';
 import { useBoolean } from 'minimal-shared/hooks';
 import { useState, useCallback, useEffect } from 'react';
 
@@ -19,7 +20,7 @@ import { darken, lighten, alpha as hexAlpha } from '@mui/material/styles';
 
 import { fData } from 'src/utils/format-number';
 import { fDateTime } from 'src/utils/format-time';
-import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant, isCalendarEvent, parseCalendarEvent, respondToCalendarEvent } from 'src/utils/gmail';
+import { downloadAttachment, prepareReply, prepareForward, toggleStarred, toggleImportant, isCalendarEvent, parseCalendarEvent, respondToCalendarEvent, markAsRead, markAsUnread } from 'src/utils/gmail';
 
 import { CONFIG } from 'src/global-config';
 
@@ -200,16 +201,19 @@ function CalendarEventView({ eventDetails, mailId }) {
 }
 
 export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onCompose }) {
+  const { enqueueSnackbar } = useSnackbar();
   const showAttachments = useBoolean(true);
   const [isStarred, setIsStarred] = useState(mail?.labelIds?.includes('STARRED') || false);
   const [isImportant, setIsImportant] = useState(mail?.labelIds?.includes('IMPORTANT') || false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isRead, setIsRead] = useState(mail?.isRead || false);
 
   // Update state when mail changes
   useEffect(() => {
     if (mail) {
       setIsStarred(mail.labelIds?.includes('STARRED') || false);
       setIsImportant(mail.labelIds?.includes('IMPORTANT') || false);
+      setIsRead(mail.isRead || false);
     }
   }, [mail]);
 
@@ -324,6 +328,43 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
       setIsUpdating(false);
     }
   }, [mail?.id, isImportant, isUpdating]);
+
+  const handleToggleRead = useCallback(async () => {
+    if (!mail?.id || isUpdating) return;
+
+    try {
+      setIsUpdating(true);
+      const newValue = !isRead;
+      
+      if (newValue) {
+        await markAsRead(mail.id);
+        enqueueSnackbar('Marked as read', { variant: 'success' });
+      } else {
+        await markAsUnread(mail.id);
+        enqueueSnackbar('Marked as unread', { variant: 'success' });
+      }
+      
+      setIsRead(newValue);
+      
+      // Refresh the mail data
+      await mutate(`gmail-message-${mail.id}`);
+      
+      // Get the current label from the mail's labelIds
+      const currentLabel = mail.labelIds?.find(id => 
+        ['INBOX', 'SENT', 'DRAFT', 'TRASH', 'SPAM', 'IMPORTANT', 'STARRED'].includes(id)
+      ) || 'INBOX';
+      
+      // Refresh the mail list for the current label
+      await mutate(['gmail-messages', currentLabel.toLowerCase()]);
+    } catch (readerror) {
+      console.error('Error toggling read status:', readerror);
+      enqueueSnackbar('Failed to update read status', { variant: 'error' });
+      // Revert the state if there was an error
+      setIsRead(!isRead);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, [mail?.id, isRead, isUpdating, enqueueSnackbar]);
 
   const handleDownloadAttachment = useCallback(async (attachment) => {
     try {
@@ -463,9 +504,18 @@ export function MailDetails({ mail, renderLabel, isEmpty, error, loading, onComp
           </IconButton>
         </Tooltip>
 
-        <Tooltip title="Mark Unread">
-          <IconButton>
-            <Iconify icon="fluent:mail-unread-20-filled" />
+        <Tooltip title={isRead ? "Mark as Unread" : "Mark as Read"}>
+          <IconButton 
+            onClick={handleToggleRead}
+            disabled={isUpdating}
+            color={!isRead ? "primary" : "default"}
+          >
+            <Iconify 
+              icon={isRead ? "fluent:mail-read-20-filled" : "fluent:mail-unread-20-filled"}
+              sx={{ 
+                ...(isUpdating && { animation: 'spin 1s linear infinite' }),
+              }} 
+            />
           </IconButton>
         </Tooltip>
 

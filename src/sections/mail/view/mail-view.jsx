@@ -1,3 +1,4 @@
+import { mutate } from 'swr';
 import { useBoolean } from 'minimal-shared/hooks';
 import { useEffect, useCallback, useState, startTransition } from 'react';
 
@@ -100,6 +101,24 @@ export function MailView() {
       handleClickMail(firstMailId);
     }
   }, [firstMailId, handleClickMail, selectedMailId]);
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // Refresh the current mail if selected
+      if (selectedMailId) {
+        mutate(`gmail-message-${selectedMailId}`);
+      }
+      
+      // Refresh the mail list for the current label
+      mutate(['gmail-messages', selectedLabelId.toLowerCase()]);
+      
+      // Refresh labels
+      mutate('gmail-labels');
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [selectedMailId, selectedLabelId]);
 
   return (
     <>

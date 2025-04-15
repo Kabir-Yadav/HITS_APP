@@ -5,6 +5,8 @@ import { CONFIG } from 'src/global-config';
 import { Iconify } from 'src/components/iconify';
 import { SvgColor } from 'src/components/svg-color';
 
+import { MailNavLabel } from 'src/sections/mail/mail-nav-label';
+
 
 // ----------------------------------------------------------------------
 
@@ -82,7 +84,10 @@ export const navData = [
         title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
       },
       {
-        title: 'Mail', path: paths.dashboard.mail, icon: ICONS.mail
+        title: 'Mail',
+        path: paths.dashboard.mail,
+        icon: ICONS.mail,
+        info: MailNavLabel
       },
       {
         title: 'Recruitment',
