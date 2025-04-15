@@ -40,7 +40,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      minify: 'esbuild', 
+      minify: false, 
       sourcemap: true, 
       chunkSizeWarningLimit: 5000, 
     },

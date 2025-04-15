@@ -35,6 +35,7 @@ export function useGetLabels() {
       labels: [
         { id: 'all', name: 'All Mail', color: '#00B8D9' },
         { id: 'inbox', name: 'Inbox', color: '#00B8D9' },
+        { id: 'unread', name: 'Unread', color: '#FF5630' },
         { id: 'sent', name: 'Sent', color: '#36B37E' },
         { id: 'drafts', name: 'Drafts', color: '#FF5630' },
         { id: 'trash', name: 'Trash', color: '#FF8B00' },

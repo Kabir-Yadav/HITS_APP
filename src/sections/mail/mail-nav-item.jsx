@@ -1,6 +1,8 @@
 import Box from '@mui/material/Box';
 import ListItemButton from '@mui/material/ListItemButton';
 
+import { useGetUnreadCount } from 'src/actions/mail';
+
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -8,6 +10,7 @@ import { Iconify } from 'src/components/iconify';
 const LABEL_ICONS = {
   all: 'fluent:mail-24-filled',
   inbox: 'solar:inbox-bold',
+  unread: 'solar:inbox-unread-bold',
   trash: 'solar:trash-bin-trash-bold',
   drafts: 'solar:file-text-bold',
   spam: 'solar:danger-bold',
@@ -22,6 +25,8 @@ const LABEL_ICONS = {
 // ----------------------------------------------------------------------
 
 export function MailNavItem({ selected, label, onClickNavItem, ...other }) {
+  const { unreadCount } = useGetUnreadCount();
+
   const labelIcon = LABEL_ICONS[label.id];
 
   return (
@@ -52,9 +57,9 @@ export function MailNavItem({ selected, label, onClickNavItem, ...other }) {
           {label.name}
         </Box>
 
-        {!!label.unreadCount && (
+        {label.id === 'unread' && unreadCount > 0 && (
           <Box component="span" sx={{ typography: 'caption' }}>
-            {label.unreadCount}
+            {unreadCount}
           </Box>
         )}
       </ListItemButton>
