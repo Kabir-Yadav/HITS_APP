@@ -127,20 +127,33 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
 
   const checkExistingApplication = async (jobId, email) => {
     try {
+      // First, check if any applications exist with the same email and job_id
       const { data, error } = await supabase
         .from('applications')
-        .select('id, created_at')
+        .select('id, created_at, status')
         .eq('job_id', jobId)
         .eq('email', email)
-        .single();
+        .order('created_at', { ascending: false });
 
       if (error) {
-        throw error;
+        console.error('Database query error:', error);
+        enqueueSnackbar('Error checking application status', { variant: 'error' });
+        return null;
       }
 
-      return data;
+      // If we found any applications, return the most recent one
+      if (data && data.length > 0) {
+        return {
+          id: data[0].id,
+          created_at: data[0].created_at,
+          status: data[0].status
+        };
+      }
+
+      return null;
     } catch (error) {
       console.error('Error checking existing application:', error);
+      enqueueSnackbar('Error checking application status', { variant: 'error' });
       return null;
     }
   };
@@ -154,6 +167,7 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
         setExistingApplication({
           applicationId: existing.id,
           timestamp: existing.created_at,
+          status: existing.status
         });
         return;
       }
@@ -185,6 +199,9 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           Your application ID is: <strong>{existingApplication.applicationId}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Status: <strong>{existingApplication.status || 'Pending'}</strong>
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
           Submitted on: {new Date(existingApplication.timestamp).toLocaleString()}
