@@ -1,4 +1,4 @@
-'use client'
+'use client';
 
 import { useState, useEffect, useCallback, startTransition } from 'react';
 
@@ -54,10 +54,29 @@ export function ChatView() {
     }
   }, [conversationError, router, selectedConversationId]);
 
-  // ✅ **Handle adding recipients for a new chat**
   const handleAddRecipients = useCallback((selected) => {
-    setRecipients(selected);
-  }, []);
+    const isSelfSelected = selected.some((recipient) => recipient.id === user?.id);
+    const isOtherSelected = selected.some((recipient) => recipient.id !== user?.id);
+  
+    if (isSelfSelected && isOtherSelected) {
+      // If the user selects himself along with others, then keep only self.
+      setRecipients(selected.filter((recipient) => recipient.id === user?.id));
+    } else {
+      setRecipients(selected);
+    }
+  }, [user]);
+  
+  // Compute available contacts based on the current selection:
+  const availableContacts = (() => {
+    // If no recipients are selected, show all contacts.
+    if (recipients.length === 0) return contacts;
+    // If self is selected, only show self (all other people disappear).
+    if (recipients.some((recipient) => recipient.id === user?.id)) {
+      return contacts.filter((contact) => contact.id === user?.id);
+    }
+    // If any non-self is selected, filter out self.
+    return contacts.filter((contact) => contact.id !== user?.id);
+  })();
 
   // ✅ **Filter out the current user from conversation participants**
   const filteredParticipants = conversation
@@ -70,8 +89,8 @@ export function ChatView() {
     setReplyTo({
       id: message.id,
       body: message.body,
-      senderName: message.senderId === user.id ? 'You' : sender ? sender.name : "Unknown",
-      attachments: message.attachments
+      senderName: message.senderId === user.id ? 'You' : sender ? sender.name : 'Unknown',
+      attachments: message.attachments,
     });
   };
 
@@ -95,7 +114,7 @@ export function ChatView() {
               loading={conversationLoading}
             />
           ) : (
-            <ChatHeaderCompose contacts={contacts} onAddRecipients={handleAddRecipients} />
+            <ChatHeaderCompose contacts={availableContacts} onAddRecipients={handleAddRecipients} />
           ),
           nav: (
             <div
