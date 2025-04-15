@@ -3,16 +3,7 @@ import useSWR, { mutate } from 'swr';
 
 import { supabase } from 'src/lib/supabase';
 
-export function useGetAllUsers() {
-  return useSWR('all_users', async () => {
-    const { data, error } = await supabase
-      .from('user_info') // or 'auth.users' if that’s where you store user data
-      .select('id, full_name, email, avatar_url');
 
-    if (error) throw error;
-    return data; // e.g. [{id, full_name, email, avatar_url}, ...]
-  });
-}
 // ----------------------------------------------------------------------------
 // This hook fetches both files and folders from Supabase, then formats them
 // to match the structure of your mock data used in the File Manager view.

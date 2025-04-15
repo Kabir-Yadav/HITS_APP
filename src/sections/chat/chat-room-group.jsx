@@ -18,14 +18,21 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Autocomplete,
+  TextField,
 } from '@mui/material';
 
 import { fData } from 'src/utils/format-number';
 
 import { supabase } from 'src/lib/supabase';
+import { useGetAllUsers } from 'src/actions/users';
+import { addUsersToGroup } from 'src/actions/chat';
 
 import { Field } from 'src/components/hook-form';
 import { Iconify } from 'src/components/iconify';
+import { Scrollbar } from 'src/components/scrollbar';
+
+import { useMockedUser } from 'src/auth/hooks';
 
 import { CollapseButton } from './styles';
 import { ChatRoomParticipantDialog } from './chat-room-participant-dialog';
@@ -37,11 +44,25 @@ export function ChatRoomGroup({ participants, groupId }) {
 
   const [selected, setSelected] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   // Group info from database
   const [groupName, setGroupName] = useState('');
   const [groupImage, setGroupImage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+
+  const { data: allUsers = [] } = useGetAllUsers();
+  const { user } = useMockedUser();
+  const [invitedUsers, setInvitedUsers] = useState([]);
+
+  // State for the "selected user" from the autocomplete
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const filteredUsers = allUsers.filter(
+    (u) =>
+      u.id !== user.id &&
+      !participants.some((p) => p.id === u.id) &&
+      !invitedUsers.some((inv) => inv.id === u.id)
+  );
 
   const defaultValues = {
     groupName: '',
@@ -111,6 +132,37 @@ export function ChatRoomGroup({ participants, groupId }) {
     setIsEditDialogOpen(false);
   };
 
+  const handleInviteDialogOpen = () => {
+    setIsInviteDialogOpen(true);
+  };
+
+  const handleInviteDialogClose = () => {
+    setIsInviteDialogOpen(false);
+    setInvitedUsers([]);
+  };
+
+  const handleUserSelect = (event, newValue) => {
+    if (newValue) {
+      setInvitedUsers((prev) => [...prev, newValue]);
+    }
+    setSelectedUser(null);
+  };
+
+  // Invite handler: You can call your invite action with invitedUsers here.
+  const handleInvite = async () => {
+    if (invitedUsers.length === 0) return;
+    try {
+      const result = await addUsersToGroup(groupId, invitedUsers);
+      if (!result) {
+        throw new Error("Unable to add users to group; no data returned.");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+    setInvitedUsers([]);
+    handleInviteDialogClose();
+  };
+  
   // Submit updated group name + avatar
   const onSubmit = handleSubmit(async (data) => {
     try {
@@ -132,9 +184,7 @@ export function ChatRoomGroup({ participants, groupId }) {
         }
 
         // Fetch public URL of the newly uploaded avatar
-        const { data: fileData } = supabase.storage
-          .from('group-avatar')
-          .getPublicUrl(filePath);
+        const { data: fileData } = supabase.storage.from('group-avatar').getPublicUrl(filePath);
 
         if (fileData?.publicUrl) {
           newAvatarUrl = fileData.publicUrl;
@@ -183,11 +233,7 @@ export function ChatRoomGroup({ participants, groupId }) {
 
       <Stack alignItems="center">
         {groupImage ? (
-          <Avatar
-            alt={groupName}
-            src={groupImage}
-            sx={{ width: 96, height: 96, mb: 2 }}
-          />
+          <Avatar alt={groupName} src={groupImage} sx={{ width: 96, height: 96, mb: 2 }} />
         ) : (
           <Box
             sx={{
@@ -196,7 +242,7 @@ export function ChatRoomGroup({ participants, groupId }) {
               mb: 2,
               display: 'flex',
               alignItems: 'center',
-                justifyContent: 'center',
+              justifyContent: 'center',
               borderRadius: '50%',
             }}
           >
@@ -211,10 +257,7 @@ export function ChatRoomGroup({ participants, groupId }) {
   const renderList = () => (
     <>
       {participants.map((participant) => (
-        <ListItemButton
-          key={participant.id}
-          onClick={() => handleOpen(participant)}
-        >
+        <ListItemButton key={participant.id} onClick={() => handleOpen(participant)}>
           <Badge variant={participant.status} badgeContent="">
             <Avatar alt={participant.name} src={participant.avatarUrl} />
           </Badge>
@@ -240,27 +283,27 @@ export function ChatRoomGroup({ participants, groupId }) {
         selected={collapse.value}
         disabled={!totalParticipants}
         onClick={collapse.onToggle}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+        }}
       >
         {`In room (${totalParticipants})`}
+        <Box sx={{ ml: 'auto', mr: 1 }}>
+          <IconButton onClick={handleInviteDialogOpen}>
+            <Iconify icon="solar:user-plus-rounded-bold" />
+          </IconButton>
+        </Box>
       </CollapseButton>
 
       <Collapse in={collapse.value}>{renderList()}</Collapse>
 
       {selected && (
-        <ChatRoomParticipantDialog
-          participant={selected}
-          open={!!selected}
-          onClose={handleClose}
-        />
+        <ChatRoomParticipantDialog participant={selected} open={!!selected} onClose={handleClose} />
       )}
 
       {/* Edit Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onClose={handleEditDialogClose}
-        fullWidth
-        maxWidth="sm"
-      >
+      <Dialog open={isEditDialogOpen} onClose={handleEditDialogClose} fullWidth maxWidth="sm">
         <DialogTitle>Edit Group</DialogTitle>
 
         {/* Use FormProvider so Field components work */}
@@ -289,11 +332,7 @@ export function ChatRoomGroup({ participants, groupId }) {
                   }
                 />
 
-                <Field.Text
-                  name="groupName"
-                  label="Group Name"
-                  placeholder="Enter group name..."
-                />
+                <Field.Text name="groupName" label="Group Name" placeholder="Enter group name..." />
               </Stack>
             </DialogContent>
 
@@ -302,16 +341,91 @@ export function ChatRoomGroup({ participants, groupId }) {
                 Cancel
               </Button>
 
-              <LoadingButton
-                type="submit"
-                variant="contained"
-                loading={isSubmitting}
-              >
+              <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
                 Save Changes
               </LoadingButton>
             </DialogActions>
           </form>
         </FormProvider>
+      </Dialog>
+
+      {/* Invite Dialog */}
+      <Dialog open={isInviteDialogOpen} onClose={handleInviteDialogClose} fullWidth maxWidth="xs">
+        <DialogTitle>Invite Users</DialogTitle>
+        <DialogContent>
+          <Autocomplete
+            options={filteredUsers}
+            getOptionLabel={(option) => option.email || 'Unnamed'}
+            value={selectedUser}
+            onChange={handleUserSelect}
+            renderOption={(props, option) => {
+              const { key, ...optionProps } = props;
+              return (
+                <Box
+                  key={key}
+                  component="li"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 1,
+                    width: '100%',
+                  }}
+                  {...optionProps}
+                >
+                  {/* Avatar */}
+                  <Avatar
+                    src={option.avatar_url}
+                    alt={option.full_name}
+                    sx={{ width: 40, height: 40 }}
+                  />
+
+                  {/* Name & Email */}
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                    <Box sx={{ fontWeight: 'bold', fontSize: '1rem' }}>{option.full_name}</Box>
+                    <Box sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>{option.email}</Box>
+                  </Box>
+                </Box>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Search user by name"
+                placeholder="Select user"
+                fullWidth
+                sx={{ mb: 2 }}
+              />
+            )}
+          />
+          {invitedUsers.length > 0 && (
+            <Scrollbar sx={{ maxHeight: 200, mb: 2 }}>
+              <Box component="ul" sx={{ listStyle: 'none', p: 0, m: 0 }}>
+                {invitedUsers.map((person) => (
+                  <Box component="li" sx={{ display: 'flex', alignItems: 'center', py: 1 }}>
+                    <Avatar alt={person.full_name} src={person.avatar_url} sx={{ mr: 2 }} />
+
+                    <ListItemText
+                      primary={person.full_name}
+                      sx={{ flexGrow: 1, pr: 1 }}
+                      slotProps={{
+                        primary: { noWrap: true },
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            </Scrollbar>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button variant="outlined" onClick={handleInviteDialogClose} color="inherit">
+            Close
+          </Button>
+          <Button variant="contained" disabled={invitedUsers.length === 0} onClick={handleInvite}>
+            Invite
+          </Button>
+        </DialogActions>
       </Dialog>
     </>
   );

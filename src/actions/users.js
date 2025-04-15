@@ -60,7 +60,8 @@ async function fetchUpcomingBirthdays() {
     const combined = [...realUsers, dummyProfile];
 
     combined.sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
-    return combined;
+    const filtered = combined.filter(user => user.daysUntilBirthday <= 45);
+    return filtered;
 }
 
 export function useUpcomingBirthdays() {
@@ -74,4 +75,15 @@ export function useUpcomingBirthdays() {
         isLoading: !data && !error,
         error,
     };
+}
+
+export function useGetAllUsers() {
+    return useSWR('all_users', async () => {
+        const { data, error } = await supabase
+            .from('user_info') // or 'auth.users' if that’s where you store user data
+            .select('id, full_name, email, avatar_url');
+
+        if (error) throw error;
+        return data; // e.g. [{id, full_name, email, avatar_url}, ...]
+    });
 }

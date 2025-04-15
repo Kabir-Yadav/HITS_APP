@@ -1158,3 +1158,26 @@ export function useUnreadChat(userId) {
     error,
   };
 }
+
+export async function addUsersToGroup(conversationId, userIds) {
+  // userIds can be a single id or an array of ids.
+  const payload = Array.isArray(userIds)
+    ? userIds.map(userId => ({
+      conversation_id: conversationId,
+      participant_id: userId.id,
+    }))
+    : [{ conversation_id: conversationId, participant_id: userIds }];
+
+  // Insert the new users into the conversation_participants table
+  const response = await supabase
+    .from('conversation_participants')
+    .insert(payload);
+
+  if (!response || response.error) {
+    console.error('Error adding user(s) to group:', response?.error);
+    throw response ? response.error : new Error("No response from insert");
+  }
+
+  mutate(["conversation", conversationId]);
+  return response.data;
+}
