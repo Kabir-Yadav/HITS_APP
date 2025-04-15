@@ -2,7 +2,7 @@ import useSWR from 'swr';
 import { useMemo } from 'react';
 import { keyBy } from 'es-toolkit';
 
-import { fetchGmailMessages, fetchGmailMessage, sendEmail } from 'src/utils/gmail';
+import { fetchGmailMessages, fetchGmailMessage, sendEmail, ensureGmailAuth } from 'src/utils/gmail';
 
 import { fetcher, endpoints } from 'src/lib/axios';
 
@@ -35,6 +35,7 @@ export function useGetLabels() {
       labels: [
         { id: 'all', name: 'All Mail', color: '#00B8D9' },
         { id: 'inbox', name: 'Inbox', color: '#00B8D9' },
+        { id: 'unread', name: 'Unread', color: '#FF5630' },
         { id: 'sent', name: 'Sent', color: '#36B37E' },
         { id: 'drafts', name: 'Drafts', color: '#FF5630' },
         { id: 'trash', name: 'Trash', color: '#FF8B00' },
@@ -59,12 +60,23 @@ export function useGetMails(labelId = 'inbox') {
   const { data, isLoading, error, isValidating } = useSWR(
     ['gmail-messages', labelId],
     async () => {
-      const messages = await fetchGmailMessages(50, LABEL_MAPPINGS[labelId] || '');
-      return { mails: messages };
+      try {
+        const authResult = await ensureGmailAuth();
+        if (authResult.status === 'no_token') {
+          return { mails: [] }; // Return empty array if no token
+        }
+        const messages = await fetchGmailMessages(50, LABEL_MAPPINGS[labelId] || '');
+        return { mails: messages };
+      } catch (fetcherror) {
+        console.error('Error fetching mails:', fetcherror);
+        return { mails: [] };
+      }
     },
     {
       ...swrOptions,
-      keepPreviousData: false, // Don't keep old data when switching labels
+      refreshInterval: 1000, // Refresh every second
+      revalidateOnFocus: true,
+      revalidateIfStale: true,
     }
   );
 
@@ -135,13 +147,23 @@ export function useGetUnreadCount() {
   const { data, isLoading } = useSWR(
     'gmail-unread-count',
     async () => {
-      const messages = await fetchGmailMessages(50, 'INBOX');
-      return countUnreadMessages(messages);
+      try {
+        const authResult = await ensureGmailAuth();
+        if (authResult.status === 'no_token') {
+          return 0; // Return 0 if no token instead of showing login window
+        }
+        const messages = await fetchGmailMessages(50, 'INBOX');
+        return countUnreadMessages(messages);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+        return 0;
+      }
     },
     {
       ...swrOptions,
-      refreshInterval: 30000, // Refresh every 30 seconds
-      revalidateOnFocus: true, // Revalidate when window gets focus
+      refreshInterval: 1000, // Refresh every second
+      revalidateOnFocus: true,
+      revalidateIfStale: true,
     }
   );
 

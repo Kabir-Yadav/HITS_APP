@@ -28,8 +28,8 @@ const getTokenFromStorage = () => {
   if (!tokenData) return null;
 
   const { token, timestamp } = JSON.parse(tokenData);
-  // Check if token is less than 1 hour old (3600000 ms)
-  if (new Date().getTime() - timestamp < 3600000) {
+  // Check if token is less than 7 days old (604800000 ms)
+  if (new Date().getTime() - timestamp < 604800000) {
     return token;
   }
   

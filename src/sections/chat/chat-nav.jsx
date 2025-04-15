@@ -191,7 +191,7 @@ export function ChatNav({ loading, contacts, collapseNav, conversations, selecte
         fullWidth
         value={searchContacts.query}
         onChange={(event) => handleSearchContacts(event.target.value)}
-        placeholder="Search contacts..."
+        placeholder="Search conversation..."
         slotProps={{
           input: {
             startAdornment: (
