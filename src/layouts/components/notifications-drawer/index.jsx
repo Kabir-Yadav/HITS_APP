@@ -26,14 +26,11 @@ import { varTap, varHover, transitionTap } from 'src/components/animate';
 
 import { useAuthContext } from 'src/auth/hooks';
 
-import { NotificationItem,ChatNotificationItem  } from './notification-item';
-
+import { NotificationItem, ChatNotificationItem } from './notification-item';
 
 // ----------------------------------------------------------------------
 
-const TABS = [
-  { value: 'unread', label: 'Unread', count: 12 },
-];
+const TABS = [{ value: 'unread', label: 'Unread', count: 12 }];
 
 const DROPDOWN_OPTIONS = [
   { value: 'kanban', label: 'Kanban' },
@@ -46,7 +43,8 @@ const DROPDOWN_OPTIONS = [
 export function NotificationsDrawer({ sx, ...other }) {
   const { user } = useAuthContext();
   const { notifications, deleteNotification } = useKanbanNotifications(user?.id);
-  const { notifications: chatNotifications, deleteNotification: deleteChatNotification } = useChatNotifications(user?.id);
+  const { notifications: chatNotifications, deleteNotification: deleteChatNotification } =
+    useChatNotifications(user?.id);
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedOption, setSelectedOption] = useState('kanban');
@@ -77,33 +75,27 @@ export function NotificationsDrawer({ sx, ...other }) {
     selectedOption === 'chat'
       ? chatNotifications
       : selectedOption === 'file-manager'
-      ? [] // For now, empty
-      : notifications; // default is Kanban
-  console.log(chatNotifications);
+        ? [] // For now, empty
+        : notifications; // default is Kanban
+
   // [NEW for combined logic] Decide which delete function to use
   const selectedDeleteNotification =
     selectedOption === 'chat'
       ? deleteChatNotification
       : selectedOption === 'file-manager'
-      ? () => {} // no-op for now
-      : deleteNotification;
+        ? () => {} // no-op for now
+        : deleteNotification;
 
   // [MODIFIED for combined logic] totalUnRead uses the selected array
   const totalUnRead = selectedNotifications.length;
-
   // [MODIFIED for combined logic] Mark all as read => delete all in selected array
   const handleMarkAllAsRead = async () => {
     try {
-      await Promise.all(
-        selectedNotifications.map((notif) =>
-          selectedDeleteNotification(notif.id)
-        )
-      );
+      await Promise.all(selectedNotifications.map((notif) => selectedDeleteNotification(notif.id)));
     } catch (error) {
       console.error('Error marking all as read:', error);
     }
   };
-
 
   const renderHead = () => (
     <Box
@@ -147,7 +139,7 @@ export function NotificationsDrawer({ sx, ...other }) {
           justifyContent: 'center',
           alignItems: 'center',
           height: 48,
-        }
+        },
       }}
     >
       <Button
@@ -158,10 +150,10 @@ export function NotificationsDrawer({ sx, ...other }) {
           borderColor: 'divider',
           '&:hover': {
             backgroundColor: 'action.hover',
-          }
+          },
         }}
       >
-        {DROPDOWN_OPTIONS.find(option => option.value === selectedOption)?.label}
+        {DROPDOWN_OPTIONS.find((option) => option.value === selectedOption)?.label}
       </Button>
 
       <Menu
@@ -173,7 +165,7 @@ export function NotificationsDrawer({ sx, ...other }) {
             mt: 1,
             minWidth: 180,
             boxShadow: (theme) => theme.customShadows.z20,
-          }
+          },
         }}
       >
         {DROPDOWN_OPTIONS.map((option) => (
@@ -192,10 +184,9 @@ export function NotificationsDrawer({ sx, ...other }) {
                 primary: {
                   sx: {
                     fontWeight: option.value === selectedOption ? 600 : 400,
-                  }
-                }
-              }
-              }
+                  },
+                },
+              }}
             />
           </MenuItem>
         ))}
@@ -209,8 +200,7 @@ export function NotificationsDrawer({ sx, ...other }) {
           backgroundColor: 'transparent',
           '& .MuiTabs-flexContainer': {
             justifyContent: 'center',
-          }
-
+          },
         }}
       >
         {TABS.map((tab) => (
@@ -219,13 +209,8 @@ export function NotificationsDrawer({ sx, ...other }) {
             iconPosition="end"
             value={tab.value}
             label={tab.label}
-
             icon={
-              <Label
-                variant={((tab.value === currentTab) && 'filled') || 'soft'}
-                color="info"
-
-              >
+              <Label variant={(tab.value === currentTab && 'filled') || 'soft'} color="info">
                 {totalUnRead}
               </Label>
             }
@@ -242,13 +227,10 @@ export function NotificationsDrawer({ sx, ...other }) {
           <>
             {notifications.map((notification) => (
               <Box component="li" key={notification.id} sx={{ listStyle: 'none' }}>
-                <NotificationItem
-                  notification={notification}
-                  onDelete={deleteNotification}
-                />
+                <NotificationItem notification={notification} onDelete={deleteNotification} />
               </Box>
             ))}
-  
+
             {notifications.length === 0 && (
               <Box sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="subtitle2">No notifications</Typography>
@@ -256,7 +238,7 @@ export function NotificationsDrawer({ sx, ...other }) {
             )}
           </>
         )}
-  
+
         {selectedOption === 'chat' && (
           <>
             {chatNotifications.map((notification) => (
@@ -267,7 +249,7 @@ export function NotificationsDrawer({ sx, ...other }) {
                 />
               </Box>
             ))}
-  
+
             {chatNotifications.length === 0 && (
               <Box sx={{ p: 3, textAlign: 'center' }}>
                 <Typography variant="subtitle2">No chat notifications</Typography>
@@ -275,7 +257,7 @@ export function NotificationsDrawer({ sx, ...other }) {
             )}
           </>
         )}
-  
+
         {selectedOption === 'file-manager' && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="subtitle2">No file manager notifications</Typography>
@@ -284,7 +266,6 @@ export function NotificationsDrawer({ sx, ...other }) {
       </Box>
     </Scrollbar>
   );
-  
 
   return (
     <>

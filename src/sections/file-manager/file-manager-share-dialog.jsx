@@ -9,7 +9,8 @@ import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
 import { Autocomplete, Avatar, MenuItem } from '@mui/material';
 
-import { useGetAllUsers, shareFile } from 'src/actions/filemanager';
+import { useGetAllUsers } from 'src/actions/users';
+import { shareFile } from 'src/actions/filemanager';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -50,7 +51,7 @@ export function FileManagerShareDialog({
       return;
     }
     try {
-      console.log(ownerId, fileId)
+      console.log(ownerId, fileId);
       const result = await shareFile(ownerId, fileId, selectedUser.id, accessType);
       if (!result.success) {
         toast.error('Failed to share file');
@@ -111,7 +112,6 @@ export function FileManagerShareDialog({
               </Box>
             );
           }}
-
           renderInput={(params) => (
             <TextField
               {...params}
@@ -159,11 +159,7 @@ export function FileManagerShareDialog({
           <Button variant="outlined" color="inherit" onClick={onClose}>
             Close
           </Button>
-          <Button
-            variant="contained"
-            disabled={!selectedUser}
-            onClick={handleShare}
-          >
+          <Button variant="contained" disabled={!selectedUser} onClick={handleShare}>
             Share
           </Button>
         </Box>

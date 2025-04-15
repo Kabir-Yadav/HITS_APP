@@ -228,7 +228,7 @@ export function useGetConversations(userId) {
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "messages",
           filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(",")})`,
@@ -788,7 +788,7 @@ export async function clickConversation(conversationId) {
 }
 
 export function useDeleteMessage() {
-  return async (messageId, conversationId) => {
+  return async (messageId, conversationId, userId) => {
     try {
       const { error } = await supabase.from('messages').delete().eq('id', messageId);
 
@@ -801,6 +801,7 @@ export function useDeleteMessage() {
 
       // ✅ Re-fetch conversation messages after deletion
       mutate(["conversation", conversationId]);
+      mutate(['conversations', userId]);
 
     } catch (error) {
       console.error("Failed to delete message:", error);
@@ -1131,6 +1132,7 @@ export function useChatNotifications(userId) {
         console.error('Error deleting chat notification:', error);
         // optionally revert local state or re-fetch
       }
+      mutate(['unreadChat', userId])
     } catch (err) {
       console.error('deleteNotification error:', err);
     }
@@ -1164,4 +1166,70 @@ export function useChatNotifications(userId) {
     notifications,
     deleteNotification,
   };
+}
+
+async function fetchUnreadChat(userId) {
+  const { data, error } = await supabase
+    .from('chat_notifications')
+    .select('id, body, is_read')
+    .eq('user_id', userId)
+    .eq('is_read', false);
+  if (error) throw error;
+  return Array.isArray(data) ? data.length : 0;
+}
+
+export function useUnreadChat(userId) {
+  const { data, error } = useSWR(userId ? ['unreadChat', userId] : null, () => fetchUnreadChat(userId));
+  useEffect(() => {
+    if (!userId) return () => { };
+
+    const unreadSubscription = supabase
+      .channel(`unread_subscription`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_notifications",
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          mutate(['unreadChat', userId]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(unreadSubscription);
+    };
+  }, [userId]);
+
+  return {
+    unreadChatCount: data || 0,
+    isLoading: !data && !error,
+    error,
+  };
+}
+
+export async function addUsersToGroup(conversationId, userIds) {
+  // userIds can be a single id or an array of ids.
+  const payload = Array.isArray(userIds)
+    ? userIds.map(userId => ({
+      conversation_id: conversationId,
+      participant_id: userId.id,
+    }))
+    : [{ conversation_id: conversationId, participant_id: userIds }];
+
+  // Insert the new users into the conversation_participants table
+  const response = await supabase
+    .from('conversation_participants')
+    .insert(payload);
+
+  if (!response || response.error) {
+    console.error('Error adding user(s) to group:', response?.error);
+    throw response ? response.error : new Error("No response from insert");
+  }
+
+  mutate(["conversation", conversationId]);
+  return response.data;
 }

@@ -6,14 +6,14 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import { useTheme } from '@mui/material';
 import Avatar from '@mui/material/Avatar';
-import Dialog from "@mui/material/Dialog";
-import Button from "@mui/material/Button";
+import Dialog from '@mui/material/Dialog';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import DialogTitle from "@mui/material/DialogTitle";
+import DialogTitle from '@mui/material/DialogTitle';
 import ListItemText from '@mui/material/ListItemText';
-import DialogContent from "@mui/material/DialogContent";
-import DialogActions from "@mui/material/DialogActions";
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 
 import { fToNow } from 'src/utils/format-time';
 import { fDateTime } from 'src/utils/format-time';
@@ -29,7 +29,14 @@ import { getMessage } from './utils/get-message';
 
 // ----------------------------------------------------------------------
 
-export function ChatMessageItem({ message, conversationId, participants, onOpenLightbox, onReply, allmessages }) {
+export function ChatMessageItem({
+  message,
+  conversationId,
+  participants,
+  onOpenLightbox,
+  onReply,
+  allmessages,
+}) {
   const { user } = useMockedUser();
 
   const { me, senderDetails, hasImage, hasFile } = getMessage({
@@ -58,17 +65,17 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
 
   const deleteMessage = useDeleteMessage();
   const handleDeleteMessage = async () => {
-    await deleteMessage(message.id, conversationId);
+    await deleteMessage(message.id, conversationId, user.id);
     setOpenDialog(false);
   };
   //-----------------------------------Emoji function------------------------------------------
 
   const [openEmojiPicker, setOpenEmojiPicker] = useState(false);
-  const [pickerPosition, setPickerPosition] = useState("top");
+  const [pickerPosition, setPickerPosition] = useState('top');
   const pickerRef = useRef(null);
 
   useEffect(() => {
-    if (!openEmojiPicker) return () => { };
+    if (!openEmojiPicker) return () => {};
 
     const handleClickOutside = (event) => {
       if (pickerRef.current && !pickerRef.current.contains(event.target)) {
@@ -88,7 +95,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
   const themes = useTheme();
   const pickerTheme = themes.palette.mode === 'dark' ? 'dark' : 'light';
 
-  //-----------------------------------Attachement message-------------------------------------  
+  //-----------------------------------Attachement message-------------------------------------
 
   const renderAttachments = (isCurrentUser) => {
     if (!attachments || attachments.length === 0) return null;
@@ -97,7 +104,9 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
       <Stack spacing={1} sx={{ mb: 1, alignItems: isCurrentUser ? 'end' : 'start' }}>
         {attachments.map((attachment, index) => {
           const fileType = attachment.type.toLowerCase();
-          const isImage = attachment.type.startsWith("image/") || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
+          const isImage =
+            attachment.type.startsWith('image/') ||
+            ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(fileType);
           return isImage ? (
             <Box
               key={attachment.name + index}
@@ -197,9 +206,23 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
 
         {/* Display reactions with a limit */}
         {message.reactions && message.reactions.length > 0 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3, justifyContent: isCurrentUser ? 'end' : 'start' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.3,
+              justifyContent: isCurrentUser ? 'end' : 'start',
+            }}
+          >
             {message.reactions.slice(0, MAX_VISIBLE_REACTIONS).map((reaction, index) => (
-              <Box sx={{ borderRadius: '50%', backgroundColor: reaction.user_id === user.id ? 'background.neutral' : 'transparent', p: .4 }}>
+              <Box
+                sx={{
+                  borderRadius: '50%',
+                  backgroundColor:
+                    reaction.user_id === user.id ? 'background.neutral' : 'transparent',
+                  p: 0.4,
+                }}
+              >
                 <Typography
                   key={index}
                   variant="caption"
@@ -211,7 +234,6 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
                   {reaction.emoji}
                 </Typography>
               </Box>
-
             ))}
 
             {/* Show +X if there are more reactions */}
@@ -234,7 +256,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
         position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: isCurrentUser ? 'end' : 'start'
+        alignItems: isCurrentUser ? 'end' : 'start',
       })}
     >
       <Box
@@ -249,8 +271,8 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
           }),
           opacity: openEmojiPicker ? 1 : 0, // ✅ Keep buttons visible when picker is open
           ...(me && { right: 0, left: 'unset' }),
-        })}>
-
+        })}
+      >
         <IconButton size="small" onClick={() => onReply(message)}>
           <Iconify icon="solar:reply-bold" width={16} />
         </IconButton>
@@ -264,8 +286,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
           <IconButton size="small" onClick={() => setOpenDialog(true)}>
             <Iconify icon="solar:trash-bin-trash-bold" width={16} />
           </IconButton>
-        )
-        }
+        )}
       </Box>
 
       {/* ✅ Emoji Picker */}
@@ -276,7 +297,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
             zIndex: 10,
             overflow: 'hidden',
             top: '100%',
-            ...me ? { right: "50%" } : { left: "50%" },
+            ...(me ? { right: '50%' } : { left: '50%' }),
             transition: 'width 0.3s ease-in-out',
           }}
         >
@@ -287,7 +308,6 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
             reactionsDefaultOpen
             theme={pickerTheme}
           />
-
         </Box>
       )}
 
@@ -324,40 +344,45 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
     // ✅ Get sender name
     const sender =
       parentMessage.senderId === user?.id
-        ? "You"
-        : participants.find((part) => String(part.id) === String(parentMessage.senderId))?.name || "Unknown";
+        ? 'You'
+        : participants.find((part) => String(part.id) === String(parentMessage.senderId))?.name ||
+          'Unknown';
 
     return (
       <Box
         sx={{
           p: 1,
           mb: 0.5,
-          borderLeft: "3px solid",
-          borderColor: "primary.main",
-          backgroundColor: "action.hover",
+          borderLeft: '3px solid',
+          borderColor: 'primary.main',
+          backgroundColor: 'action.hover',
           borderRadius: 1,
           maxWidth: 350,
-          fontSize: "0.875rem",
-          color: "text.secondary",
-          display: "flex",
-          flexDirection: 'column'
+          fontSize: '0.875rem',
+          color: 'text.secondary',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Typography variant="caption" fontWeight="bold" marginBottom={1}>{sender}</Typography>
+        <Typography variant="caption" fontWeight="bold" marginBottom={1}>
+          {sender}
+        </Typography>
 
         {/* ✅ Show message body if available */}
         {parentMessage.body ? (
-          <Typography variant="body2" noWrap>{parentMessage.body}</Typography>
+          <Typography variant="body2" noWrap>
+            {parentMessage.body}
+          </Typography>
         ) : parentMessage.attachments && parentMessage.attachments.length > 0 ? (
           <>
             {/* ✅ If first attachment is an image, show it */}
-            {["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(
+            {['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(
               parentMessage.attachments[0].type
             ) ? (
               <img
                 src={parentMessage.attachments[0].path}
                 alt="Attachment Preview"
-                style={{ width: 100, height: 80, borderRadius: 5, objectFit: "cover" }}
+                style={{ width: 100, height: 80, borderRadius: 5, objectFit: 'cover' }}
               />
             ) : (
               // ✅ Show file icon and name for non-image files
@@ -366,7 +391,7 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
                   imageView
                   file={parentMessage.attachments[0].path}
                   slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
-                  sx={{ width: 30, height: 30, bgcolor: "background.neutral" }}
+                  sx={{ width: 30, height: 30, bgcolor: 'background.neutral' }}
                 />
                 <ListItemText
                   secondary={formatFileSize(parentMessage.attachments[0].size)}
@@ -385,15 +410,16 @@ export function ChatMessageItem({ message, conversationId, participants, onOpenL
             )}
           </>
         ) : (
-          <Typography variant="body2" color="text.secondary">[No Content]</Typography>
+          <Typography variant="body2" color="text.secondary">
+            [No Content]
+          </Typography>
         )}
       </Box>
     );
   };
 
-
   return (
-    <Box sx={{ mb: 3, display: 'flex', justifyContent: me ? 'flex-end' : 'unset' }}>
+    <Box sx={{ mb: 1, display: 'flex', justifyContent: me ? 'flex-end' : 'unset' }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>

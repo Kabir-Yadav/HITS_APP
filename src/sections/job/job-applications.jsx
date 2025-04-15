@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Button from '@mui/material/Button';
 import { visuallyHidden } from '@mui/utils';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
@@ -122,7 +123,7 @@ export function JobApplications({ jobId }) {
                   ) : null}
                 </TableSortLabel>
               </TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell align="right">Resume</TableCell>
             </TableRow>
           </TableHead>
 
@@ -157,16 +158,14 @@ export function JobApplications({ jobId }) {
                 <TableCell>{fDate(application.created_at)}</TableCell>
 
                 <TableCell align="right">
-                  <Stack direction="row" spacing={1} justifyContent="flex-end">
-                    <Tooltip title="View Resume">
-                      <IconButton 
-                        onClick={() => handleViewResume(application.resume_url)}
-                        color="info"
-                      >
-                        <Iconify icon="solar:file-text-bold" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
+                  <Button
+                    variant="text"
+                    color="info"
+                    onClick={() => handleViewResume(application.resume_url)}
+                    startIcon={<Iconify icon="solar:file-text-bold" />}
+                  >
+                    View
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

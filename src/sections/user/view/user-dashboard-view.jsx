@@ -7,12 +7,24 @@ import { useTheme } from '@mui/material/styles';
 import { usePathname, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
+import { useUpcomingBirthdays } from 'src/actions/users';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { SeoIllustration } from 'src/assets/illustrations';
 import {
-    _appAuthors, _appRelated, _appFeatured, _appInvoices, _appInstalled,
-    _userAbout, _userFeeds, _userFriends, _userGallery, _userFollowers,
-    _analyticPosts, _analyticOrderTimeline, _analyticTraffic, _analyticTasks
+  _appAuthors,
+  _appRelated,
+  _appFeatured,
+  _appInvoices,
+  _appInstalled,
+  _userAbout,
+  _userFeeds,
+  _userFriends,
+  _userGallery,
+  _userFollowers,
+  _analyticPosts,
+  _analyticOrderTimeline,
+  _analyticTraffic,
+  _analyticTasks,
 } from 'src/_mock';
 
 import { Iconify } from 'src/components/iconify';
@@ -27,13 +39,12 @@ import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics/analytic
 import { useAuthContext } from 'src/auth/hooks';
 // ----------------------------------------------------------------------
 
-
 const NAV_ITEMS = [
-    {
-        value: '',
-        label: `About Me`,
-        icon: <Iconify width={24} icon="solar:user-id-bold" />,
-    }
+  {
+    value: '',
+    label: `About Me`,
+    icon: <Iconify width={24} icon="solar:user-id-bold" />,
+  },
 ];
 
 // ----------------------------------------------------------------------
@@ -41,48 +52,49 @@ const NAV_ITEMS = [
 const TAB_PARAM = 'tab';
 
 export function UserDashboardView() {
-    const pathname = usePathname();
-    const searchParams = useSearchParams();
-    const selectedTab = searchParams.get(TAB_PARAM) ?? '';
-    const theme = useTheme();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedTab = searchParams.get(TAB_PARAM) ?? '';
+  const theme = useTheme();
 
-    const { user } = useAuthContext();
+  const { user } = useAuthContext();
+  const { upcomingBirthdays, isLoading, error } = useUpcomingBirthdays();
 
-    const [searchFriends, setSearchFriends] = useState('');
+  const [searchFriends, setSearchFriends] = useState('');
 
-    const handleSearchFriends = useCallback((event) => {
-        setSearchFriends(event.target.value);
-    }, []);
+  const handleSearchFriends = useCallback((event) => {
+    setSearchFriends(event.target.value);
+  }, []);
 
-    const createRedirectPath = (currentPath, query) => {
-        const queryString = new URLSearchParams({ [TAB_PARAM]: query }).toString();
-        return query ? `${currentPath}?${queryString}` : currentPath;
-    };
+  const createRedirectPath = (currentPath, query) => {
+    const queryString = new URLSearchParams({ [TAB_PARAM]: query }).toString();
+    return query ? `${currentPath}?${queryString}` : currentPath;
+  };
 
-    // Get full name from metadata
-    const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`;
+  // Get full name from metadata
+  const fullName = `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`;
 
-    return (
-        <DashboardContent maxWidth="xl">
-            <Grid container spacing={3}>
-                <Grid size={{ xs: 12, md: 9 }}>
-                    <AppWelcome
-                        title={`Welcome back 👋 \n ${fullName}`}
-                        description="If you are going to use a passage of Lorem Ipsum, you need to be sure there isn't anything."
-                        img={<SeoIllustration hideBackground />}
-                        action={
-                            <Button variant="contained" color="primary">
-                                Go now
-                            </Button>
-                        }
-                    />
-                </Grid>
+  return (
+    <DashboardContent maxWidth="xl">
+      <Grid container spacing={3}>
+        <Grid size={{ xs: 12, md: 9 }}>
+          <AppWelcome
+            title={`Welcome back 👋 \n ${fullName}`}
+            description="Let's see what is going on at F13 Technologies employee space"
+            img={<SeoIllustration hideBackground />}
+            action={
+              <Button variant="contained" color="primary">
+                Go now
+              </Button>
+            }
+          />
+        </Grid>
 
-                <Grid size={{ xs: 12, md: 3 }}>
-                    <AppFeatured list={_appFeatured} />
-                </Grid>
+        <Grid size={{ xs: 12, md: 3 }}>
+          <AppFeatured list={_appFeatured} />
+        </Grid>
 
-                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        {/*<Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <AnalyticsWidgetSummary
                         title="Weekly sales"
                         percent={2.6}
@@ -155,18 +167,18 @@ export function UserDashboardView() {
                             series: [56, 30, 23, 54, 47, 40, 62, 73],
                         }}
                     />
-                </Grid>
+                </Grid>*/}
 
-                <Grid size={{ xs: 12, md: 6, lg: 8 }}>
-                    <AnalyticsTasks title="Today's Tasks" />
-                </Grid>
-                <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-                    <AppUpcomingBirthdays title="UpComing Birthdays" list={_appAuthors} />
-                </Grid>
-                <Grid size={{ xs: 12, md: 12, lg: 12 }}>
-                    <AnalyticsNews title="What's happening" list={_analyticPosts} />
-                </Grid>
-            </Grid>
-        </DashboardContent>
-    );
+        <Grid size={{ xs: 12, md: 6, lg: 8 }}>
+          <AnalyticsTasks title="Today's Tasks" />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }}>
+          <AppUpcomingBirthdays title="Upcoming Birthdays" list={upcomingBirthdays} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 12, lg: 12 }}>
+          <AnalyticsNews title="What's happening" list={_analyticPosts} />
+        </Grid>
+      </Grid>
+    </DashboardContent>
+  );
 }
