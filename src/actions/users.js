@@ -33,31 +33,8 @@ async function fetchUpcomingBirthdays() {
             };
         });
 
-    // Create a dummy user with birthday today
-    const dummyUser = {
-        id: 'dummy-user',
-        email: 'dummy@example.com',
-        name: 'Dummy Birthday',
-        avatar_url: '/assets/dummy-avatar.png', // Adjust this path to your dummy image
-        date_of_birth: today.format('YYYY-MM-DD')  // Birthday is today
-    };
-
-    const dummyDob = dayjs(dummyUser.date_of_birth, 'YYYY-MM-DD');
-    let dummyNextBirthday = dayjs(`${today.year()}-${dummyDob.format('MM-DD')}`, 'YYYY-MM-DD');
-    // If by any chance today's birthday is considered before today then add one year (normally not needed)
-    if (dummyNextBirthday.isBefore(today, 'day')) {
-        dummyNextBirthday = dummyNextBirthday.add(1, 'year');
-    }
-    const dummyDaysUntilBirthday = dummyNextBirthday.diff(today, 'day');
-
-    const dummyProfile = {
-        ...dummyUser,
-        nextBirthday: dummyNextBirthday.toISOString(),
-        daysUntilBirthday: dummyDaysUntilBirthday,
-    };
-
-    // Merge the real users with the dummy profile and sort by days remaining
-    const combined = [...realUsers, dummyProfile];
+   
+    const combined = [...realUsers];
 
     combined.sort((a, b) => a.daysUntilBirthday - b.daysUntilBirthday);
     const filtered = combined.filter(user => user.daysUntilBirthday <= 45);
