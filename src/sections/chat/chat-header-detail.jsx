@@ -60,7 +60,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }) {
         primary={singleParticipant?.name}
         secondary={
           singleParticipant?.status === 'offline'
-            ? fToNow(singleParticipant?.last_activity)
+            ? `${fToNow(singleParticipant?.last_activity)} ago`
             : singleParticipant?.status
         }
       />
