@@ -112,13 +112,13 @@ export function NotificationsDrawer({ sx, ...other }) {
         Notifications
       </Typography>
 
-      {!!totalUnRead && (
+      {/* {!!totalUnRead && (
         <Tooltip title="Mark all as read">
           <IconButton color="primary" onClick={handleMarkAllAsRead}>
             <Iconify icon="eva:done-all-fill" />
           </IconButton>
         </Tooltip>
-      )}
+      )} */}
 
       <IconButton onClick={onClose} sx={{ display: { xs: 'inline-flex', sm: 'none' } }}>
         <Iconify icon="mingcute:close-line" />
