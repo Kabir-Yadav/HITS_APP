@@ -16,6 +16,28 @@ export function AuthProvider({ children }) {
   const router = useRouter();
   const { state, setState } = useSetState({ user: null, loading: true });
 
+  // Centralized method to update user status
+  const updateUserStatus = useCallback(async (userId, status) => {
+    try {
+      console.log('Updating user status:', { userId, status });
+
+      const { data, error } = await supabase
+      .from('user_info') // Ensure this table exists
+      .update({ status }) // Update the status field
+      .eq('id', userId); // Match the user by ID
+
+
+      if (error) {
+        console.error('Error updating user status:', error);
+      } else {
+        console.log('User status updated successfully:', data);
+      }
+    } catch (err) {
+      console.error('Error in updateUserStatus:', err);
+    }
+    
+  }, []);
+
   const checkUserSession = useCallback(async () => {
     try {
       const {
@@ -31,10 +53,17 @@ export function AuthProvider({ children }) {
 
       if (session) {
         const accessToken = session?.access_token;
-
+        // Extract the user ID from the session object
+        const userId = session?.user?.id;
+       
         setState({ user: { ...session, ...session?.user }, loading: false });
         axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
+         // Update user status to "online"
+         if (userId) {
+    
+          await updateUserStatus(userId, 'online');
+        }
         // Get the redirect path from router state
         const location = router.location;
         const from = location?.state?.from || '/dashboard/user/dashboard';

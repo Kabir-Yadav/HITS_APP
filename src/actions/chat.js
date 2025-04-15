@@ -91,7 +91,8 @@ const fetchConversations = async (userId) => {
         full_name,
         phone_number,
         avatar_url,
-        role
+        role,
+        status
       )
     `)
     .in("conversation_id", conversationIds);
@@ -171,7 +172,7 @@ const fetchConversations = async (userId) => {
           .map((p) => ({
             id: p.user_info?.id || "",
             role: p.user_info?.role || "participant",
-            status: "offline",
+            status: p.user_info?.status || "offline",
             name: `${p.user_info?.full_name}`.trim(),
             email: p.user_info?.email || "",
             phoneNumber: p.user_info?.phone_number || "",
@@ -257,10 +258,27 @@ export function useGetConversations(userId) {
       )
       .subscribe();
 
+      const onlineStatusSubscription = supabase
+        .channel("online_status_updates")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "user_info",
+          },
+          (payload) => {
+            console.log("User online status updated:", payload);
+            mutate(["conversations", userId]); // Refresh conversations
+          }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(conversationSubscription);
       supabase.removeChannel(messageSubscription);
       supabase.removeChannel(groupSubscription);
+      supabase.removeChannel(onlineStatusSubscription);
     };
   }, [userId, data]);
 
@@ -311,6 +329,7 @@ export function useGetConversation(conversationId) {
             phone_number,
             avatar_url,
             role,
+            status,
             last_activity
           )
         `)
@@ -369,7 +388,7 @@ export function useGetConversation(conversationId) {
         participants: participants.map((p) => ({
           id: p.user_info?.id || "",
           role: p.user_info?.role || "participant",
-          status: "offline",
+          status: p.user_info?.status || "offline",
           name: `${p.user_info?.full_name}`.trim(),
           email: p.user_info?.email || "",
           phoneNumber: p.user_info?.phone_number || "",
@@ -465,11 +484,44 @@ export function useGetConversation(conversationId) {
       )
       .subscribe();
 
+      const onlineStatusSubscription = supabase
+        .channel("online_status_updates")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "user_info",
+          },
+          (payload) => {
+            console.log("User online status updated:", payload);
+            mutate(["conversation", conversationId]); // Refresh conversation
+          }
+      )
+      .subscribe();
+
+      const lastActivitySubscription = supabase
+        .channel("user_last_activity_updates")
+        .on(
+        "postgres_changes",
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_info',
+        },
+        (payload) => {
+          console.log('User last_activity updated:', payload);
+          mutate(["conversation", conversationId]);
+        }
+    )
+    .subscribe();
+
 
     return () => {
       supabase.removeChannel(messageSubscription);
       supabase.removeChannel(reactionSubscription);
-
+      supabase.removeChannel(onlineStatusSubscription);
+      supabase.removeChannel(lastActivitySubscription);
     };
   }, [conversationId]);
 

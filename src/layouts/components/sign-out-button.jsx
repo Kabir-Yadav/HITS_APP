@@ -7,6 +7,7 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/global-config';
+import { supabase } from 'src/lib/supabase';
 
 import { toast } from 'src/components/snackbar';
 
@@ -15,6 +16,8 @@ import { signOut as jwtSignOut } from 'src/auth/context/jwt/action';
 import { signOut as amplifySignOut } from 'src/auth/context/amplify/action';
 import { signOut as supabaseSignOut } from 'src/auth/context/supabase/action';
 import { signOut as firebaseSignOut } from 'src/auth/context/firebase/action';
+
+
 
 // ----------------------------------------------------------------------
 
@@ -30,6 +33,7 @@ export function SignOutButton({ onClose, sx, ...other }) {
   const router = useRouter();
 
   const { checkUserSession } = useAuthContext();
+  const { user } = useAuthContext();
 
   const { logout: signOutAuth0 } = useAuth0();
 
@@ -41,6 +45,18 @@ export function SignOutButton({ onClose, sx, ...other }) {
       onClose?.();
       
       if (CONFIG.auth.method === 'supabase') {
+        try {
+          const { error } = await supabase
+            .from('user_info') // Ensure this table exists
+            .update({status: 'offline'}) // Update the status field
+            .eq('id', user.id); // Match the user by ID
+    
+          if (error) {
+            console.error('Error updating user status:', error);
+          }
+        } catch (err) {
+          console.error('Error in updateUserStatus:', err);
+        }
         router.push(paths.home);
       }
       router.refresh();

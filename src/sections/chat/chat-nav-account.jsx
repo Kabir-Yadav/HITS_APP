@@ -15,6 +15,8 @@ import { svgIconClasses } from '@mui/material/SvgIcon';
 import Badge, { badgeClasses } from '@mui/material/Badge';
 import InputBase, { inputBaseClasses } from '@mui/material/InputBase';
 
+import { supabase } from 'src/lib/supabase';
+
 import { Iconify } from 'src/components/iconify';
 import { CustomPopover } from 'src/components/custom-popover';
 
@@ -24,14 +26,46 @@ import { useMockedUser } from 'src/auth/hooks';
 
 export function ChatNavAccount() {
   const { user } = useMockedUser();
+  const updateUserStatus = useCallback(async (userId, status) => {
+      try {
+        console.log('Updating user status:', { userId, status });
+  
+        const { data, error } = await supabase
+        .from('user_info') // Ensure this table exists
+        .update({ status }) // Update the status field
+        .eq('id', userId); // Match the user by ID
+  
+  
+        if (error) {
+          console.error('Error updating user status:', error);
+        } else {
+          console.log('User status updated successfully:', data);
+        }
+      } catch (err) {
+        console.error('Error in updateUserStatus:', err);
+      }
+      
+    }, []);
 
   const menuActions = usePopover();
 
   const [status, setStatus] = useState('online');
 
-  const handleChangeStatus = useCallback((event) => {
-    setStatus(event.target.value);
-  }, []);
+  const handleChangeStatus = useCallback(
+    async (event) => {
+      const newStatus = event.target.value;
+      setStatus(newStatus);
+
+      try {
+        // Call updateUserStatus with the user's ID and the new status
+        await updateUserStatus(user.id, newStatus);
+        console.log('Status updated successfully:', newStatus);
+      } catch (error) {
+        console.error('Error updating status:', error);
+      }
+    },
+    [user.id, updateUserStatus]
+  );
 
   const renderMenuActions = () => (
     <CustomPopover
