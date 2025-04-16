@@ -104,8 +104,8 @@ export function MailCompose({ onCloseCompose, initialData = {} }) {
       await sendEmail(to, subject, message, { cc, bcc }, attachments);
       onCloseCompose();
     } catch (error) {
-      console.error('Error sending email:', error);
-      // TODO: Show error message
+      console.error('Failed to send email:', error);
+      // TODO: Show error message to user
     } finally {
       setSending(false);
     }
