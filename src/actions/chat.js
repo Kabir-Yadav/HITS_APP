@@ -1140,7 +1140,12 @@ export function useChatNotifications(userId) {
             }
           } else if (payload.eventType === 'DELETE') {
             // Remove from local state
-            setNotifications((prev) => prev.filter((n) => n.id !== payload.old.id));
+            setNotifications((prev) => {
+              const newNotifications = prev.filter(
+                (n) => String(n.id) !== String(payload.old.id)
+              );
+              return newNotifications;
+            });
           }
           // If there's an UPDATE, you can decide how to handle it
         }
@@ -1203,6 +1208,8 @@ export function useChatNotifications(userId) {
   return {
     notifications,
     deleteNotification,
+     // You can also export setNotifications if needed
+    setNotifications,
   };
 }
 

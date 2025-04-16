@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 
-import { deleteNotificationsForConversation } from 'src/actions/chat';
+import { deleteNotificationsForConversation} from 'src/actions/chat';
 
 import { Scrollbar } from 'src/components/scrollbar';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
@@ -22,7 +22,6 @@ export function ChatMessageList({
   userId,
 }) {
   const { messagesEndRef } = useMessagesScroll(messages);
-
   useEffect(() => {
     const deleteNotification = async () => {
       await deleteNotificationsForConversation(conversationId, userId);
