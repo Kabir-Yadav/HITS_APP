@@ -35,6 +35,7 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
   const [resumeFile, setResumeFile] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submittedApplication, setSubmittedApplication] = useState(null);
+  const [existingApplication, setExistingApplication] = useState(null);
 
   const { enqueueSnackbar } = useSnackbar();
 
@@ -124,8 +125,53 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
     }
   };
 
+  const checkExistingApplication = async (jobId, email) => {
+    try {
+      // First, check if any applications exist with the same email and job_id
+      const { data, error } = await supabase
+        .from('applications')
+        .select('id, created_at, status')
+        .eq('job_id', jobId)
+        .eq('email', email)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Database query error:', error);
+        enqueueSnackbar('Error checking application status', { variant: 'error' });
+        return null;
+      }
+
+      // If we found any applications, return the most recent one
+      if (data && data.length > 0) {
+        return {
+          id: data[0].id,
+          created_at: data[0].created_at,
+          status: data[0].status
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error checking existing application:', error);
+      enqueueSnackbar('Error checking application status', { variant: 'error' });
+      return null;
+    }
+  };
+
   const handleCreateApplication = async (data) => {
     try {
+      // Check for existing application
+      const existing = await checkExistingApplication(data.job_id, data.email);
+      
+      if (existing) {
+        setExistingApplication({
+          applicationId: existing.id,
+          timestamp: existing.created_at,
+          status: existing.status
+        });
+        return;
+      }
+
       const result = await onSubmit(data);
       reset();
       if (result?.success) {
@@ -142,6 +188,30 @@ export function ApplicationNewEditForm({ jobs, currentApplication, onSubmit, pub
       enqueueSnackbar('Error occurred!', { variant: 'error' });
     }
   };
+
+  if (existingApplication) {
+    return (
+      <Card sx={{ p: 3, textAlign: 'center' }}>
+        <Iconify icon="eva:info-circle-fill" width={60} sx={{ color: 'info.main', mb: 2 }} />
+        <Typography variant="h4" sx={{ mb: 2 }}>Application Already Exists</Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          You have already applied for this position.
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Your application ID is: <strong>{existingApplication.applicationId}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
+          Status: <strong>{existingApplication.status || 'Pending'}</strong>
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Submitted on: {new Date(existingApplication.timestamp).toLocaleString()}
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Please stand by while we review your application and reach out to you.
+        </Typography>
+      </Card>
+    );
+  }
 
   if (submitSuccess) {
     return (

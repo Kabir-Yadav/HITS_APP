@@ -74,9 +74,12 @@ export function useGetMails(labelId = 'inbox') {
     },
     {
       ...swrOptions,
-      refreshInterval: 1000, // Refresh every second
+      refreshInterval: 3000,
       revalidateOnFocus: true,
       revalidateIfStale: true,
+      keepPreviousData: true, // Keep showing previous data while fetching
+      dedupingInterval: 1000, // Dedupe requests within 1 second
+      errorRetryCount: 3, // Retry failed requests 3 times
     }
   );
 
@@ -86,10 +89,10 @@ export function useGetMails(labelId = 'inbox') {
 
     return {
       mails: { byId, allIds },
-      mailsLoading: isLoading,
+      mailsLoading: isLoading && !data?.mails?.length, // Only show loading if we have no data
       mailsError: error,
       mailsValidating: isValidating,
-      mailsEmpty: !isLoading && !isValidating && !allIds.length,
+      mailsEmpty: !isLoading && !isValidating && !allIds.length && !error,
     };
   }, [data?.mails, error, isLoading, isValidating]);
 
@@ -150,7 +153,7 @@ export function useGetUnreadCount() {
       try {
         const authResult = await ensureGmailAuth();
         if (authResult.status === 'no_token') {
-          return 0; // Return 0 if no token instead of showing login window
+          return 0;
         }
         const messages = await fetchGmailMessages(50, 'INBOX');
         return countUnreadMessages(messages);
@@ -161,14 +164,16 @@ export function useGetUnreadCount() {
     },
     {
       ...swrOptions,
-      refreshInterval: 1000, // Refresh every second
+      refreshInterval: 3000,
       revalidateOnFocus: true,
       revalidateIfStale: true,
+      keepPreviousData: true, // Keep showing previous count while fetching
+      dedupingInterval: 1000, // Dedupe requests within 1 second
     }
   );
 
   return {
     unreadCount: data || 0,
-    loading: isLoading,
+    loading: isLoading && typeof data === 'undefined', // Only show loading if we have no data
   };
 }

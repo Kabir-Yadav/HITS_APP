@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 
 import { usePathname } from 'src/routes/hooks';
 
+import { initializeGmail } from 'src/utils/gmail';
+
 import { CONFIG } from 'src/global-config';
 import { LocalizationProvider } from 'src/locales';
 import { themeConfig, ThemeProvider } from 'src/theme';
@@ -22,6 +24,7 @@ import { AuthProvider as AmplifyAuthProvider } from 'src/auth/context/amplify';
 import { AuthProvider as SupabaseAuthProvider } from 'src/auth/context/supabase';
 import { AuthProvider as FirebaseAuthProvider } from 'src/auth/context/firebase';
 
+
 // ----------------------------------------------------------------------
 
 const AuthProvider =
@@ -35,6 +38,13 @@ const AuthProvider =
 
 export default function App({ children }) {
   useScrollToTop();
+
+  useEffect(() => {
+    // Initialize Gmail API
+    initializeGmail().catch((error) => {
+      console.error('Failed to initialize Gmail:', error);
+    });
+  }, []);
 
   return (
     <I18nProvider>
