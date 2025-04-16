@@ -8,6 +8,7 @@ import { ChatRoomSkeleton } from './chat-skeleton';
 import { ChatRoomSingle } from './chat-room-single';
 import { ChatRoomAttachments } from './chat-room-attachments';
 
+
 // ----------------------------------------------------------------------
 
 const NAV_WIDTH = 280;
