@@ -52,7 +52,7 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.10.0",
     "@iconify/react": "^5.1.0",
-    "@mui/icons-material": "^6.4.0",
+    "@mui/icons-material": "^6.4.11",
     "@mui/lab": "^6.0.0-beta.21",
     "@mui/material": "^6.3.0",
     "@mui/x-data-grid": "^7.23.5",
