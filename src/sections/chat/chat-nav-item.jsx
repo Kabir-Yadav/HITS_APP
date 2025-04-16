@@ -15,7 +15,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { fToNow } from 'src/utils/format-time';
 
-import { clickConversation } from 'src/actions/chat';
+import { clickConversation, deleteNotificationsForConversation } from 'src/actions/chat';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -31,8 +31,15 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up('md'));
 
-  const { group, displayName, displayText, participants, groupAvatar, lastActivity, hasOnlineInGroup } =
-    getNavItem({ conversation, currentUserId: `${user?.id}` });
+  const {
+    group,
+    displayName,
+    displayText,
+    participants,
+    groupAvatar,
+    lastActivity,
+    hasOnlineInGroup,
+  } = getNavItem({ conversation, currentUserId: `${user?.id}` });
 
   const singleParticipant = participants[0];
   const handleClickConversation = useCallback(async () => {
@@ -54,18 +61,19 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
 
   const renderGroup = () => (
     <Badge variant={hasOnlineInGroup ? 'online' : 'invisible'} badgeContent="">
-      {groupAvatar ?
-        (<Avatar
-          alt={displayName??"Unamed Group"}
+      {groupAvatar ? (
+        <Avatar
+          alt={displayName ?? 'Unamed Group'}
           src={groupAvatar}
           sx={{ width: 48, height: 48 }}
-        />)
-        :
-        (<AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
+        />
+      ) : (
+        <AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
           {participants.slice(0, 2).map((participant) => (
             <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
           ))}
-        </AvatarGroup>)}
+        </AvatarGroup>
+      )}
     </Badge>
   );
 
@@ -138,12 +146,24 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile })
                 <Box
                   component="span"
                   sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    bgcolor: 'info.main',
+                    ml: 1,
+                    height: 20,
+                    minWidth: 20,
+                    lineHeight: 0,
+                    borderRadius: 10,
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'info.lighter',
+                    color: 'info.darker',
+                    px: 1,
+                    fontSize: 12,
+                    fontWeight: 'bold',
                   }}
-                />
+                >
+                  {conversation.unreadCount}
+                </Box>
               )}
             </Box>
           </>

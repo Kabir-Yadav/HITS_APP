@@ -72,24 +72,24 @@ export function useNavData() {
     if (servicesSection) {
       // Find and update the Kanban item
       const kanbanItem = servicesSection.items.find((item) => item.title === 'Kanban');
-      if (kanbanItem && totalAssignedTasks > 0) {
-        kanbanItem.info = Counter(totalAssignedTasks);
+      if (kanbanItem) {
+        kanbanItem.info = totalAssignedTasks > 0 ? Counter(totalAssignedTasks) : null;
       }
 
       const chatItem = servicesSection.items.find((item) => item.title === 'Chat');
-      if (chatItem && unreadChatCount > 0) {
-        chatItem.info = Counter(unreadChatCount);
+      if (chatItem) {
+        chatItem.info = unreadChatCount > 0 ? Counter(unreadChatCount) : null;
       }
 
       // Find and update the Mail item with unread count
       const mailItem = servicesSection.items.find((item) => item.title === 'Mail');
-      if (mailItem && unreadCount > 0) {
-        mailItem.info = Counter(unreadCount);
+      if (mailItem) {
+        mailItem.info = unreadCount > 0 ? Counter(unreadCount) : null;
       }
     }
 
     return newNavData;
-  }, [totalAssignedTasks, unreadCount,unreadChatCount]);
+  }, [totalAssignedTasks, unreadCount, unreadChatCount]);
 
   return navData;
 }
