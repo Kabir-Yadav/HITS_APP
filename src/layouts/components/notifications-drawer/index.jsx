@@ -1,6 +1,7 @@
+import * as Tone from 'tone';
 import { m } from 'framer-motion';
 import { useBoolean } from 'minimal-shared/hooks';
-import { useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -15,10 +16,14 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
 import { useChatNotifications } from 'src/actions/chat';
 import { useKanbanNotifications } from 'src/actions/kanban';
 
 import { Label } from 'src/components/label';
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { CustomTabs } from 'src/components/custom-tabs';
@@ -42,6 +47,7 @@ const DROPDOWN_OPTIONS = [
 
 export function NotificationsDrawer({ sx, ...other }) {
   const { user } = useAuthContext();
+  const router = useRouter();
   const { notifications, deleteNotification } = useKanbanNotifications(user?.id);
   const { notifications: chatNotifications, deleteNotification: deleteChatNotification } =
     useChatNotifications(user?.id);
@@ -96,6 +102,49 @@ export function NotificationsDrawer({ sx, ...other }) {
       console.error('Error marking all as read:', error);
     }
   };
+
+  // Inside the NotificationsDrawer component
+  // Create a ref to store the ID of the last chat notification that caused a toast
+  // Use a ref to keep track of all notification IDs that have been toasted
+  const toastedNotificationIds = useRef(new Set());
+
+  useEffect(() => {
+    // Iterate over all chat notifications
+    chatNotifications.forEach((notification) => {
+      // If this notification was not already toasted, show the toast
+      if (!toastedNotificationIds.current.has(notification.id)) {
+        toastedNotificationIds.current.add(notification.id);
+
+        // Extract notification details
+        let message = notification.message || 'New chat notification';
+        if (notification.notification_type === 'message') {
+          message = `${notification.actor.full_name} sent you a message`;
+        } else if (notification.notification_type === 'reply') {
+          message = `${notification.actor.full_name} replied`;
+        } else if (notification.notification_type === 'reaction') {
+          message = `${notification.actor.full_name} reacted with ${notification.reaction_emoji}`;
+        }
+
+        // Play sound alert
+        const playPingSound = async () => {
+          const synth = new Tone.Synth().toDestination();
+          await Tone.start(); // Ensure the audio context is started
+          synth.triggerAttackRelease('C6', '8n'); // Play a short "ping" sound
+        };
+        playPingSound();
+
+        // Show toast notification
+        toast.info(`${message}`, {
+          autoClose: 5000, // Dismiss automatically after 5 seconds
+          onClick: () => {
+            // Redirect to chat and delete the notification
+            router.push(`${paths.dashboard.chat}?id=${notification.conversation_id}`);
+            deleteNotification(notification.id);
+          },
+        });
+      }
+    });
+  }, [chatNotifications]);
 
   const renderHead = () => (
     <Box

@@ -41,7 +41,7 @@ export function ChatMessageInput({
   const { user } = useMockedUser();
 
   const fileImageRef = useRef(null); // ✅ Reference for images
-  const fileDocRef = useRef(null);   // ✅ Reference for non-image files
+  const fileDocRef = useRef(null); // ✅ Reference for non-image files
 
   const [message, setMessage] = useState('');
   const [attachments, setAttachments] = useState([]); // ✅ Store multiple attachments
@@ -121,7 +121,7 @@ export function ChatMessageInput({
   const handleSendMessage = useCallback(
     async (event) => {
       if (event.key !== 'Enter' && event.type !== 'click') return;
-
+      console.log(message);
       try {
         let finalMessageData = { ...messageData, body: message };
 
@@ -140,7 +140,13 @@ export function ChatMessageInput({
         console.log('Sending message:', finalMessageData); // ✅ Debug before sending
         if (message !== '' || attachments.length > 0) {
           if (selectedConversationId) {
-            await sendMessage(selectedConversationId, user?.id, finalMessageData.body, replyTo?.id || null, finalMessageData.attachments);
+            await sendMessage(
+              selectedConversationId,
+              user?.id,
+              finalMessageData.body,
+              replyTo?.id || null,
+              finalMessageData.attachments
+            );
           } else {
             console.log(conversationData);
             const res = await createConversation(conversationData, user?.id);
@@ -171,7 +177,6 @@ export function ChatMessageInput({
 
   return (
     <>
-
       {/* ✅ Small preview inside input like WhatsApp */}
       {replyTo && (
         <Box
@@ -190,8 +195,9 @@ export function ChatMessageInput({
           <Box
             sx={{
               display: 'flex',
-              flexDirection: 'column'
-            }}>
+              flexDirection: 'column',
+            }}
+          >
             <Typography variant="caption" color="text.secondary" marginBottom={1}>
               Replying to {replyTo.senderName}:
             </Typography>
@@ -204,13 +210,13 @@ export function ChatMessageInput({
             ) : replyTo.attachments && replyTo.attachments.length > 0 ? (
               <>
                 {/* ✅ If first attachment is an image, show it */}
-                {["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(
+                {['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(
                   replyTo.attachments[0].type
                 ) ? (
                   <img
                     src={replyTo.attachments[0].path}
                     alt="Attachment Preview"
-                    style={{ width: 70, height: 70, borderRadius: 5, objectFit: "cover" }}
+                    style={{ width: 70, height: 70, borderRadius: 5, objectFit: 'cover' }}
                   />
                 ) : (
                   // ✅ Show file icon for non-image files
@@ -219,7 +225,7 @@ export function ChatMessageInput({
                       imageView
                       file={replyTo.attachments[0].path}
                       slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
-                      sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
+                      sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
                     />
                     <Typography variant="body2" noWrap>
                       {replyTo.attachments[0].name}
@@ -246,35 +252,38 @@ export function ChatMessageInput({
           sx={{
             maxHeight: 200,
             minHeight: attachments.some((file) =>
-              ["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(file.type)
-            ) ? 120 : 70,
-            overflowY: "auto",
-            transition: "min-height .3s ease-in-out", // ✅ Smooth transition on shrink
+              ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(file.type)
+            )
+              ? 120
+              : 70,
+            overflowY: 'auto',
+            transition: 'min-height .3s ease-in-out', // ✅ Smooth transition on shrink
           }}
         >
-
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              flexWrap: "wrap",
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
               gap: 1,
               p: 1,
               borderRadius: 1,
-              maxHeight: "100%",
-              overflowY: "auto",
+              maxHeight: '100%',
+              overflowY: 'auto',
             }}
           >
             {attachments.map((file) => {
-              const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg", "svg+xml"].includes(file.type);
+              const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(
+                file.type
+              );
 
               return (
-                <Stack key={file.id} sx={{ position: "relative", alignItems: "center" }}>
+                <Stack key={file.id} sx={{ position: 'relative', alignItems: 'center' }}>
                   <Box
                     sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       boxShadow: 1,
                       maxWidth: 180,
                       borderRadius: 2,
@@ -282,45 +291,63 @@ export function ChatMessageInput({
                   >
                     {isImage && (
                       <IconButton
-                        onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== file.id))}
+                        onClick={() =>
+                          setAttachments((prev) => prev.filter((item) => item.id !== file.id))
+                        }
                         sx={{
-                          position: "absolute",
+                          position: 'absolute',
                           top: 0,
                           right: 0,
                           width: 30,
                           height: 30,
-                          color: "white",
-                          backgroundColor: "rgba(0, 0, 0, 0.2)",
-                          "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.5)" },
+                          color: 'white',
+                          backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                          '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.5)' },
                         }}
                       >
                         <Iconify icon="mingcute:close-line" width={18} />
                       </IconButton>
                     )}
                     {isImage ? (
-                      <img src={file.preview} alt="Preview" style={{ width: 110, height: 100, borderRadius: 5 }} />
+                      <img
+                        src={file.preview}
+                        alt="Preview"
+                        style={{ width: 110, height: 100, borderRadius: 5 }}
+                      />
                     ) : null}
                   </Box>
                   {!isImage && (
-                    <Box sx={{ boxShadow: 1, p: 0.5, borderRadius: 2, maxWidth: 200, gap: 1.5, display: "flex", alignItems: "center" }}>
+                    <Box
+                      sx={{
+                        boxShadow: 1,
+                        p: 0.5,
+                        borderRadius: 2,
+                        maxWidth: 200,
+                        gap: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
                       <FileThumbnail
                         imageView
                         file={file.type}
-                        onRemove={() => setAttachments((prev) => prev.filter((item) => item.id !== file.id))}
+                        onRemove={() =>
+                          setAttachments((prev) => prev.filter((item) => item.id !== file.id))
+                        }
                         slotProps={{ icon: { sx: { width: 24, height: 24 } } }}
-                        sx={{ width: 40, height: 40, bgcolor: "background.neutral" }}
+                        sx={{ width: 40, height: 40, bgcolor: 'background.neutral' }}
                       />
                       <ListItemText
                         primary={file.name}
                         secondary={formatFileSize(file.size)}
                         slotProps={{
-                          primary: { noWrap: true, sx: { typography: "body2" } },
+                          primary: { noWrap: true, sx: { typography: 'body2' } },
                           secondary: {
                             noWrap: true,
                             sx: {
                               mt: 0.25,
-                              typography: "caption",
-                              color: "text.disabled",
+                              typography: 'caption',
+                              color: 'text.disabled',
                             },
                           },
                         }}
@@ -338,7 +365,14 @@ export function ChatMessageInput({
         name="chat-message"
         id="chat-message-input"
         value={message}
-        onKeyUp={handleSendMessage}
+        maxRows={5}
+        multiline
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage(e);
+          }
+        }}
         onChange={handleChangeMessage}
         placeholder="Type a message"
         disabled={disabled}
@@ -349,6 +383,9 @@ export function ChatMessageInput({
         }
         endAdornment={
           <Box sx={{ flexShrink: 0, display: 'flex' }}>
+            <IconButton onClick={handleSendMessage}>
+              <Iconify icon="solar:plain-bold" />
+            </IconButton>
             <IconButton onClick={handleAttachImages}>
               <Iconify icon="solar:gallery-add-bold" />
             </IconButton>
@@ -363,9 +400,21 @@ export function ChatMessageInput({
         sx={[
           (theme) => ({
             px: 1,
-            height: 56,
+            maxheight: 200,
+            minHeight: 56,
             flexShrink: 0,
             borderTop: `solid 1px ${theme.vars.palette.divider}`,
+            overflowY: 'auto',
+            /* Custom scrollbar: only thumb visible */
+            '&::-webkit-scrollbar': { width: 6 },
+            '&::-webkit-scrollbar-track': { background: 'transparent' },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: theme.vars.palette.text.disabled,
+              borderRadius: 3,
+            },
+            /* Firefox */
+            scrollbarWidth: 'thin',
+            scrollbarColor: `${theme.vars.palette.text.disabled} transparent`,
           }),
         ]}
       />
@@ -376,7 +425,7 @@ export function ChatMessageInput({
             zIndex: 99,
             borderRadius: 2,
             boxShadow: 3,
-            bottom: 60
+            bottom: 60,
           }}
         >
           <EmojiPicker
@@ -391,7 +440,7 @@ export function ChatMessageInput({
       <input
         type="file"
         ref={fileImageRef}
-        style={{ display: "none" }}
+        style={{ display: 'none' }}
         accept="image/*" // ✅ Only allows images
         onChange={handleFileChange}
       />
@@ -400,7 +449,7 @@ export function ChatMessageInput({
       <input
         type="file"
         ref={fileDocRef}
-        style={{ display: "none" }}
+        style={{ display: 'none' }}
         accept=".pdf,.docx,.xlsx,.zip,.txt" // ✅ Only allows documents
         onChange={handleFileChange}
       />

@@ -1,5 +1,9 @@
+import { useEffect } from 'react';
+
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
+
+import { deleteNotificationsForConversation} from 'src/actions/chat';
 
 import { Scrollbar } from 'src/components/scrollbar';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
@@ -9,9 +13,24 @@ import { useMessagesScroll } from './hooks/use-messages-scroll';
 
 // ----------------------------------------------------------------------
 
-export function ChatMessageList({ messages = [], conversationId, participants, loading, onReply }) {
+export function ChatMessageList({
+  messages = [],
+  conversationId,
+  participants,
+  loading,
+  onReply,
+  userId,
+}) {
   const { messagesEndRef } = useMessagesScroll(messages);
+  useEffect(() => {
+    const deleteNotification = async () => {
+      await deleteNotificationsForConversation(conversationId, userId);
+    };
 
+    if (userId) {
+      deleteNotification();
+    }
+  },);
   // ✅ Collect all image attachments from messages
   const slides = messages.flatMap(
     (message) =>

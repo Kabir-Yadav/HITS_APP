@@ -77,6 +77,12 @@ export const NavItem = forwardRef((props, ref) => {
         </ItemTitle>
       )}
 
+      {info && (
+        <ItemInfo {...ownerState} className={navSectionClasses.item.info} sx={slotProps?.info}>
+          {navItem.renderInfo}
+        </ItemInfo>
+      )}
+
       {caption && (
         <Tooltip title={caption} arrow placement="right">
           <ItemCaptionIcon
@@ -209,7 +215,19 @@ const ItemCaptionIcon = styled(Iconify, { shouldForwardProp })(({ theme }) => ({
  */
 const ItemInfo = styled('span', { shouldForwardProp })(({ theme }) => ({
   ...navItemStyles.info,
+  position: 'absolute',
+  top: 5,
+  right: 5,
+  color: theme.palette.common.white,
+  borderRadius: '50%',
+  minWidth: '20px',
+  height: '20px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: theme.typography.caption.fontSize,
 }));
+
 
 /**
  * @slot arrow

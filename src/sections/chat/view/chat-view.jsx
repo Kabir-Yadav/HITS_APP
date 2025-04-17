@@ -54,18 +54,21 @@ export function ChatView() {
     }
   }, [conversationError, router, selectedConversationId]);
 
-  const handleAddRecipients = useCallback((selected) => {
-    const isSelfSelected = selected.some((recipient) => recipient.id === user?.id);
-    const isOtherSelected = selected.some((recipient) => recipient.id !== user?.id);
-  
-    if (isSelfSelected && isOtherSelected) {
-      // If the user selects himself along with others, then keep only self.
-      setRecipients(selected.filter((recipient) => recipient.id === user?.id));
-    } else {
-      setRecipients(selected);
-    }
-  }, [user]);
-  
+  const handleAddRecipients = useCallback(
+    (selected) => {
+      const isSelfSelected = selected.some((recipient) => recipient.id === user?.id);
+      const isOtherSelected = selected.some((recipient) => recipient.id !== user?.id);
+
+      if (isSelfSelected && isOtherSelected) {
+        // If the user selects himself along with others, then keep only self.
+        setRecipients(selected.filter((recipient) => recipient.id === user?.id));
+      } else {
+        setRecipients(selected);
+      }
+    },
+    [user]
+  );
+
   // Compute available contacts based on the current selection:
   const availableContacts = (() => {
     // If no recipients are selected, show all contacts.
@@ -144,6 +147,7 @@ export function ChatView() {
                   />
                 ) : (
                   <ChatMessageList
+                    userId={user?.id}
                     conversationId={selectedConversationId}
                     messages={conversation?.messages ?? []}
                     participants={filteredParticipants}
