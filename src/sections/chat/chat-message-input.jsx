@@ -121,7 +121,7 @@ export function ChatMessageInput({
   const handleSendMessage = useCallback(
     async (event) => {
       if (event.key !== 'Enter' && event.type !== 'click') return;
-
+      console.log(message);
       try {
         let finalMessageData = { ...messageData, body: message };
 
@@ -365,7 +365,14 @@ export function ChatMessageInput({
         name="chat-message"
         id="chat-message-input"
         value={message}
-        onKeyUp={handleSendMessage}
+        maxRows={5}
+        multiline
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendMessage(e);
+          }
+        }}
         onChange={handleChangeMessage}
         placeholder="Type a message"
         disabled={disabled}
@@ -393,9 +400,21 @@ export function ChatMessageInput({
         sx={[
           (theme) => ({
             px: 1,
-            height: 56,
+            maxheight: 200,
+            minHeight: 56,
             flexShrink: 0,
             borderTop: `solid 1px ${theme.vars.palette.divider}`,
+            overflowY: 'auto',
+            /* Custom scrollbar: only thumb visible */
+            '&::-webkit-scrollbar': { width: 6 },
+            '&::-webkit-scrollbar-track': { background: 'transparent' },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: theme.vars.palette.text.disabled,
+              borderRadius: 3,
+            },
+            /* Firefox */
+            scrollbarWidth: 'thin',
+            scrollbarColor: `${theme.vars.palette.text.disabled} transparent`,
           }),
         ]}
       />

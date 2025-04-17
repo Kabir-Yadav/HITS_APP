@@ -44,6 +44,7 @@ export function ChatMessageItem({
     participants,
     currentUserId: `${user?.id}`,
   });
+  console.log(message);
   const { firstName, avatarUrl } = senderDetails;
   const [openDialog, setOpenDialog] = useState(false);
   const MAX_VISIBLE_REACTIONS = 3;
@@ -189,7 +190,7 @@ export function ChatMessageItem({
     if (!body) return null;
 
     return (
-      <Box>
+       <Box>
         <Stack
           sx={{
             p: 1.5,
@@ -198,6 +199,8 @@ export function ChatMessageItem({
             borderRadius: 1,
             typography: 'body2',
             bgcolor: 'background.neutral',
+            whiteSpace: 'pre-wrap',       // ← Respect \n as line breaks
+            wordBreak: 'break-word',      // ← Wrap long lines
             ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
           }}
         >
