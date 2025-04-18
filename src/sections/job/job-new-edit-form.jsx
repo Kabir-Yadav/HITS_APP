@@ -40,12 +40,12 @@ export const NewJobSchema = zod.object({
   joining_months: zod.string().min(0),
   is_internship: zod.boolean(),
   duration_months: zod.string().min(0),
-  expected_ctc_range: zod.string().refine((val, ctx) => {
-    if (!ctx.parent.is_internship && !val) {
-      return false;
-    }
-    return true;
-  }, { message: 'CTC range is required for non-internship positions!' }),
+  expected_ctc_range: zod.string().optional().refine((val) => {
+    // If value is empty or undefined, it's valid
+    if (!val) return true;
+    // Check if the string contains at least one number
+    return /\d/.test(val);
+  }, { message: 'Please enter a valid CTC range with numbers' }),
   posted_by_name: zod.string(),
   posted_by_email: zod.string().email(),
 });
@@ -301,18 +301,6 @@ export const JobNewEditForm = ({ currentJob }) => {
 
   const renderActions = () => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-      <FormControlLabel
-        label="Active"
-        control={
-          <Switch
-            checked={isActive}
-            onChange={(e) => setIsActive(e.target.checked)}
-            inputProps={{ id: 'active-switch' }}
-          />
-        }
-        sx={{ flexGrow: 1, pl: 3 }}
-      />
-
       <LoadingButton
         type="submit"
         variant="contained"
