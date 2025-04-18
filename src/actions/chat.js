@@ -37,7 +37,7 @@ export function useGetContacts() {
       contactsLoading: isLoading,
       contactsError: error,
       contactsValidating: isValidating,
-      contactsEmpty: !isLoading && !isValidating && !data.length,
+      contactsEmpty: !isLoading && !isValidating && !data?.length,
     }),
     [data, error, isLoading, isValidating]
   );
@@ -220,7 +220,7 @@ const fetchConversations = async (userId) => {
   return conversations;
 };
 
-export function useGetConversations(userId) {
+export function useGetConversations(userId, contacts) {
   const { data, error, isLoading } = useSWR(
     userId ? ['conversations', userId] : null,
     () => fetchConversations(userId),
@@ -228,7 +228,7 @@ export function useGetConversations(userId) {
   );
 
   useEffect(() => {
-    if (!userId) return () => {};
+    if (!userId) return () => { };
 
     // ✅ Subscribe to new conversations
     const conversationSubscription = supabase
@@ -242,7 +242,7 @@ export function useGetConversations(userId) {
           filter: `participant_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('New conversation added:', payload);
+          console.log('New conversation:', payload);
           mutate(['conversations', userId]); // ✅ Refresh conversation list
         }
       )
@@ -260,7 +260,15 @@ export function useGetConversations(userId) {
           filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(',')})`,
         },
         (payload) => {
-          console.log('New message received 2:', payload);
+          const msg = payload.new;
+          const sender = contacts.find((contact) => contact.id === payload.new.sender_id);
+          if (sender?.id !== userId) {
+            showDesktopNotification({
+              title: `${sender?.full_name}`,
+              body: msg?.body || 'Sent an attachment',
+              icon: sender?.avatar_url,
+            });
+          }
           mutate(['conversations', userId]); // ✅ Refresh conversations
           mutate(['conversation', payload.new.conversation_id]); // ✅ Refresh individual conversation
         }
@@ -280,6 +288,29 @@ export function useGetConversations(userId) {
           console.log('Global group update:', payload);
           // Trigger a revalidation of the conversations list.
           mutate(['conversations', userId]);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new group creations and show desktop notification
+    const groupInsertSubscription = supabase
+      .channel(`group_created_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'groups',
+        },
+        (payload) => {
+          console.log('New group created:', payload);
+          const newGroup = payload.new;
+          showDesktopNotification({
+            title: `New group created: ${newGroup.group_name || 'Unnamed Group'}`,
+            body: 'You have been added to a new group.',
+            icon: newGroup.group_icon,
+          });
+          mutate(['conversations', userId]); // Refresh conversations list
         }
       )
       .subscribe();
@@ -322,6 +353,7 @@ export function useGetConversations(userId) {
       supabase.removeChannel(groupSubscription);
       supabase.removeChannel(onlineStatusSubscription);
       supabase.removeChannel(unreadSubscription);
+      supabase.removeChannel(groupInsertSubscription);
     };
   }, [userId, data]);
 
@@ -456,7 +488,7 @@ export function useGetConversation(conversationId) {
   });
 
   useEffect(() => {
-    if (!conversationId) return () => {};
+    if (!conversationId) return () => { };
 
     // ✅ Listen for new messages in the conversation
     const messageSubscription = supabase
@@ -830,7 +862,7 @@ export async function markConversationAsRead(conversationId) {
   await supabase.from('messages').update({ read: true }).eq('conversation_id', conversationId);
 }
 
-export async function clickConversation(conversationId) {}
+export async function clickConversation(conversationId) { }
 
 export function useDeleteMessage() {
   return async (messageId, conversationId, userId) => {
@@ -1208,7 +1240,7 @@ export function useChatNotifications(userId) {
   return {
     notifications,
     deleteNotification,
-     // You can also export setNotifications if needed
+    // You can also export setNotifications if needed
     setNotifications,
   };
 }
@@ -1230,7 +1262,7 @@ export function useUnreadChat(userId) {
   // console.log(data);
 
   useEffect(() => {
-    if (!userId) return () => {};
+    if (!userId) return () => { };
 
     const unreadSubscription = supabase
       .channel(`unread_subscription`)
@@ -1265,9 +1297,9 @@ export async function addUsersToGroup(conversationId, userIds) {
   // userIds can be a single id or an array of ids.
   const payload = Array.isArray(userIds)
     ? userIds.map((userId) => ({
-        conversation_id: conversationId,
-        participant_id: userId.id,
-      }))
+      conversation_id: conversationId,
+      participant_id: userId.id,
+    }))
     : [{ conversation_id: conversationId, participant_id: userIds }];
 
   // Insert the new users into the conversation_participants table
@@ -1302,4 +1334,44 @@ export async function deleteNotificationsForConversation(conversationId, userId)
     console.error('Error deleting notifications for conversation:', error);
     return false;
   }
+}
+
+// ----------------------------------------------------------------------
+// Delete an entire conversation (and all its messages, participants, notifications…)
+// ----------------------------------------------------------------------
+export async function deleteConversation(conversationId, userId) {
+  // Delete the conversation row — everything tied to it cascades
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId);
+
+  if (error) {
+    console.error('Error deleting conversation:', error);
+    throw error;
+  }
+
+  // Re‑fetch your SWR caches so the UI updates
+  mutate(['conversations', userId]);
+  mutate(['conversation', conversationId]);
+}
+
+function showDesktopNotification({ title, body, icon }) {
+  if (Notification.permission !== 'granted') return;
+
+  const options = {
+    body,
+    icon,      // URL string for sender’s avatar or your app icon
+    tag: title,   // prevents duplicate notifications with the same tag
+  };
+
+  const notif = new Notification(title, options);
+
+  // Optional: focus your window when it’s clicked
+  notif.onclick = () => {
+    window.focus();
+    // e.g. navigate to the chat thread:
+    // router.push(`/chat?id=${conversationId}`);
+    notif.close();
+  };
 }

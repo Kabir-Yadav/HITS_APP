@@ -3,17 +3,21 @@ import EmojiPicker from 'emoji-picker-react'; // ✅ New Emoji Picker
 import { useRef, useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
+import List from '@mui/material/List';
 import Stack from '@mui/material/Stack';
-import { useTheme } from '@mui/material';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import Popover from '@mui/material/Popover';
+import ListItem from '@mui/material/ListItem';
 import IconButton from '@mui/material/IconButton';
+import { Tooltip, useTheme } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import ListItemText from '@mui/material/ListItemText';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import ListItemAvatar from '@mui/material/ListItemAvatar';
 
 import { fToNow } from 'src/utils/format-time';
 import { fDateTime } from 'src/utils/format-time';
@@ -44,9 +48,12 @@ export function ChatMessageItem({
     participants,
     currentUserId: `${user?.id}`,
   });
-  console.log(message);
   const { firstName, avatarUrl } = senderDetails;
   const [openDialog, setOpenDialog] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const openReactionsPopover = Boolean(anchorEl);
+  const handleOpenPopover = (event) => setAnchorEl(event.currentTarget);
+  const handleClosePopover = () => setAnchorEl(null);
   const MAX_VISIBLE_REACTIONS = 3;
   const { body, createdAt, attachments } = message;
 
@@ -157,29 +164,107 @@ export function ChatMessageItem({
           );
         })}
         {/* Display reactions with a limit */}
-        {body === '' && message.reactions && message.reactions.length > 0 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
-            {message.reactions.slice(0, MAX_VISIBLE_REACTIONS).map((reaction, index) => (
-              <Typography
-                key={index}
-                variant="caption"
-                sx={{
-                  cursor: 'pointer',
-                  fontSize: 16,
+        {body==='' && message.reactions &&
+          message.reactions.length > 0 &&
+          (() => {
+            // Group reactions by emoji
+            const byEmoji = message.reactions.reduce((acc, r) => {
+              acc[r.emoji] = acc[r.emoji] || [];
+              acc[r.emoji].push(r.user_id);
+              return acc;
+            }, {});
+
+            return (
+              <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                justifyContent: isCurrentUser ? 'end' : 'start',
+              }}
+              >
+              {/* Render up to MAX_VISIBLE_REACTIONS distinct emojis */}
+              {Object.entries(byEmoji)
+                .slice(0, MAX_VISIBLE_REACTIONS)
+                .map(([emoji, userIds]) => {
+                // Look up participant names
+                const names = userIds
+                  .map((id) => {
+                  if (id === user.id) return 'You';
+                  const p = participants.find((item) => String(item.id) === String(id));
+                  return p?.name ?? 'Unknown';
+                  })
+                  .join(', ');
+                return (
+                  <Tooltip key={emoji} title={names}>
+                  <Box
+                    onClick={handleOpenPopover}
+                    sx={{
+                    borderRadius: '50%',
+                    backgroundColor: 'background.paper',
+                    p: 0.4,
+                    cursor: 'pointer',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontSize: 14 }}>
+                    {emoji} {userIds.length > 1 ? userIds.length : ''}
+                    </Typography>
+                  </Box>
+                  </Tooltip>
+                );
+                })}
+
+              {/* If there are more emojis beyond MAX_VISIBLE, show a “+N” */}
+              {Object.keys(byEmoji).length > MAX_VISIBLE_REACTIONS && (
+                <IconButton size="small" onClick={handleOpenPopover}>
+                <Typography variant="caption" sx={{ fontSize: 14, color: 'text.secondary' }}>
+                  +{Object.keys(byEmoji).length - MAX_VISIBLE_REACTIONS}
+                </Typography>
+                </IconButton>
+              )}
+
+              {/* Popover listing every single reaction with name and emoji */}
+              <Popover
+                open={openReactionsPopover}
+                anchorEl={anchorEl}
+                onClose={handleClosePopover}
+                anchorOrigin={{
+                vertical: 'center',
+                horizontal: isCurrentUser?'left': 'right',
+                }}
+                transformOrigin={{
+                vertical: 'top',
+                horizontal: isCurrentUser?'right':'left',
                 }}
               >
-                {reaction.emoji}
-              </Typography>
-            ))}
-
-            {/* Show +X if there are more reactions */}
-            {message.reactions.length > MAX_VISIBLE_REACTIONS && (
-              <Typography variant="caption" sx={{ fontSize: 14, color: 'grey.600' }}>
-                +{message.reactions.length - MAX_VISIBLE_REACTIONS}
-              </Typography>
-            )}
-          </Box>
-        )}
+                <List sx={{ p: 1, minWidth: 200 }}>
+                {message.reactions.map((r) => {
+                  const isMe = r.user_id === user.id;
+                  const p = participants.find((item) => String(item.id) === String(r.user_id));
+                  return (
+                  <ListItem key={`${r.user_id}-${r.emoji}`} sx={{ display: 'flex', gap: 1 }}>
+                    <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{
+                      maxWidth: 120,
+                      flex:1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    >
+                    {isMe ? 'You' : (p?.name ?? 'Unknown')}
+                    </Typography>
+                    <Typography variant="body2">{r.emoji}</Typography>
+                  </ListItem>
+                  );
+                })}
+                </List>
+              </Popover>
+              </Box>
+            );
+          })()}
       </Stack>
     );
   };
@@ -190,7 +275,7 @@ export function ChatMessageItem({
     if (!body) return null;
 
     return (
-       <Box>
+      <Box>
         <Stack
           sx={{
             p: 1.5,
@@ -199,8 +284,8 @@ export function ChatMessageItem({
             borderRadius: 1,
             typography: 'body2',
             bgcolor: 'background.neutral',
-            whiteSpace: 'pre-wrap',       // ← Respect \n as line breaks
-            wordBreak: 'break-word',      // ← Wrap long lines
+            whiteSpace: 'pre-wrap', // ← Respect \n as line breaks
+            wordBreak: 'break-word', // ← Wrap long lines
             ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
           }}
         >
@@ -208,45 +293,107 @@ export function ChatMessageItem({
         </Stack>
 
         {/* Display reactions with a limit */}
-        {message.reactions && message.reactions.length > 0 && (
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.3,
-              justifyContent: isCurrentUser ? 'end' : 'start',
-            }}
-          >
-            {message.reactions.slice(0, MAX_VISIBLE_REACTIONS).map((reaction, index) => (
+        {message.reactions &&
+          message.reactions.length > 0 &&
+          (() => {
+            // Group reactions by emoji
+            const byEmoji = message.reactions.reduce((acc, r) => {
+              acc[r.emoji] = acc[r.emoji] || [];
+              acc[r.emoji].push(r.user_id);
+              return acc;
+            }, {});
+
+            return (
               <Box
-                sx={{
-                  borderRadius: '50%',
-                  backgroundColor:
-                    reaction.user_id === user.id ? 'background.neutral' : 'transparent',
-                  p: 0.4,
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                justifyContent: isCurrentUser ? 'end' : 'start',
+              }}
+              >
+              {/* Render up to MAX_VISIBLE_REACTIONS distinct emojis */}
+              {Object.entries(byEmoji)
+                .slice(0, MAX_VISIBLE_REACTIONS)
+                .map(([emoji, userIds]) => {
+                // Look up participant names
+                const names = userIds
+                  .map((id) => {
+                  if (id === user.id) return 'You';
+                  const p = participants.find((item) => String(item.id) === String(id));
+                  return p?.name ?? 'Unknown';
+                  })
+                  .join(', ');
+                return (
+                  <Tooltip key={emoji} title={names}>
+                  <Box
+                    onClick={handleOpenPopover}
+                    sx={{
+                    borderRadius: '50%',
+                    backgroundColor: 'background.paper',
+                    p: 0.4,
+                    cursor: 'pointer',
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontSize: 14 }}>
+                    {emoji} {userIds.length > 1 ? userIds.length : ''}
+                    </Typography>
+                  </Box>
+                  </Tooltip>
+                );
+                })}
+
+              {/* If there are more emojis beyond MAX_VISIBLE, show a “+N” */}
+              {Object.keys(byEmoji).length > MAX_VISIBLE_REACTIONS && (
+                <IconButton size="small" onClick={handleOpenPopover}>
+                <Typography variant="caption" sx={{ fontSize: 14, color: 'text.secondary' }}>
+                  +{Object.keys(byEmoji).length - MAX_VISIBLE_REACTIONS}
+                </Typography>
+                </IconButton>
+              )}
+
+              {/* Popover listing every single reaction with name and emoji */}
+              <Popover
+                open={openReactionsPopover}
+                anchorEl={anchorEl}
+                onClose={handleClosePopover}
+                anchorOrigin={{
+                vertical: 'center',
+                horizontal: isCurrentUser?'left': 'right',
+                }}
+                transformOrigin={{
+                vertical: 'top',
+                horizontal: isCurrentUser?'right':'left',
                 }}
               >
-                <Typography
-                  key={index}
-                  variant="caption"
-                  sx={{
-                    cursor: 'pointer',
-                    fontSize: 16,
-                  }}
-                >
-                  {reaction.emoji}
-                </Typography>
+                <List sx={{ p: 1, minWidth: 200 }}>
+                {message.reactions.map((r) => {
+                  const isMe = r.user_id === user.id;
+                  const p = participants.find((item) => String(item.id) === String(r.user_id));
+                  return (
+                  <ListItem key={`${r.user_id}-${r.emoji}`} sx={{ display: 'flex', gap: 1 }}>
+                    <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{
+                      maxWidth: 120,
+                      flex:1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    >
+                    {isMe ? 'You' : (p?.name ?? 'Unknown')}
+                    </Typography>
+                    <Typography variant="body2">{r.emoji}</Typography>
+                  </ListItem>
+                  );
+                })}
+                </List>
+              </Popover>
               </Box>
-            ))}
-
-            {/* Show +X if there are more reactions */}
-            {message.reactions.length > MAX_VISIBLE_REACTIONS && (
-              <Typography variant="caption" sx={{ fontSize: 14, color: 'grey.600' }}>
-                +{message.reactions.length - MAX_VISIBLE_REACTIONS}
-              </Typography>
-            )}
-          </Box>
-        )}
+            );
+          })()}
       </Box>
     );
   };

@@ -36,10 +36,11 @@ export function ChatView() {
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
 
-  const { conversations, conversationsLoading } = useGetConversations(user?.id);
+  const { conversations, conversationsLoading } = useGetConversations(user?.id, contacts);
   const { conversation, conversationError, conversationLoading } =
     useGetConversation(selectedConversationId);
 
+  console.log(conversationError);
   const roomNav = useCollapseNav();
   const conversationsNav = useCollapseNav();
   const [replyTo, setReplyTo] = useState(null); // ✅ Store reply message
@@ -112,6 +113,8 @@ export function ChatView() {
         slots={{
           header: hasConversation ? (
             <ChatHeaderDetail
+              conversationid={selectedConversationId}
+              user={user}
               collapseNav={roomNav}
               participants={filteredParticipants}
               loading={conversationLoading}
@@ -142,7 +145,24 @@ export function ChatView() {
               {selectedConversationId ? (
                 conversationError ? (
                   <EmptyContent
-                    title={conversationError.message}
+                    title={
+                      !navigator.onLine
+                        ? 'No internet connection'
+                        : conversationError.message.includes('No rows')
+                          ? 'No conversation found!'
+                          : conversationError.message.includes('Failed to fetch')
+                            ? 'Unable to load conversation.'
+                            : 'An unexpected error occurred.'
+                    }
+                    description={
+                      !navigator.onLine
+                        ? 'Please check your internet connection and try again.'
+                        : conversationError.message.includes('No rows')
+                          ? 'There is no conversation data available at the moment.'
+                          : conversationError.message.includes('Failed to fetch')
+                            ? 'The request to load conversation data failed. Verify your network and retry.'
+                            : ''
+                    }
                     imgUrl={`${CONFIG.assetsDir}/assets/icons/empty/ic-chat-empty.svg`}
                   />
                 ) : (
@@ -152,7 +172,7 @@ export function ChatView() {
                     messages={conversation?.messages ?? []}
                     participants={filteredParticipants}
                     loading={conversationLoading}
-                    onReply={handleReply} // ✅ Keep passing reply handler
+                    onReply={handleReply}
                   />
                 )
               ) : (
@@ -162,7 +182,6 @@ export function ChatView() {
                   imgUrl={`${CONFIG.assetsDir}/assets/icons/empty/ic-chat-active.svg`}
                 />
               )}
-
               <ChatMessageInput
                 recipients={recipients}
                 onAddRecipients={handleAddRecipients}
