@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { format } from 'date-fns';
+import { useMemo, useState } from 'react';
 import {
   Page,
   Text,
@@ -11,14 +12,23 @@ import {
   PDFDownloadLink,
 } from '@react-pdf/renderer';
 
+import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import Divider from '@mui/material/Divider';
+import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
+import CardContent from '@mui/material/CardContent';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
 import { fCurrency } from 'src/utils/format-number';
 
 import { Iconify } from 'src/components/iconify';
+
+
 
 // ----------------------------------------------------------------------
 
@@ -276,5 +286,134 @@ function InvoicePdfDocument({ invoice, currentStatus }) {
         {renderFooter()}
       </Page>
     </Document>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+const stylesLOR = StyleSheet.create({
+  page: {
+    padding: 30,
+    fontSize: 12,
+  },
+  header: {
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  date: {
+    fontSize: 12,
+    marginBottom: 20,
+    textAlign: 'right',
+  },
+  content: {
+    marginBottom: 20,
+  },
+  paragraph: {
+    marginBottom: 10,
+    lineHeight: 1.5,
+  },
+  signature: {
+    marginTop: 50,
+  },
+  signatureLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000',
+    width: 200,
+    marginBottom: 5,
+  },
+});
+
+export function LORPDFDocument({ lor }) {
+  return (
+    <Document>
+      <Page size="A4" style={stylesLOR.page}>
+        <View style={stylesLOR.header}>
+          <Text style={stylesLOR.title}>Letter of Recommendation</Text>
+          <Text style={stylesLOR.date}>{format(new Date(lor.issue_date), 'MMMM dd, yyyy')}</Text>
+        </View>
+
+        <View style={stylesLOR.content}>
+          <Text style={stylesLOR.paragraph}>
+            This letter is to certify that {lor.intern_name} has completed their internship successfully.
+          </Text>
+
+          <Text style={stylesLOR.paragraph}>
+            We highly recommend {lor.intern_name} for future opportunities and believe they would be a valuable addition to any organization.
+          </Text>
+        </View>
+
+        <View style={stylesLOR.signature}>
+          <View style={stylesLOR.signatureLine} />
+          <Text>Authorized Signatory</Text>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+export function LORPDFDownload({ lor }) {
+  const [showPreview, setShowPreview] = useState(false);
+
+  return (
+    <Card>
+      <CardContent>
+        <Stack spacing={3}>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Letter of Recommendation
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+              Preview and download the LOR in PDF format
+            </Typography>
+          </Box>
+
+          <Divider />
+
+          {showPreview && (
+            <Box sx={{ height: '600px', mb: 3 }}>
+              <PDFViewer width="100%" height="100%" style={{ border: '1px solid rgba(145, 158, 171, 0.16)' }}>
+                <LORPDFDocument lor={lor} />
+              </PDFViewer>
+            </Box>
+          )}
+
+          <Stack direction="row" spacing={2}>
+            <Button
+              fullWidth
+              color="primary"
+              size="large"
+              variant="outlined"
+              onClick={() => setShowPreview(!showPreview)}
+            >
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </Button>
+
+            <PDFDownloadLink
+              document={<LORPDFDocument lor={lor} />}
+              fileName={`LOR-${lor.intern_name}-${format(new Date(lor.issue_date), 'yyyy-MM-dd')}.pdf`}
+              style={{ textDecoration: 'none', width: '100%' }}
+            >
+              {({ loading }) => (
+                <Button
+                  fullWidth
+                  color="inherit"
+                  size="large"
+                  variant="contained"
+                  disabled={loading}
+                >
+                  {loading ? 'Generating PDF...' : 'Download PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
