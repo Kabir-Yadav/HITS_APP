@@ -441,6 +441,7 @@ export function ChatMessageInput({
         type="file"
         ref={fileImageRef}
         style={{ display: 'none' }}
+        multiple // ✅ Allow multiple file selection
         accept="image/*" // ✅ Only allows images
         onChange={handleFileChange}
       />
@@ -449,6 +450,7 @@ export function ChatMessageInput({
       <input
         type="file"
         ref={fileDocRef}
+        multiple // ✅ Allow multiple file selection
         style={{ display: 'none' }}
         accept=".pdf,.docx,.xlsx,.zip,.txt" // ✅ Only allows documents
         onChange={handleFileChange}
