@@ -14,7 +14,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
 
-import { InvoicePDFViewer, InvoicePDFDownload } from './invoice-pdf';
+import { InvoicePDFViewer, LORPDFDownload } from './invoice-pdf';
 
 // ----------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChange
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
   const renderDownloadButton = () =>
-    invoice ? <InvoicePDFDownload invoice={invoice} currentStatus={currentStatus} /> : null;
+    invoice ? <LORPDFDownload invoice={invoice} currentStatus={currentStatus} /> : null;
 
   const renderDetailsDialog = () => (
     <Dialog fullScreen open={open}>
