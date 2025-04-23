@@ -131,8 +131,8 @@ export function LORPDFDocument({ lor }) {
         <View style={stylesLOR.content}>
           <Text style={stylesLOR.paragraph}>
             I am writing to express my strongest recommendation for {firstName} {lastName}, who recently completed a research
-            internship under my supervision at F13 Technologies. Throughout her internship, {firstName} consistently
-            demonstrated exceptional research skills and a profound dedication to her work.
+            internship under my supervision at F13 Technologies. Throughout the internship, {firstName} consistently
+            demonstrated exceptional research skills and a profound dedication to given work.
           </Text>
           
           <Text style={stylesLOR.paragraph}>
@@ -146,14 +146,15 @@ export function LORPDFDocument({ lor }) {
             {firstName} is not only an accomplished researcher but also a valuable team member. She fosters a collaborative and
             productive environment by specific examples of teamwork, e.g., effectively communicating research findings to
             both technical and non-technical audiences, readily assisting colleagues with troubleshooting and
-            problem-solving, offering insightful suggestions that demonstrably improve the research process. Her positive
+            problem-solving, offering insightful suggestions that demonstrably improve the research process. The intern&apos;s positive
             personality traits relevant to research, intellectual curiosity, unwavering work ethic, and a commitment to
             excellence are truly commendable.
           </Text>
+      
           
           <Text style={stylesLOR.sectionTitle}>Significant Contribution</Text>
           <Text style={stylesLOR.paragraph}>
-            {firstName} played a critical role in conducting research for various events for the general public. Her contribution to
+            {firstName} played a critical role in conducting research for various events for the general public. The intern &apos;s contribution to
             our research project was nothing short of transformative. She unearthed a previously unknown research avenue,
             spearheaded the development of a groundbreaking research methodology, and played a pivotal role in achieving
             groundbreaking results. Undoubtedly hIs work has the potential to leave an indelible mark on the field.
@@ -171,14 +172,14 @@ export function LORPDFDocument({ lor }) {
           <Text style={stylesLOR.paragraph}>
             Without any reservations, {firstName} {lastName} has my unqualified professional endorsement for any future
             endeavours. She is a prodigiously talented and remarkably motivated individual who would be an invaluable
-            asset to any team. Her intellectual prowess, technical skills, and persistent dedication make them a highly
-            sought-after asset to any team. Her ability to learn independently, adapt to new challenges with a
+            asset to any team. The intern&apos;s intellectual prowess, technical skills, and persistent dedication make them a highly
+            sought-after asset to any team. The intern&apos;s ability to learn independently, adapt to new challenges with a
             solutions-oriented approach, and consistently deliver impactful results is truly exceptional.
           </Text>
           
           <Text style={stylesLOR.paragraph}>
             {firstName} {lastName} has my deepest personal respect which extends far beyond their professional capabilities.
-            She is an individual of unwavering integrity, genuine humility, and an everlasting passion. I have absolutely no
+            The intern is an individual of unwavering integrity, genuine humility, and an everlasting passion. I have absolutely no
             reservations in stating that they are destined for exceptional achievements in their chosen field.
         </Text>
           
