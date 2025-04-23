@@ -1,3 +1,4 @@
+import { PDFViewer } from '@react-pdf/renderer';
 import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
@@ -14,7 +15,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { Iconify } from 'src/components/iconify';
 
-import { InvoicePDFViewer, LORPDFDownload } from './invoice-pdf';
+import { LORPDFDownload, LORPDFDocument } from './invoice-pdf';
 
 // ----------------------------------------------------------------------
 
@@ -33,7 +34,11 @@ export function InvoiceToolbar({ invoice, currentStatus, statusOptions, onChange
           </Button>
         </DialogActions>
         <Box sx={{ flexGrow: 1, height: 1, overflow: 'hidden' }}>
-          {invoice && <InvoicePDFViewer invoice={invoice} currentStatus={currentStatus} />}
+          {invoice && (
+            <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
+              <LORPDFDocument lor={invoice} />
+            </PDFViewer>
+          )}
         </Box>
       </Box>
     </Dialog>

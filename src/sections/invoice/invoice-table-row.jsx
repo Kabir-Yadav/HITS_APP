@@ -25,15 +25,14 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 
 // ----------------------------------------------------------------------
 
-export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow, detailsHref }) {
-  const { intern_name, created_at, issue_date, id } = row;
+export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow }) {
+  const { intern_name, created_at, id } = row;
   const confirm = useBoolean();
   const [pdfOpen, setPdfOpen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
 
   const handleViewPDF = async () => {
     try {
-      // Get the signed URL for the PDF
       const { data: { publicUrl } } = supabase
         .storage
         .from('lor-pdfs')
@@ -89,12 +88,12 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow, detai
   );
 
   return (
-    <TableRow hover selected={selected}>
-      <TableCell padding="checkbox">
+      <TableRow hover selected={selected}>
+        <TableCell padding="checkbox">
         <Checkbox checked={selected} onClick={onSelectRow} />
-      </TableCell>
+        </TableCell>
 
-      <TableCell>
+        <TableCell>
         <Stack direction="row" alignItems="center" spacing={2}>
           <Avatar variant="rounded">
             {intern_name.charAt(0).toUpperCase()}
@@ -104,15 +103,11 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow, detai
             {intern_name}
           </Box>
         </Stack>
-      </TableCell>
+        </TableCell>
 
-      <TableCell>
+        <TableCell>
         <Box sx={{ typography: 'body2' }}>{fDateTime(created_at)}</Box>
-      </TableCell>
-
-      <TableCell>
-        <Box sx={{ typography: 'body2' }}>{fDateTime(issue_date)}</Box>
-      </TableCell>
+        </TableCell>
 
       <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
         <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -134,11 +129,11 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow, detai
             </IconButton>
           </Tooltip>
         </Stack>
-      </TableCell>
+        </TableCell>
 
       {renderDeleteDialog}
       {renderPDFDialog()}
-    </TableRow>
+      </TableRow>
   );
 }
 
@@ -147,5 +142,4 @@ InvoiceTableRow.propTypes = {
   onSelectRow: PropTypes.func,
   row: PropTypes.object,
   selected: PropTypes.bool,
-  detailsHref: PropTypes.string,
 };

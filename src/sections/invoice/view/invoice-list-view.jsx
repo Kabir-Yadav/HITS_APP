@@ -43,9 +43,8 @@ import { InvoiceTableFiltersResult } from '../invoice-table-filters-result';
 
 const TABLE_HEAD = [
   { id: 'intern_name', label: 'Intern Name' },
-  { id: 'created_at', label: 'Create' },
-  { id: 'issue_date', label: 'Issue Date' },
-  { id: '' },
+  { id: 'created_at', label: 'Issue Date' },
+  { id: '', label: '' },
 ];
 
 // ----------------------------------------------------------------------

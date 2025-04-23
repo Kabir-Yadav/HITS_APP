@@ -17,7 +17,7 @@ const stylesLOR = StyleSheet.create({
   page: {
     padding: 30,
     fontSize: 8,
-    fontFamily: 'Roboto',
+    fontFamily: 'Times-Roman',
   },
   header: {
     marginBottom: 20,
@@ -42,11 +42,13 @@ const stylesLOR = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 5,
     textAlign: 'right',
+    fontFamily: 'Times-Roman',
   },
   companyDetails: {
     fontSize: 8,
     marginBottom: 2,
     textAlign: 'right',
+    fontFamily: 'Times-Roman',
   },
   letterTitle: {
     fontSize: 14,
@@ -55,12 +57,14 @@ const stylesLOR = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
     textDecoration: 'underline',
+    fontFamily: 'Times-Roman',
   },
   date: {
     fontSize: 10,
     marginBottom: 10,
     textAlign: 'right',
     marginRight: 2,
+    fontFamily: 'Times-Roman',
   },
   content: {
     marginBottom: 5,
@@ -69,21 +73,28 @@ const stylesLOR = StyleSheet.create({
     marginBottom: 2,
     lineHeight: 1,
     textAlign: 'justify',
+    fontFamily: 'Times-Roman',
   },
   sectionTitle: {
     fontWeight: 'bold',
-    marginTop: 1,
-    marginBottom: 3,
+    marginTop: 8,
+    marginBottom: 5,
+    fontSize: 10,
+    fontFamily: 'Times-Bold',
+    textDecoration: 'underline',
   },
   signature: {
     marginTop: 8,
+    fontFamily: 'Times-Roman',
   },
   signatureName: {
     marginTop: 50,
     fontWeight: 'bold',
+    fontFamily: 'Times-Roman',
   },
   signatureTitle: {
     fontSize: 10,
+    fontFamily: 'Times-Roman',
   },
 });
 
@@ -91,7 +102,7 @@ export function LORPDFDocument({ lor }) {
   // Split the intern name into first and last name
   const [firstName, lastName] = (lor?.intern_name || "Prerna Khandelwal").split(' ');
   const issueDate = lor?.issue_date ? format(new Date(lor.issue_date), 'MMMM dd, yyyy') : "April 04, 2025";
-  
+
   return (
     <Document>
       <Page size="A4" style={stylesLOR.page}>
@@ -169,11 +180,11 @@ export function LORPDFDocument({ lor }) {
             {firstName} {lastName} has my deepest personal respect which extends far beyond their professional capabilities.
             She is an individual of unwavering integrity, genuine humility, and an everlasting passion. I have absolutely no
             reservations in stating that they are destined for exceptional achievements in their chosen field.
-          </Text>
+        </Text>
           
           <Text style={stylesLOR.paragraph}>
             You may get in touch if you require any further information.
-          </Text>
+        </Text>
         </View>
 
         <View style={stylesLOR.signature}>
@@ -206,7 +217,7 @@ export function LORPDFDownload({ lor }) {
           <Divider />
 
           {showPreview && (
-            <Box sx={{ height: '600px', mb: 3 }}>
+            <Box sx={{ height: '80vh', width: '100%' }}>
               <PDFViewer width="100%" height="100%" style={{ border: '1px solid rgba(145, 158, 171, 0.16)' }}>
                 <LORPDFDocument lor={lor} />
               </PDFViewer>
