@@ -95,8 +95,8 @@ export function ChatMessageInput({
   const handleFileChange = useCallback((event) => {
     const files = Array.from(event.target.files);
     const newAttachments = [];
-
     files.forEach((file) => {
+      console.log('Selected files:', file.type); // ✅ Debugging line
       const reader = new FileReader();
       reader.onload = (e) => {
         newAttachments.push({
@@ -106,7 +106,7 @@ export function ChatMessageInput({
           preview: e.target.result,
           size: file.size,
           createdAt: new Date().toISOString(),
-          type: file.type.split('/')[1],
+          type: file.type,
         });
 
         if (newAttachments.length === files.length) {
@@ -330,7 +330,7 @@ export function ChatMessageInput({
                     >
                       <FileThumbnail
                         imageView
-                        file={file.type}
+                        file={file.type.split('/')[1]}
                         onRemove={() =>
                           setAttachments((prev) => prev.filter((item) => item.id !== file.id))
                         }
