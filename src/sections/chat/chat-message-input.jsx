@@ -96,7 +96,6 @@ export function ChatMessageInput({
     const files = Array.from(event.target.files);
     const newAttachments = [];
     files.forEach((file) => {
-      console.log('Selected files:', file.type); // ✅ Debugging line
       const reader = new FileReader();
       reader.onload = (e) => {
         newAttachments.push({
@@ -252,7 +251,9 @@ export function ChatMessageInput({
           sx={{
             maxHeight: 200,
             minHeight: attachments.some((file) =>
-              ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(file.type)
+              ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(
+                file.type.split('/')[1]
+              )
             )
               ? 120
               : 70,
@@ -274,7 +275,7 @@ export function ChatMessageInput({
           >
             {attachments.map((file) => {
               const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'svg+xml'].includes(
-                file.type
+                file.type.split('/')[1]
               );
 
               return (
