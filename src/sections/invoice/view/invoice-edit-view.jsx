@@ -4,7 +4,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
-import { InvoiceNewEditForm } from '../invoice-new-edit-form';
+import { LORNewEditForm } from '../invoice-new-edit-form';
 
 // ----------------------------------------------------------------------
 
@@ -22,7 +22,7 @@ export function InvoiceEditView({ invoice }) {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <InvoiceNewEditForm currentInvoice={invoice} />
+      <LORNewEditForm currentInvoice={invoice} />
     </DashboardContent>
   );
 }

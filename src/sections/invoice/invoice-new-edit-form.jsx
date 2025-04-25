@@ -1,88 +1,62 @@
 import { z as zod } from 'zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useBoolean } from 'minimal-shared/hooks';
+import { pdf } from '@react-pdf/renderer';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Stack from '@mui/material/Stack';
+import Dialog from '@mui/material/Dialog';
+import Divider from '@mui/material/Divider';
+import CardHeader from '@mui/material/CardHeader';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
-import { today, fIsAfter } from 'src/utils/format-time';
+import { today } from 'src/utils/format-time';
 
-import { _addressBooks } from 'src/_mock';
+import { supabase } from 'src/lib/supabase';
 
-import { Form, schemaHelper } from 'src/components/hook-form';
+import { toast } from 'src/components/snackbar';
+import { Field } from 'src/components/hook-form';
+import { FormProvider } from 'src/components/hook-form';
 
-import { InvoiceNewEditAddress } from './invoice-new-edit-address';
-import { InvoiceNewEditStatusDate } from './invoice-new-edit-status-date';
-import { defaultItem, InvoiceNewEditDetails } from './invoice-new-edit-details';
+import { useAuthContext } from 'src/auth/hooks/use-auth-context';
 
-// ----------------------------------------------------------------------
-
-export const NewInvoiceSchema = zod
-  .object({
-    invoiceTo: schemaHelper.nullableInput(zod.custom(), {
-      message: 'Invoice to is required!',
-    }),
-    createDate: schemaHelper.date({ message: { required: 'Create date is required!' } }),
-    dueDate: schemaHelper.date({ message: { required: 'Due date is required!' } }),
-    items: zod.array(
-      zod.object({
-        title: zod.string().min(1, { message: 'Title is required!' }),
-        service: zod.string().min(1, { message: 'Service is required!' }),
-        quantity: zod.number().int().positive().min(1, { message: 'Quantity must be more than 0' }),
-        // Not required
-        price: zod.number(),
-        total: zod.number(),
-        description: zod.string(),
-      })
-    ),
-    // Not required
-    taxes: zod.number(),
-    status: zod.string(),
-    discount: zod.number(),
-    shipping: zod.number(),
-    subtotal: zod.number(),
-    totalAmount: zod.number(),
-    invoiceNumber: zod.string(),
-    invoiceFrom: zod.custom().nullable(),
-  })
-  .refine((data) => !fIsAfter(data.createDate, data.dueDate), {
-    message: 'Due date cannot be earlier than create date!',
-    path: ['dueDate'],
-  });
+import { LORPDFDownload, LORPDFDocument } from './invoice-pdf';
 
 // ----------------------------------------------------------------------
 
-export function InvoiceNewEditForm({ currentInvoice }) {
+export const NewLORSchema = zod.object({
+  intern_name: zod.string().min(1, { message: 'Intern name is required!' }),
+  issue_date: zod.string().min(1, { message: 'Issue date is required!' }),
+});
+
+// ----------------------------------------------------------------------
+
+export function LORNewEditForm({ currentLOR }) {
   const router = useRouter();
-
-  const loadingSave = useBoolean();
-  const loadingSend = useBoolean();
+  const { user } = useAuthContext();
+  const [generatedLOR, setGeneratedLOR] = useState(null);
+  const [openPreview, setOpenPreview] = useState(false);
 
   const defaultValues = {
-    invoiceNumber: 'INV-1990',
-    createDate: today(),
-    dueDate: null,
-    taxes: 0,
-    shipping: 0,
-    status: 'draft',
-    discount: 0,
-    invoiceFrom: _addressBooks[0],
-    invoiceTo: null,
-    subtotal: 0,
-    totalAmount: 0,
-    items: [defaultItem],
+    intern_name: '',
+    issue_date: today('YYYY-MM-DD'),
   };
 
   const methods = useForm({
     mode: 'all',
-    resolver: zodResolver(NewInvoiceSchema),
+    resolver: zodResolver(NewLORSchema),
     defaultValues,
-    values: currentInvoice,
+    values: currentLOR ? {
+      ...currentLOR,
+    } : {
+      ...defaultValues,
+    },
   });
 
   const {
@@ -91,73 +65,133 @@ export function InvoiceNewEditForm({ currentInvoice }) {
     formState: { isSubmitting },
   } = methods;
 
-  const handleSaveAsDraft = handleSubmit(async (data) => {
-    loadingSave.onTrue();
-
+  const savePDFToStorage = async (lorData) => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      reset();
-      loadingSave.onFalse();
-      router.push(paths.dashboard.invoice.root);
-      console.info('DATA', JSON.stringify(data, null, 2));
+      // Generate PDF blob
+      const pdfDoc = <LORPDFDocument lor={lorData} />;
+      const blob = await pdf(pdfDoc).toBlob();
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase
+        .storage
+        .from('lor-pdfs')
+        .upload(`${lorData.id}.pdf`, blob, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
     } catch (error) {
-      console.error(error);
-      loadingSave.onFalse();
+      console.error('Error saving PDF:', error);
+      throw new Error('Failed to save PDF');
+    }
+  };
+
+  const onSubmit = handleSubmit(async (data) => {
+    try {
+      const lorData = {
+        ...data,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (currentLOR?.id) {
+        const { error } = await supabase
+          .from('lor')
+          .update({
+            ...lorData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', currentLOR.id)
+          .eq('created_by', user.id);
+
+        if (error) throw error;
+        setGeneratedLOR({ ...currentLOR, ...lorData });
+        await savePDFToStorage({ ...currentLOR, ...lorData });
+      } else {
+        const { data: insertedData, error } = await supabase
+          .from('lor')
+          .insert([
+            {
+              ...lorData,
+              created_by: user.id,
+            },
+          ])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setGeneratedLOR(insertedData);
+        await savePDFToStorage(insertedData);
+      }
+
+      setOpenPreview(true);
+      toast.success(currentLOR ? 'Update success!' : 'Create success!');
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error.message || 'Something went wrong');
     }
   });
 
-  const handleCreateAndSend = handleSubmit(async (data) => {
-    loadingSend.onTrue();
+  const handleClosePreview = () => {
+    setOpenPreview(false);
+    reset();
+    router.push(paths.dashboard.invoice.root);
+  };
 
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      reset();
-      loadingSend.onFalse();
-      router.push(paths.dashboard.invoice.root);
-      console.info('DATA', JSON.stringify(data, null, 2));
-    } catch (error) {
-      console.error(error);
-      loadingSend.onFalse();
-    }
-  });
+  const renderDetails = () => (
+    <Card>
+      <CardHeader title="Letter of Recommendation Details" subheader="Enter intern information..." sx={{ mb: 3 }} />
+
+      <Divider />
+
+      <Stack spacing={3} sx={{ p: 3 }}>
+        <Stack spacing={1.5}>
+          <Typography variant="subtitle2">Intern Name</Typography>
+          <Field.Text name="intern_name" placeholder="Enter intern name..." />
+        </Stack>
+
+        <Stack spacing={1.5}>
+          <Typography variant="subtitle2">Issue Date</Typography>
+          <Field.Text name="issue_date" type="date" />
+        </Stack>
+      </Stack>
+    </Card>
+  );
+
+  const renderActions = () => (
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+      <LoadingButton
+        type="submit"
+        variant="contained"
+        size="large"
+        loading={isSubmitting}
+        sx={{ ml: 2 }}
+      >
+        {!currentLOR ? 'Generate LOR' : 'Save Changes'}
+      </LoadingButton>
+    </Box>
+  );
 
   return (
-    <Form methods={methods}>
-      <Card>
-        <InvoiceNewEditAddress />
+    <>
+      <FormProvider methods={methods} onSubmit={onSubmit}>
+        <Stack spacing={3} sx={{ mx: 'auto', maxWidth: { xs: 720, xl: 880 } }}>
+          {renderDetails()}
+          {renderActions()}
+        </Stack>
+      </FormProvider>
 
-        <InvoiceNewEditStatusDate />
-
-        <InvoiceNewEditDetails />
-      </Card>
-
-      <Box
-        sx={{
-          mt: 3,
-          gap: 2,
-          display: 'flex',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <LoadingButton
-          color="inherit"
-          size="large"
-          variant="outlined"
-          loading={loadingSave.value && isSubmitting}
-          onClick={handleSaveAsDraft}
-        >
-          Save as draft
-        </LoadingButton>
-
-        <LoadingButton
-          size="large"
-          variant="contained"
-          loading={loadingSend.value && isSubmitting}
-          onClick={handleCreateAndSend}
-        >
-          {currentInvoice ? 'Update' : 'Create'} & send
-        </LoadingButton>
-      </Box>
-    </Form>
+      <Dialog fullWidth maxWidth="md" open={openPreview} onClose={handleClosePreview}>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h6" sx={{ mb: 3 }}>
+            Preview Letter of Recommendation
+          </Typography>
+          
+          {generatedLOR && <LORPDFDownload lor={generatedLOR} />}
+        </Box>
+      </Dialog>
+    </>
   );
 }

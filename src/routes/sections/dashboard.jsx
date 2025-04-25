@@ -26,6 +26,11 @@ const OverviewCoursePage = lazy(() => import('src/pages/dashboard/course'));
 // Order
 const OrderListPage = lazy(() => import('src/pages/dashboard/order/list'));
 const OrderDetailsPage = lazy(() => import('src/pages/dashboard/order/details'));
+// Invoice
+const InvoiceListPage = lazy(() => import('src/pages/dashboard/invoice/list'));
+const InvoiceDetailsPage = lazy(() => import('src/pages/dashboard/invoice/details'));
+const InvoiceCreatePage = lazy(() => import('src/pages/dashboard/invoice/new'));
+const InvoiceEditPage = lazy(() => import('src/pages/dashboard/invoice/edit'));
 // User
 const UserProfilePage = lazy(() => import('src/pages/dashboard/user/profile'));
 const UserDashboardPage = lazy(() => import('src/pages/dashboard/user/dashboard'))
@@ -150,6 +155,16 @@ export const dashboardRoutes = [
           { index: true, element: <OrderListPage /> },
           { path: 'list', element: <OrderListPage /> },
           { path: ':id', element: <OrderDetailsPage /> },
+        ],
+      },
+      {
+        path: 'invoice',
+        children: [
+          { index: true, element: <InvoiceListPage /> },
+          { path: 'list', element: <InvoiceListPage /> },
+          { path: ':id', element: <InvoiceDetailsPage /> },
+          { path: 'new', element: <InvoiceCreatePage /> },
+          { path: ':id/edit', element: <InvoiceEditPage /> },
         ],
       },
       {

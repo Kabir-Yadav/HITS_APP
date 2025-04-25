@@ -1,4 +1,6 @@
-import { useMemo } from 'react';
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { PDFDownloadLink, PDFViewer } from '@react-pdf/renderer';
 import {
   Page,
   Text,
@@ -6,275 +8,254 @@ import {
   Font,
   Image,
   Document,
-  PDFViewer,
   StyleSheet,
-  PDFDownloadLink,
 } from '@react-pdf/renderer';
 
-import Tooltip from '@mui/material/Tooltip';
-import IconButton from '@mui/material/IconButton';
-import CircularProgress from '@mui/material/CircularProgress';
+import { Card, CardContent, Stack, Box, Typography, Divider, Button } from '@mui/material';
 
-import { fDate } from 'src/utils/format-time';
-import { fCurrency } from 'src/utils/format-number';
-
-import { Iconify } from 'src/components/iconify';
-
-// ----------------------------------------------------------------------
-
-export function InvoicePDFDownload({ invoice, currentStatus }) {
-  const renderButton = (loading) => (
-    <Tooltip title="Download">
-      <IconButton>
-        {loading ? (
-          <CircularProgress size={24} color="inherit" />
-        ) : (
-          <Iconify icon="eva:cloud-download-fill" />
-        )}
-      </IconButton>
-    </Tooltip>
-  );
-
-  return (
-    <PDFDownloadLink
-      document={<InvoicePdfDocument invoice={invoice} currentStatus={currentStatus} />}
-      fileName={invoice?.invoiceNumber}
-      style={{ textDecoration: 'none' }}
-    >
-      {/* @ts-expect-error: https://github.com/diegomura/react-pdf/issues/2886 */}
-      {({ loading }) => renderButton(loading)}
-    </PDFDownloadLink>
-  );
-}
-
-// ----------------------------------------------------------------------
-
-export function InvoicePDFViewer({ invoice, currentStatus }) {
-  return (
-    <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
-      <InvoicePdfDocument invoice={invoice} currentStatus={currentStatus} />
-    </PDFViewer>
-  );
-}
-
-// ----------------------------------------------------------------------
-
-Font.register({
-  family: 'Roboto',
-  // fonts from public folder
-  fonts: [{ src: '/fonts/Roboto-Regular.ttf' }, { src: '/fonts/Roboto-Bold.ttf' }],
+const stylesLOR = StyleSheet.create({
+  page: {
+    padding: 30,
+    fontSize: 8,
+    fontFamily: 'Times-Roman',
+  },
+  header: {
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerLeft: {
+    width: '30%',
+  },
+  headerRight: {
+    width: '70%',
+    alignItems: 'flex-end',  
+  },
+  logo: {
+    width: 120,
+    height: 'auto',
+    marginBottom: 10,
+  },
+  companyName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    textAlign: 'right',
+    fontFamily: 'Times-Roman',
+  },
+  companyDetails: {
+    fontSize: 8,
+    marginBottom: 2,
+    textAlign: 'right',
+    fontFamily: 'Times-Roman',
+  },
+  letterTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 10,
+    textAlign: 'center',
+    textDecoration: 'underline',
+    fontFamily: 'Times-Roman',
+  },
+  date: {
+    fontSize: 10,
+    marginBottom: 10,
+    textAlign: 'right',
+    marginRight: 2,
+    fontFamily: 'Times-Roman',
+  },
+  content: {
+    marginBottom: 5,
+  },
+  paragraph: {
+    marginBottom: 2,
+    lineHeight: 1,
+    textAlign: 'justify',
+    fontFamily: 'Times-Roman',
+  },
+  sectionTitle: {
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 5,
+    fontSize: 10,
+    fontFamily: 'Times-Bold',
+    textDecoration: 'underline',
+  },
+  signature: {
+    marginTop: 8,
+    fontFamily: 'Times-Roman',
+  },
+  signatureName: {
+    marginTop: 50,
+    fontWeight: 'bold',
+    fontFamily: 'Times-Roman',
+  },
+  signatureTitle: {
+    fontSize: 10,
+    fontFamily: 'Times-Roman',
+  },
 });
 
-const useStyles = () =>
-  useMemo(
-    () =>
-      StyleSheet.create({
-        // layout
-        page: {
-          fontSize: 9,
-          lineHeight: 1.6,
-          fontFamily: 'Roboto',
-          backgroundColor: '#FFFFFF',
-          padding: '40px 24px 120px 24px',
-        },
-        footer: {
-          left: 0,
-          right: 0,
-          bottom: 0,
-          padding: 24,
-          margin: 'auto',
-          borderTopWidth: 1,
-          borderStyle: 'solid',
-          position: 'absolute',
-          borderColor: '#e9ecef',
-        },
-        container: { flexDirection: 'row', justifyContent: 'space-between' },
-        // margin
-        mb4: { marginBottom: 4 },
-        mb8: { marginBottom: 8 },
-        mb40: { marginBottom: 40 },
-        // text
-        h3: { fontSize: 16, fontWeight: 700, lineHeight: 1.2 },
-        h4: { fontSize: 12, fontWeight: 700 },
-        text1: { fontSize: 10 },
-        text2: { fontSize: 9 },
-        text1Bold: { fontSize: 10, fontWeight: 700 },
-        text2Bold: { fontSize: 9, fontWeight: 700 },
-        // table
-        table: { display: 'flex', width: '100%' },
-        row: {
-          padding: '10px 0 8px 0',
-          flexDirection: 'row',
-          borderBottomWidth: 1,
-          borderStyle: 'solid',
-          borderColor: '#e9ecef',
-        },
-        cell_1: { width: '5%' },
-        cell_2: { width: '50%' },
-        cell_3: { width: '15%', paddingLeft: 32 },
-        cell_4: { width: '15%', paddingLeft: 8 },
-        cell_5: { width: '15%' },
-        noBorder: { paddingTop: '10px', paddingBottom: 0, borderBottomWidth: 0 },
-      }),
-    []
-  );
-
-function InvoicePdfDocument({ invoice, currentStatus }) {
-  const {
-    items,
-    taxes,
-    dueDate,
-    discount,
-    shipping,
-    subtotal,
-    invoiceTo,
-    createDate,
-    totalAmount,
-    invoiceFrom,
-    invoiceNumber,
-  } = invoice ?? {};
-
-  const styles = useStyles();
-
-  const renderHeader = () => (
-    <View style={[styles.container, styles.mb40]}>
-      <Image source="/logo/logo-single.png" style={{ width: 48, height: 48 }} />
-
-      <View style={{ alignItems: 'flex-end', flexDirection: 'column' }}>
-        <Text style={[styles.h3, styles.mb8, { textTransform: 'capitalize' }]}>
-          {currentStatus}
-        </Text>
-        <Text style={[styles.text2]}>{invoiceNumber}</Text>
-      </View>
-    </View>
-  );
-
-  const renderFooter = () => (
-    <View style={[styles.container, styles.footer]} fixed>
-      <View style={{ width: '75%' }}>
-        <Text style={[styles.text2Bold, styles.mb4]}>NOTES</Text>
-        <Text style={[styles.text2]}>
-          We appreciate your business. Should you need us to add VAT or extra notes let us know!
-        </Text>
-      </View>
-      <View style={{ width: '25%', textAlign: 'right' }}>
-        <Text style={[styles.text2Bold, styles.mb4]}>Have a question?</Text>
-        <Text style={[styles.text2]}>support@abcapp.com</Text>
-      </View>
-    </View>
-  );
-
-  const renderBillingInfo = () => (
-    <View style={[styles.container, styles.mb40]}>
-      <View style={{ width: '50%' }}>
-        <Text style={[styles.text1Bold, styles.mb4]}>Invoice from</Text>
-        <Text style={[styles.text2]}>{invoiceFrom?.name}</Text>
-        <Text style={[styles.text2]}>{invoiceFrom?.fullAddress}</Text>
-        <Text style={[styles.text2]}>{invoiceFrom?.phoneNumber}</Text>
-      </View>
-
-      <View style={{ width: '50%' }}>
-        <Text style={[styles.text1Bold, styles.mb4]}>Invoice to</Text>
-        <Text style={[styles.text2]}>{invoiceTo?.name}</Text>
-        <Text style={[styles.text2]}>{invoiceTo?.fullAddress}</Text>
-        <Text style={[styles.text2]}>{invoiceTo?.phoneNumber}</Text>
-      </View>
-    </View>
-  );
-
-  const renderDates = () => (
-    <View style={[styles.container, styles.mb40]}>
-      <View style={{ width: '50%' }}>
-        <Text style={[styles.text1Bold, styles.mb4]}>Date create</Text>
-        <Text style={[styles.text2]}>{fDate(createDate)}</Text>
-      </View>
-      <View style={{ width: '50%' }}>
-        <Text style={[styles.text1Bold, styles.mb4]}>Due date</Text>
-        <Text style={[styles.text2]}>{fDate(dueDate)}</Text>
-      </View>
-    </View>
-  );
-
-  const renderTable = () => (
-    <>
-      <Text style={[styles.text1Bold]}>Invoice details</Text>
-
-      <View style={styles.table}>
-        <View>
-          <View style={styles.row}>
-            <View style={styles.cell_1}>
-              <Text style={[styles.text2Bold]}>#</Text>
-            </View>
-            <View style={styles.cell_2}>
-              <Text style={[styles.text2Bold]}>Description</Text>
-            </View>
-            <View style={styles.cell_3}>
-              <Text style={[styles.text2Bold]}>Qty</Text>
-            </View>
-            <View style={styles.cell_4}>
-              <Text style={[styles.text2Bold]}>Unit price</Text>
-            </View>
-            <View style={[styles.cell_5, { textAlign: 'right' }]}>
-              <Text style={[styles.text2Bold]}>Total</Text>
-            </View>
-          </View>
-        </View>
-
-        <View>
-          {items?.map((item, index) => (
-            <View key={item.id} style={styles.row}>
-              <View style={styles.cell_1}>
-                <Text>{index + 1}</Text>
-              </View>
-              <View style={styles.cell_2}>
-                <Text style={[styles.text2Bold]}>{item.title}</Text>
-                <Text style={[styles.text2]}>{item.description}</Text>
-              </View>
-              <View style={styles.cell_3}>
-                <Text style={[styles.text2]}>{item.quantity}</Text>
-              </View>
-              <View style={styles.cell_4}>
-                <Text style={[styles.text2]}>{item.price}</Text>
-              </View>
-              <View style={[styles.cell_5, { textAlign: 'right' }]}>
-                <Text style={[styles.text2]}>{fCurrency(item.price * item.quantity)}</Text>
-              </View>
-            </View>
-          ))}
-
-          {[
-            { name: 'Subtotal', value: subtotal },
-            { name: 'Shipping', value: -(shipping ?? 0) },
-            { name: 'Discount', value: -(discount ?? 0) },
-            { name: 'Taxes', value: taxes },
-            { name: 'Total', value: totalAmount, styles: styles.h4 },
-          ].map((item) => (
-            <View key={item.name} style={[styles.row, styles.noBorder]}>
-              <View style={styles.cell_1} />
-              <View style={styles.cell_2} />
-              <View style={styles.cell_3} />
-              <View style={styles.cell_4}>
-                <Text style={[item.styles ?? styles.text2]}>{item.name}</Text>
-              </View>
-              <View style={[styles.cell_5, { textAlign: 'right' }]}>
-                <Text style={[item.styles ?? styles.text2]}>{fCurrency(item.value)}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-    </>
-  );
+export function LORPDFDocument({ lor }) {
+  // Split the intern name into first and last name
+  const [firstName, lastName] = (lor?.intern_name || "Prerna Khandelwal").split(' ');
+  const issueDate = lor?.issue_date ? format(new Date(lor.issue_date), 'MMMM dd, yyyy') : "April 04, 2025";
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
-        {renderHeader()}
-        {renderBillingInfo()}
-        {renderDates()}
-        {renderTable()}
-        {renderFooter()}
+      <Page size="A4" style={stylesLOR.page}>
+        {/* Header with logo and company info */}
+        <View style={stylesLOR.header}>
+          <View style={stylesLOR.headerLeft}>
+            <Image 
+              src="/assets/F13-logo-new.png"
+              style={stylesLOR.logo}
+            />
+          </View>
+          <View style={stylesLOR.headerRight}>
+            <Text style={stylesLOR.companyName}>FXIII ENHANCE PRIVATE LIMITED</Text>
+            <Text style={stylesLOR.companyDetails}>Regd. Add: 47, Rao Harnath Marg,</Text>
+            <Text style={stylesLOR.companyDetails}>Kapashera, New Delhi-110037</Text>
+            <Text style={stylesLOR.companyDetails}>CIN: U72900DL2018PTC337917</Text>
+            <Text style={stylesLOR.companyDetails}>GSTIN: 07AADCF4775B1ZS</Text>
+            <Text style={stylesLOR.companyDetails}>Website:www.f13.tech | Email:info@f13.tech</Text>
+          </View>
+        </View>
+        
+        <Text style={stylesLOR.date}>{issueDate}</Text>
+        
+        <Text style={stylesLOR.letterTitle}>LETTER OF RECOMMENDATION</Text>
+
+        <View style={stylesLOR.content}>
+          <Text style={stylesLOR.paragraph}>
+            I am writing to express my strongest recommendation for {firstName} {lastName}, who recently completed a research
+            internship under my supervision at F13 Technologies. Throughout the internship, {firstName} consistently
+            demonstrated exceptional research skills and a profound dedication to given work.
+          </Text>
+          
+          <Text style={stylesLOR.paragraph}>
+            {firstName} possesses a remarkable ability to grasp complex concepts, design and execute rigorous tasks, analyse
+            and interpret data with proficiency. HIs independent research on a critical aspect of the project, development of a
+            novel methodology that significantly improved efficiency and significantly advanced our research efforts.
+          </Text>
+          
+          <Text style={stylesLOR.sectionTitle}>Exemplary Teamwork and Collaboration</Text>
+          <Text style={stylesLOR.paragraph}>
+            {firstName} is not only an accomplished researcher but also a valuable team member. She fosters a collaborative and
+            productive environment by specific examples of teamwork, e.g., effectively communicating research findings to
+            both technical and non-technical audiences, readily assisting colleagues with troubleshooting and
+            problem-solving, offering insightful suggestions that demonstrably improve the research process. The intern&apos;s positive
+            personality traits relevant to research, intellectual curiosity, unwavering work ethic, and a commitment to
+            excellence are truly commendable.
+          </Text>
+      
+          
+          <Text style={stylesLOR.sectionTitle}>Significant Contribution</Text>
+          <Text style={stylesLOR.paragraph}>
+            {firstName} played a critical role in conducting research for various events for the general public. The intern &apos;s contribution to
+            our research project was nothing short of transformative. She unearthed a previously unknown research avenue,
+            spearheaded the development of a groundbreaking research methodology, and played a pivotal role in achieving
+            groundbreaking results. Undoubtedly hIs work has the potential to leave an indelible mark on the field.
+          </Text>
+          
+          <Text style={stylesLOR.sectionTitle}>Capabilities</Text>
+          <Text style={stylesLOR.paragraph}>
+            Beyond technical prowess, {firstName} brought an infectious collaborative spirit, relentless work ethic, and an
+            insatiable thirst for knowledge to our research team. She consistently impressed me with their eagerness to
+            master new techniques, unwavering perseverance in the face of challenges, and an exceptional ability to
+            collaborate effectively.
+          </Text>
+          
+          <Text style={stylesLOR.sectionTitle}>Unqualified Professional Endorsement</Text>
+          <Text style={stylesLOR.paragraph}>
+            Without any reservations, {firstName} {lastName} has my unqualified professional endorsement for any future
+            endeavours. She is a prodigiously talented and remarkably motivated individual who would be an invaluable
+            asset to any team. The intern&apos;s intellectual prowess, technical skills, and persistent dedication make them a highly
+            sought-after asset to any team. The intern&apos;s ability to learn independently, adapt to new challenges with a
+            solutions-oriented approach, and consistently deliver impactful results is truly exceptional.
+          </Text>
+          
+          <Text style={stylesLOR.paragraph}>
+            {firstName} {lastName} has my deepest personal respect which extends far beyond their professional capabilities.
+            The intern is an individual of unwavering integrity, genuine humility, and an everlasting passion. I have absolutely no
+            reservations in stating that they are destined for exceptional achievements in their chosen field.
+        </Text>
+          
+          <Text style={stylesLOR.paragraph}>
+            You may get in touch if you require any further information.
+        </Text>
+        </View>
+
+        <View style={stylesLOR.signature}>
+          <Text>Sincerely,</Text>
+          <Text style={stylesLOR.signatureName}>Amanpreet Singh</Text>
+          <Text style={stylesLOR.signatureTitle}>Founder & Director</Text>
+        </View>
       </Page>
     </Document>
+  );
+}
+
+// For the download component, we can keep the existing implementation
+export function LORPDFDownload({ lor }) {
+  const [showPreview, setShowPreview] = useState(false);
+
+  return (
+    <Card>
+      <CardContent>
+        <Stack spacing={3}>
+          <Box sx={{ textAlign: 'center' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Letter of Recommendation
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
+              Preview and download the LOR in PDF format
+            </Typography>
+          </Box>
+
+          <Divider />
+
+          {showPreview && (
+            <Box sx={{ height: '80vh', width: '100%' }}>
+              <PDFViewer width="100%" height="100%" style={{ border: '1px solid rgba(145, 158, 171, 0.16)' }}>
+                <LORPDFDocument lor={lor} />
+              </PDFViewer>
+            </Box>
+          )}
+
+          <Stack direction="row" spacing={2}>
+            <Button
+              fullWidth
+              color="primary"
+              size="large"
+              variant="outlined"
+              onClick={() => setShowPreview(!showPreview)}
+            >
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
+            </Button>
+
+            <PDFDownloadLink
+              document={<LORPDFDocument lor={lor} />}
+              fileName={`LOR-${lor.intern_name}-${format(new Date(lor.issue_date), 'yyyy-MM-dd')}.pdf`}
+              style={{ textDecoration: 'none', width: '100%' }}
+            >
+              {({ loading }) => (
+                <Button
+                  fullWidth
+                  color="inherit"
+                  size="large"
+                  variant="contained"
+                  disabled={loading}
+                >
+                  {loading ? 'Generating PDF...' : 'Download PDF'}
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </Stack>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
