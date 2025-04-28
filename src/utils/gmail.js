@@ -1,7 +1,5 @@
 /* global gapi, google */
 
-import { supabase } from 'src/lib/supabase';
-
 import { GMAIL_CONFIG } from '../config/gmail';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -75,35 +73,55 @@ export const ensureGmailAuth = async () => {
     await initializeGmail();
   }
 
-  // Get the current session from Supabase
-  const { data: { session }, error } = await supabase.auth.getSession();
-  
-  if (error || !session) {
-    throw new Error('No active session found');
+  // Check if we already have a valid token
+  const currentToken = gapi.client.getToken();
+  if (currentToken && currentToken.access_token) {
+    try {
+      // Test the token with a simple API call
+      await gapi.client.gmail.users.getProfile({ userId: 'me' });
+      return { status: 'valid_token' };
+    } catch (error) {
+      console.log('Token validation failed, requesting new token');
+      localStorage.removeItem('gmailToken');
+    }
   }
 
-  // Try to get the Google access token from the session
-  let accessToken = null;
-  if (session.provider_token) {
-    accessToken = session.provider_token;
-  } else if (
-    session.user &&
-    session.user.identities &&
-    session.user.identities.length > 0 &&
-    session.user.identities[0].identity_data &&
-    session.user.identities[0].identity_data.access_token
-  ) {
-    accessToken = session.user.identities[0].identity_data.access_token;
+  // Check storage for a valid token
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    try {
+      gapi.client.setToken(storedToken);
+      await gapi.client.gmail.users.getProfile({ userId: 'me' });
+      return { status: 'valid_token' };
+    } catch (error) {
+      console.log('Stored token validation failed, requesting new token');
+      localStorage.removeItem('gmailToken');
+    }
   }
 
-  if (!accessToken) {
-    throw new Error('No Google access token found');
+  // Only request new token if we don't have a valid one
+  if (!storedToken && !currentToken) {
+    return new Promise((resolve, reject) => {
+      try {
+        tokenClient.callback = async (response) => {
+          if (response.error !== undefined) {
+            reject(response);
+            return;
+          }
+          saveTokenToStorage(response);
+          await gapi.client.gmail.users.getProfile({ userId: 'me' });
+          resolve({ status: 'new_token', response });
+        };
+        
+        tokenClient.requestAccessToken({ prompt: 'consent' });
+      } catch (err) {
+        console.error('Auth error:', err);
+        reject(err);
+      }
+    });
   }
 
-  // Set the token for gapi
-  gapi.client.setToken({ access_token: accessToken });
-
-  return { status: 'valid_token' };
+  return { status: 'no_token' };
 };
 
 // Helper function to decode base64url encoded strings

@@ -2,15 +2,41 @@
 
 // google-calendar.js
 
-import { supabase } from 'src/lib/supabase';
-
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const API_KEY = process.env.GOOGLE_CALENDAR_API_KEY;
 const SCOPES = 'https://www.googleapis.com/auth/calendar';
 
+let tokenClient;
 let gapiInited = false;
+let gisInited = false;
+
+// Function to save token to localStorage
+const saveTokenToStorage = (token) => {
+  if (token) {
+    localStorage.setItem('googleCalendarToken', JSON.stringify({
+      token,
+      timestamp: new Date().getTime()
+    }));
+  }
+};
+
+// Function to get token from localStorage
+const getTokenFromStorage = () => {
+  const tokenData = localStorage.getItem('googleCalendarToken');
+  if (!tokenData) return null;
+
+  const { token, timestamp } = JSON.parse(tokenData);
+  // Check if token is less than 7 days old (604800000 ms)
+  if (new Date().getTime() - timestamp < 604800000) {
+    return token;
+  }
+  
+  // Clear expired token
+  localStorage.removeItem('googleCalendarToken');
+  return null;
+};
 
 export const initializeGoogleCalendar = async () => {
   // Initialize the Google API client
@@ -27,49 +53,82 @@ export const initializeGoogleCalendar = async () => {
     discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'],
   });
 
+  // Initialize the token client
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: '', // defined at request time
+  });
+
   gapiInited = true;
+  gisInited = true;
+
+  // Try to set token from storage
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    gapi.client.setToken(storedToken);
+  }
 };
 
 export const ensureGoogleCalendarAuth = async () => {
-  if (!gapiInited) {
+  if (!gapiInited || !gisInited) {
     await initializeGoogleCalendar();
   }
 
-  // Get the current session from Supabase
-  const { data: { session }, error } = await supabase.auth.getSession();
-  
-  if (error || !session) {
-    throw new Error('No active session found');
+  // Check if we already have a valid token
+  const currentToken = gapi.client.getToken();
+  if (currentToken && currentToken.access_token) {
+    try {
+      // Test the token with a simple API call
+      await gapi.client.calendar.calendarList.list();
+      return { status: 'valid_token' }; // Return value for valid token
+    } catch (error) {
+      console.log('Token validation failed, requesting new token');
+      // Clear invalid token
+      localStorage.removeItem('googleCalendarToken');
+      // Continue to request new token
+    }
   }
 
-  // Try to get the Google access token from the session
-  let accessToken = null;
-  if (session.provider_token) {
-    accessToken = session.provider_token;
-  } else if (
-    session.user &&
-    session.user.identities &&
-    session.user.identities.length > 0 &&
-    session.user.identities[0].identity_data &&
-    session.user.identities[0].identity_data.access_token
-  ) {
-    accessToken = session.user.identities[0].identity_data.access_token;
+  // Check storage for a valid token
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    try {
+      gapi.client.setToken(storedToken);
+      await gapi.client.calendar.calendarList.list();
+      return { status: 'valid_token' };
+    } catch (error) {
+      console.log('Stored token validation failed, requesting new token');
+      localStorage.removeItem('googleCalendarToken');
+    }
   }
 
-  if (!accessToken) {
-    throw new Error('No Google access token found');
-  }
-
-  // Set the token for gapi
-  gapi.client.setToken({ access_token: accessToken });
-
-  return { status: 'valid_token' };
+  return new Promise((resolve, reject) => {
+    try {
+      tokenClient.callback = async (response) => {
+        if (response.error !== undefined) {
+          reject(response);
+          return;
+        }
+        // Save the new token
+        saveTokenToStorage(response);
+        await gapi.client.calendar.calendarList.list(); // Verify token works
+        resolve({ status: 'new_token', response }); // Return value for new token
+      };
+      
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } catch (err) {
+      console.error('Auth error:', err);
+      reject(err);
+    }
+  });
 };
 
 // Get authorized domains
 export const isAuthorizedDomain = () => {
   const currentDomain = window.location.host;
-  return GOOGLE_CALENDAR_CONFIG.AUTHORIZED_DOMAINS.includes(currentDomain);
+  return GOOGLE_CALENDAR_CONFIG.AUTHORIZED_DOMAINS.includes(currentDomain) || 
+         currentDomain.includes('localhost'); // Allow localhost for development
 };
 
 // Fetch Google Calendar events
