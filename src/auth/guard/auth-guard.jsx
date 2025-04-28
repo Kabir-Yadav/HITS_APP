@@ -36,20 +36,9 @@ export function AuthGuard({ children }) {
     const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/app');
     
     if (!authenticated && isProtectedRoute) {
-      // Store the current path in localStorage before redirecting
-      localStorage.setItem('redirectAfterLogin', pathname);
-      router.replace('/sign-in');
+      // Use state parameter instead of query string for cleaner URLs
+      router.replace('/sign-in', { state: { from: pathname } });
       return;
-    }
-
-    // If authenticated and there's a stored redirect path, use it
-    if (authenticated) {
-      const storedPath = localStorage.getItem('redirectAfterLogin');
-      if (storedPath && storedPath !== pathname) {
-        localStorage.removeItem('redirectAfterLogin');
-        router.replace(storedPath);
-        return;
-      }
     }
 
     setIsChecking(false);

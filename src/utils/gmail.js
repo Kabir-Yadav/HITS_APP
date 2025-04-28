@@ -1,6 +1,6 @@
 /* global gapi, google */
 
-import { supabase } from '../lib/supabase';
+import { supabase } from 'src/lib/supabase';
 import { GMAIL_CONFIG } from '../config/gmail';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
@@ -11,18 +11,30 @@ let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 
-// Function to get token from Supabase session
-const getTokenFromSupabase = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.provider_token) {
-    return {
-      access_token: session.provider_token,
-      token_type: 'Bearer',
-      scope: SCOPES,
-      expires_in: 3600
-    };
+// Function to save token to localStorage
+const saveTokenToStorage = (token) => {
+  if (token) {
+    localStorage.setItem('gmailToken', JSON.stringify({
+      token,
+      timestamp: new Date().getTime()
+    }));
   }
-  return null;
+};
+
+const getTokenFromStorage = () => {
+  const stored = localStorage.getItem('gmailToken');
+  if (!stored) return null;
+  
+  const { token, timestamp } = JSON.parse(stored);
+  const now = new Date().getTime();
+  
+  // Token expires after 7 days (604800000 ms)
+  if (now - timestamp > 604800000) {
+    localStorage.removeItem('gmailToken');
+    return null;
+  }
+  
+  return token;
 };
 
 export const initializeGmail = async () => {
@@ -40,16 +52,7 @@ export const initializeGmail = async () => {
     discoveryDocs: GMAIL_CONFIG.DISCOVERY_DOCS,
   });
 
-  // Get token from Supabase session
-  const token = await getTokenFromSupabase();
-  if (token) {
-    gapi.client.setToken(token);
-    gapiInited = true;
-    gisInited = true;
-    return;
-  }
-
-  // Initialize the token client as fallback
+  // Initialize the token client
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
@@ -58,6 +61,12 @@ export const initializeGmail = async () => {
 
   gapiInited = true;
   gisInited = true;
+
+  // Try to set token from storage
+  const storedToken = getTokenFromStorage();
+  if (storedToken) {
+    gapi.client.setToken(storedToken);
+  }
 };
 
 export const ensureGmailAuth = async () => {
@@ -65,41 +74,24 @@ export const ensureGmailAuth = async () => {
     await initializeGmail();
   }
 
-  // Check if we already have a valid token
-  const currentToken = gapi.client.getToken();
-  if (currentToken && currentToken.access_token) {
-    try {
-      // Test the token with a simple API call
-      await gapi.client.gmail.users.getProfile({ userId: 'me' });
-      return { status: 'valid_token' };
-    } catch (error) {
-      console.log('Token validation failed, trying to get new token from Supabase');
-      // Try to get new token from Supabase
-      const newToken = await getTokenFromSupabase();
-      if (newToken) {
-        gapi.client.setToken(newToken);
-        return { status: 'valid_token' };
-      }
-    }
+  // Get the current session from Supabase
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error || !session) {
+    throw new Error('No active session found');
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      tokenClient.callback = async (response) => {
-        if (response.error !== undefined) {
-          reject(response);
-          return;
-        }
-        await gapi.client.gmail.users.getProfile({ userId: 'me' });
-        resolve({ status: 'new_token', response });
-      };
-      
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } catch (err) {
-      console.error('Auth error:', err);
-      reject(err);
-    }
-  });
+  // Get the Google access token from the session
+  const { provider_token } = session.provider_token;
+  
+  if (!provider_token) {
+    throw new Error('No Google access token found');
+  }
+
+  // Set the token for gapi
+  gapi.client.setToken({ access_token: provider_token });
+
+  return { status: 'valid_token' };
 };
 
 // Helper function to decode base64url encoded strings
