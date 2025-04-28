@@ -26,7 +26,14 @@ export default function AuthCallback() {
 
         if (session) {
           await checkUserSession?.();
-          navigate(paths.dashboard.user.dashboard);
+          // Check for stored redirect path
+          const storedPath = localStorage.getItem('redirectAfterLogin');
+          if (storedPath) {
+            localStorage.removeItem('redirectAfterLogin');
+            navigate(storedPath);
+          } else {
+            navigate(paths.dashboard.user.dashboard);
+          }
         } else {
           navigate(paths.auth.supabase.signIn);
         }
