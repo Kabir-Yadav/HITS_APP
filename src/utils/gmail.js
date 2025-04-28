@@ -1,6 +1,7 @@
 /* global gapi, google */
 
 import { supabase } from 'src/lib/supabase';
+
 import { GMAIL_CONFIG } from '../config/gmail';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;

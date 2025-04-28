@@ -3,6 +3,7 @@
 // google-calendar.js
 
 import { supabase } from 'src/lib/supabase';
+
 import { GOOGLE_CALENDAR_CONFIG } from '../config/google-calendar';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
