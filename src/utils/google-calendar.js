@@ -42,15 +42,26 @@ export const ensureGoogleCalendarAuth = async () => {
     throw new Error('No active session found');
   }
 
-  // Get the Google access token from the session
-  const { provider_token } = session.provider_token;
-  
-  if (!provider_token) {
+  // Try to get the Google access token from the session
+  let accessToken = null;
+  if (session.provider_token) {
+    accessToken = session.provider_token;
+  } else if (
+    session.user &&
+    session.user.identities &&
+    session.user.identities.length > 0 &&
+    session.user.identities[0].identity_data &&
+    session.user.identities[0].identity_data.access_token
+  ) {
+    accessToken = session.user.identities[0].identity_data.access_token;
+  }
+
+  if (!accessToken) {
     throw new Error('No Google access token found');
   }
 
   // Set the token for gapi
-  gapi.client.setToken({ access_token: provider_token });
+  gapi.client.setToken({ access_token: accessToken });
 
   return { status: 'valid_token' };
 };
