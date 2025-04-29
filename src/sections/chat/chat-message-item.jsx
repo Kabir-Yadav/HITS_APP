@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { mutate } from 'swr';
 import EmojiPicker from 'emoji-picker-react'; // ✅ New Emoji Picker
 import { useRef, useEffect, useState } from 'react';
 
@@ -8,6 +8,7 @@ import { useTheme } from '@mui/material';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -18,6 +19,7 @@ import DialogActions from '@mui/material/DialogActions';
 import { fToNow } from 'src/utils/format-time';
 import { fDateTime } from 'src/utils/format-time';
 
+import { supabase } from 'src/lib/supabase';
 import { useDeleteMessage, handleAddReaction } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
@@ -44,6 +46,9 @@ export function ChatMessageItem({
     participants,
     currentUserId: `${user?.id}`,
   });
+  const TEN_MINUTES = 10 * 60 * 1000;
+  const createdTs = new Date(message.createdAt).getTime();
+  const canEdit = me && Date.now() - createdTs <= TEN_MINUTES;
   const { firstName, avatarUrl } = senderDetails;
   const [openDialog, setOpenDialog] = useState(false);
   const MAX_VISIBLE_REACTIONS = 3;
@@ -72,6 +77,12 @@ export function ChatMessageItem({
 
   const [openEmojiPicker, setOpenEmojiPicker] = useState(false);
   const [pickerPosition, setPickerPosition] = useState('top');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(body);
+  useEffect(() => {
+    setEditText(body);
+  }, [body]);
+
   const pickerRef = useRef(null);
 
   useEffect(() => {
@@ -86,6 +97,28 @@ export function ChatMessageItem({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [openEmojiPicker]);
+
+  const updateMessage = async () => {
+    setIsEditing(false);
+    if (editText === body) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          body: editText,
+          is_edited: true,
+        })
+        .eq('id', message.id);
+      if (error) throw error;
+
+      await mutate(['conversation', conversationId]);
+      await mutate(['conversations', user?.id]);
+      console.log('Message updated successfully!');
+    } catch (err) {
+      console.error('Failed to update message:', err);
+    }
+  };
 
   const handleReactionClick = (emoji) => {
     setOpenEmojiPicker(false);
@@ -186,13 +219,34 @@ export function ChatMessageItem({
   //-----------------------------------Message Body-----------------------------------------
 
   const renderBody = (isCurrentUser) => {
+    // ← Add this first:
+    if (isEditing) {
+      return (
+        <TextField
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onKeyDown={async (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              await updateMessage();
+            }
+          }}
+          onBlur={updateMessage}
+          size="small"
+          fullWidth
+          autoFocus
+        />
+      );
+    }
     if (!body) return null;
 
     return (
       <Box>
         <Stack
           sx={{
+            position: 'relative',
             p: 1.5,
+            pb: 3,
             maxWidth: 400,
             width: 'fit-content',
             borderRadius: 1,
@@ -202,6 +256,22 @@ export function ChatMessageItem({
           }}
         >
           {body}
+
+          {/* show tag if this message was edited */}
+          {!isEditing && message.isEdited && (
+            <Typography
+              variant="caption"
+              sx={{
+                position: 'absolute',
+                bottom: 4, // ↓ small gap from the bottom edge
+                right: 8, // ← small gap from the right edge
+                color: 'text.disabled',
+                fontSize: '10px',
+              }}
+            >
+              Edited
+            </Typography>
+          )}
         </Stack>
 
         {/* Display reactions with a limit */}
@@ -281,7 +351,17 @@ export function ChatMessageItem({
         <IconButton size="small" onClick={() => setOpenEmojiPicker(!openEmojiPicker)}>
           <Iconify icon="eva:smiling-face-fill" width={16} />
         </IconButton>
-
+        {isCurrentUser && canEdit && !isEditing && (
+          <IconButton
+            size="small"
+            onClick={() => {
+              setIsEditing(true);
+              setEditText(body);
+            }}
+          >
+            <Iconify icon="eva:edit-2-outline" width={16} />
+          </IconButton>
+        )}
         {isCurrentUser && (
           <IconButton size="small" onClick={() => setOpenDialog(true)}>
             <Iconify icon="solar:trash-bin-trash-bold" width={16} />

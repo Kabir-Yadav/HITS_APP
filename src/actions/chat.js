@@ -392,6 +392,7 @@ export function useGetConversation(conversationId) {
           parent_id,
           content_type, 
           created_at,
+          is_edited,
           attachments (
             id, 
             name, 
@@ -448,6 +449,7 @@ export function useGetConversation(conversationId) {
           contentType: msg.content_type,
           createdAt: msg.created_at,
           parentId: msg.parent_id,
+          isEdited: msg.is_edited,
           attachments: msg.attachments ? await fetchPublicUrls(msg.attachments) : [],
           reactions: msg.message_reactions || [],
         }))
@@ -473,6 +475,16 @@ export function useGetConversation(conversationId) {
           console.log('New message received:', payload);
           mutate(['conversation', conversationId]); // Re-fetch messages in real-time
         }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => mutate(['conversation', conversationId])
       )
       .on(
         'postgres_changes',
@@ -1141,9 +1153,7 @@ export function useChatNotifications(userId) {
           } else if (payload.eventType === 'DELETE') {
             // Remove from local state
             setNotifications((prev) => {
-              const newNotifications = prev.filter(
-                (n) => String(n.id) !== String(payload.old.id)
-              );
+              const newNotifications = prev.filter((n) => String(n.id) !== String(payload.old.id));
               return newNotifications;
             });
           }
@@ -1208,7 +1218,7 @@ export function useChatNotifications(userId) {
   return {
     notifications,
     deleteNotification,
-     // You can also export setNotifications if needed
+    // You can also export setNotifications if needed
     setNotifications,
   };
 }
