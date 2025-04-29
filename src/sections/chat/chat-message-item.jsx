@@ -332,7 +332,7 @@ export function ChatMessageItem({
           sx={{
             position: 'relative',
             p: 1.5,
-            pb: 3,
+            pb: message.isEdited ? 3 : 1.5,
             maxWidth: 400,
             width: 'fit-content',
             borderRadius: 1,
