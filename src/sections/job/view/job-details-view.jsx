@@ -120,16 +120,18 @@ export function JobDetailsView({ id }) {
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 {tab.label}
                 <Badge 
-                  badgeContent={applicationCount} 
+                  badgeContent={applicationCount}
                   color="info"
+                  max={999}
                   sx={{
                     '& .MuiBadge-badge': {
                       right: -16,
                       top: -8,
-                      minWidth: 20,
-                      height: 20,
-                      padding: '0 6px',
+                      minWidth: 28,
+                      height: 24,
+                      padding: '0 3px',
                       borderRadius: 10,
+                      fontSize: 12,
                     },
                   }}
                 />
@@ -138,6 +140,7 @@ export function JobDetailsView({ id }) {
               tab.label
             )
           }
+          sx={{ minWidth: 180 }}
         />
       ))}
     </Tabs>

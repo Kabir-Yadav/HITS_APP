@@ -1,3 +1,6 @@
+import 'jspdf-autotable';
+
+import jsPDF from 'jspdf';
 import PropTypes from 'prop-types';
 import { useState, useEffect } from 'react';
 
@@ -35,6 +38,7 @@ export function JobApplications({ jobId }) {
   const [order, setOrder] = useState('desc');
   const [selected, setSelected] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [jobInfo, setJobInfo] = useState({ title: '', id: '' });
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -55,8 +59,23 @@ export function JobApplications({ jobId }) {
       }
     };
 
+    const fetchJobInfo = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('jobs')
+          .select('title, job_id')
+          .eq('id', jobId)
+          .single();
+        if (error) throw error;
+        setJobInfo({ title: data?.title || '', id: data?.job_id || '' });
+      } catch (error) {
+        setJobInfo({ title: '', id: '' });
+      }
+    };
+
     if (jobId) {
       fetchApplications();
+      fetchJobInfo();
     }
   }, [jobId, orderBy, order]);
 
@@ -139,56 +158,21 @@ export function JobApplications({ jobId }) {
       ? applications.filter(app => selected.includes(app.id))
       : applications;
 
-    // Create a new window with the table content
-    const printWindow = window.open('', '_blank');
-    const tableContent = `
-      <html>
-        <head>
-          <title>Job Applications</title>
-          <style>
-            body { font-family: Arial, sans-serif; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-          </style>
-        </head>
-        <body>
-          <h2>Job Applications</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Applied On</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${applicationsToDownload.map(app => `
-                <tr>
-                  <td>${app.applicant_name}</td>
-                  <td>${app.email}</td>
-                  <td>${app.phone_number}</td>
-                  <td>${app.status}</td>
-                  <td>${fDate(app.created_at)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(tableContent);
-    printWindow.document.close();
-    
-    // Wait for the content to load before printing
-    printWindow.onload = function() {
-      printWindow.print();
-      printWindow.close();
-    };
-    
+    const doc = new jsPDF();
+    const pdfTitle = `Job Applications for: ${jobInfo.title} (${jobInfo.id})`;
+    doc.text(pdfTitle, 14, 16);
+    doc.autoTable({
+      startY: 22,
+      head: [['Name', 'Email', 'Phone', 'Status', 'Applied On']],
+      body: applicationsToDownload.map(app => [
+        app.applicant_name,
+        app.email,
+        app.phone_number,
+        app.status,
+        fDate(app.created_at)
+      ]),
+    });
+    doc.save(`job-applications-${jobInfo.title.replace(/[^a-zA-Z0-9]/g, '_')}-${jobInfo.id}.pdf`);
     handleDownloadMenuClose();
   };
 
