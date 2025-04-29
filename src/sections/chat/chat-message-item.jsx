@@ -309,14 +309,18 @@ export function ChatMessageItem({
     if (isEditing) {
       return (
         <TextField
+          multiline
+          minRows={1}
+          maxRows={4}
           value={editText}
           onChange={(e) => setEditText(e.target.value)}
           onKeyDown={async (e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              await updateMessage();
-            }
-          }}
+                // Shift+Enter → newline (default)
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  await updateMessage();
+                }
+              }}
           onBlur={updateMessage}
           size="small"
           fullWidth
