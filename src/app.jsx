@@ -46,6 +46,21 @@ export default function App({ children }) {
     });
   }, []);
 
+  useEffect(() => {
+    if (!('Notification' in window)) {
+      console.warn('This browser does not support desktop notifications');
+      return;
+    }
+  
+    // Only ask once
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        console.log('Notification permission:', permission);
+      });
+    }
+  }, []);
+  
+
   return (
     <I18nProvider>
       <AuthProvider>

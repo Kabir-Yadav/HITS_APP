@@ -90,6 +90,12 @@ export const navData = [
         info: MailNavLabel
       },
       {
+        title: 'LOR Generation',
+        path: paths.dashboard.invoice.root,
+        icon: ICONS.invoice,
+        roles: ['ADMIN', 'HR']
+      },
+      {
         title: 'Recruitment',
         path: paths.dashboard.recruitment.root,
         icon: ICONS.external,

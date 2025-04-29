@@ -37,7 +37,7 @@ export function useGetContacts() {
       contactsLoading: isLoading,
       contactsError: error,
       contactsValidating: isValidating,
-      contactsEmpty: !isLoading && !isValidating && !data.length,
+      contactsEmpty: !isLoading && !isValidating && !data?.length,
     }),
     [data, error, isLoading, isValidating]
   );
@@ -220,7 +220,7 @@ const fetchConversations = async (userId) => {
   return conversations;
 };
 
-export function useGetConversations(userId) {
+export function useGetConversations(userId, contacts) {
   const { data, error, isLoading } = useSWR(
     userId ? ['conversations', userId] : null,
     () => fetchConversations(userId),
@@ -228,7 +228,7 @@ export function useGetConversations(userId) {
   );
 
   useEffect(() => {
-    if (!userId) return () => {};
+    if (!userId) return () => { };
 
     // ✅ Subscribe to new conversations
     const conversationSubscription = supabase
@@ -242,7 +242,7 @@ export function useGetConversations(userId) {
           filter: `participant_id=eq.${userId}`,
         },
         (payload) => {
-          console.log('New conversation added:', payload);
+          console.log('New conversation:', payload);
           mutate(['conversations', userId]); // ✅ Refresh conversation list
         }
       )
@@ -260,7 +260,15 @@ export function useGetConversations(userId) {
           filter: `conversation_id=in.(${data?.map((conv) => conv.id).join(',')})`,
         },
         (payload) => {
-          console.log('New message received 2:', payload);
+          const msg = payload.new;
+          const sender = contacts.find((contact) => contact.id === payload.new.sender_id);
+          if (sender?.id !== userId) {
+            showDesktopNotification({
+              title: `${sender?.full_name}`,
+              body: msg?.body || 'Sent an attachment',
+              icon: sender?.avatar_url,
+            });
+          }
           mutate(['conversations', userId]); // ✅ Refresh conversations
           mutate(['conversation', payload.new.conversation_id]); // ✅ Refresh individual conversation
         }
@@ -280,6 +288,29 @@ export function useGetConversations(userId) {
           console.log('Global group update:', payload);
           // Trigger a revalidation of the conversations list.
           mutate(['conversations', userId]);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to new group creations and show desktop notification
+    const groupInsertSubscription = supabase
+      .channel(`group_created_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'groups',
+        },
+        (payload) => {
+          console.log('New group created:', payload);
+          const newGroup = payload.new;
+          showDesktopNotification({
+            title: `New group created: ${newGroup.group_name || 'Unnamed Group'}`,
+            body: 'You have been added to a new group.',
+            icon: newGroup.group_icon,
+          });
+          mutate(['conversations', userId]); // Refresh conversations list
         }
       )
       .subscribe();
@@ -322,13 +353,14 @@ export function useGetConversations(userId) {
       supabase.removeChannel(groupSubscription);
       supabase.removeChannel(onlineStatusSubscription);
       supabase.removeChannel(unreadSubscription);
+      supabase.removeChannel(groupInsertSubscription);
     };
   }, [userId, data]);
 
   const memoizedValue = useMemo(() => {
     const byId = data?.length ? keyBy(data, (conv) => conv.id) : {};
     const allIds = Object.keys(byId);
-    console.log({ byId, allIds });
+    // console.log({ byId, allIds });
     return {
       conversations: { byId, allIds },
       conversationsLoading: isLoading,
@@ -458,7 +490,7 @@ export function useGetConversation(conversationId) {
   });
 
   useEffect(() => {
-    if (!conversationId) return () => {};
+    if (!conversationId) return () => { };
 
     // ✅ Listen for new messages in the conversation
     const messageSubscription = supabase
@@ -650,13 +682,13 @@ export async function sendMessage(
           console.error('Attachment upload error:', uploadError);
           throw uploadError;
         }
-        console.log('file-uploaded');
+        // console.log('file-uploaded');
 
         // 📌 Generate Public URL
         const { data } = supabase.storage.from('chat_attachment').getPublicUrl(filePath);
         const publicUrl = data.publicUrl;
 
-        console.log('file-path generated:', publicUrl);
+        // console.log('file-path generated:', publicUrl);
 
         // 📌 Insert attachment record in DB
         const { error: attachmentError } = await supabase.from('attachments').insert({
@@ -720,9 +752,9 @@ export async function createConversation(conversationData, userid) {
     console.error('Error creating conversation:', error);
     throw error;
   }
-  console.log('conversation added', newConversation.id);
+  // console.log('conversation added', newConversation.id);
 
-  console.log(is_group);
+  // console.log(is_group);
   // Step 2️⃣: If it's a group, insert group details into the `groups` table
   if (is_group) {
     const { error: groupError } = await supabase.from('groups').insert({
@@ -735,7 +767,7 @@ export async function createConversation(conversationData, userid) {
       console.error('Error inserting group details:', groupError);
       throw groupError;
     }
-    console.log('Group details added for conversation:', newConversation.id);
+    // console.log('Group details added for conversation:', newConversation.id);
   }
 
   // Step 3️⃣: Insert participants into `conversation_participants`
@@ -752,7 +784,7 @@ export async function createConversation(conversationData, userid) {
     console.error('Error adding participants:', partErr);
     throw partErr;
   }
-  console.log('participants added');
+  // console.log('participants added');
 
   let messageData = {
     conversation_id: newConversation.id,
@@ -773,7 +805,7 @@ export async function createConversation(conversationData, userid) {
     throw messageError;
   }
 
-  console.log('message added');
+  // console.log('message added');
 
   // Handle attachments
   if (messages[0].attachments.length > 0) {
@@ -802,13 +834,13 @@ export async function createConversation(conversationData, userid) {
           console.error('Attachment upload error:', uploadError);
           throw uploadError;
         }
-        console.log('file-uploaded');
+        // console.log('file-uploaded');
 
         // 📌 Generate Public URL
         const { data } = supabase.storage.from('chat_attachment').getPublicUrl(filePath);
         const publicUrl = data.publicUrl;
 
-        console.log('file-path generated:', publicUrl);
+        // console.log('file-path generated:', publicUrl);
 
         // 📌 Insert attachment record in DB
         const { error: attachmentError } = await supabase.from('attachments').insert({
@@ -842,7 +874,7 @@ export async function markConversationAsRead(conversationId) {
   await supabase.from('messages').update({ read: true }).eq('conversation_id', conversationId);
 }
 
-export async function clickConversation(conversationId) {}
+export async function clickConversation(conversationId) { }
 
 export function useDeleteMessage() {
   return async (messageId, conversationId, userId) => {
@@ -854,7 +886,7 @@ export function useDeleteMessage() {
         throw error;
       }
 
-      console.log('Message deleted:', messageId);
+      // console.log('Message deleted:', messageId);
 
       // ✅ Re-fetch conversation messages after deletion
       mutate(['conversation', conversationId]);
@@ -891,7 +923,7 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
           .eq('id', existingReaction.id);
 
         if (deleteError) throw deleteError;
-        console.log('Reaction deleted');
+        // console.log('Reaction deleted');
       } else {
         // ✅ If the user reacts with a different emoji, UPDATE the reaction
         const { error: updateError } = await supabase
@@ -900,7 +932,7 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
           .eq('id', existingReaction.id);
 
         if (updateError) throw updateError;
-        console.log('Reaction updated');
+        // console.log('Reaction updated');
 
         await createChatNotificationForReaction(conversationId, messageId, userId, emoji);
       }
@@ -913,7 +945,7 @@ export async function handleAddReaction(messageId, userId, emoji, conversationId
       });
 
       if (insertError) throw insertError;
-      console.log('Reaction added');
+      // console.log('Reaction added');
 
       await createChatNotificationForReaction(conversationId, messageId, userId, emoji);
     }
@@ -966,7 +998,7 @@ async function createChatNotificationForNewMessage(conversationId, insertedMessa
       if (insertError) {
         console.error('Error inserting message notifications:', insertError);
       } else {
-        console.log("Inserted 'message' notifications:", notifications);
+        // console.log("Inserted 'message' notifications:", notifications);
       }
     }
   } catch (err) {
@@ -1009,7 +1041,7 @@ async function createChatNotificationForReply(conversationId, insertedMessage, s
     if (insertError) {
       console.error("Error inserting 'reply' notification:", insertError);
     } else {
-      console.log("Inserted 'reply' notification for user:", parentMsg.sender_id);
+      // console.log("Inserted 'reply' notification for user:", parentMsg.sender_id);
     }
   } catch (err) {
     console.error('createChatNotificationForReply error:', err);
@@ -1049,7 +1081,7 @@ async function createChatNotificationForReaction(conversationId, messageId, reac
     if (insertError) {
       console.error("Error inserting 'reaction' notification:", insertError);
     } else {
-      console.log("Inserted 'reaction' notification for user:", origMsg.sender_id);
+      // console.log("Inserted 'reaction' notification for user:", origMsg.sender_id);
     }
   } catch (err) {
     console.error('createChatNotificationForReaction error:', err);
@@ -1120,7 +1152,7 @@ export function useChatNotifications(userId) {
         async (payload) => {
           // No partial return statements => if not mounted, do nothing
           if (!mounted) {
-            console.log('not mounted');
+            // console.log('not mounted');
             return;
           }
 
@@ -1141,11 +1173,11 @@ export function useChatNotifications(userId) {
                 )
                 .eq('id', payload.new.id)
                 .single();
-              console.log(newRow);
+              // console.log(newRow);
               if (!error && newRow && mounted) {
                 // Prepend the new item
                 setNotifications((prev) => [newRow, ...prev]);
-                console.log(newRow);
+                // console.log(newRow);
               }
             } catch (err) {
               console.error('Error fetching new chat notification row:', err);
@@ -1237,10 +1269,10 @@ export function useUnreadChat(userId) {
   const { data, error } = useSWR(userId ? ['unreadChat', userId] : null, () =>
     fetchUnreadChat(userId)
   );
-  console.log(data);
+  // console.log(data);
 
   useEffect(() => {
-    if (!userId) return () => {};
+    if (!userId) return () => { };
 
     const unreadSubscription = supabase
       .channel(`unread_subscription`)
@@ -1275,9 +1307,9 @@ export async function addUsersToGroup(conversationId, userIds) {
   // userIds can be a single id or an array of ids.
   const payload = Array.isArray(userIds)
     ? userIds.map((userId) => ({
-        conversation_id: conversationId,
-        participant_id: userId.id,
-      }))
+      conversation_id: conversationId,
+      participant_id: userId.id,
+    }))
     : [{ conversation_id: conversationId, participant_id: userIds }];
 
   // Insert the new users into the conversation_participants table
@@ -1306,10 +1338,50 @@ export async function deleteNotificationsForConversation(conversationId, userId)
     mutate(['unreadChat', userId]);
     mutate(['conversations', userId]);
 
-    console.log('Notifications for conversation deleted');
+    // console.log('Notifications for conversation deleted');
     return true;
   } catch (error) {
     console.error('Error deleting notifications for conversation:', error);
     return false;
   }
+}
+
+// ----------------------------------------------------------------------
+// Delete an entire conversation (and all its messages, participants, notifications…)
+// ----------------------------------------------------------------------
+export async function deleteConversation(conversationId, userId) {
+  // Delete the conversation row — everything tied to it cascades
+  const { error } = await supabase
+    .from('conversations')
+    .delete()
+    .eq('id', conversationId);
+
+  if (error) {
+    console.error('Error deleting conversation:', error);
+    throw error;
+  }
+
+  // Re‑fetch your SWR caches so the UI updates
+  mutate(['conversations', userId]);
+  mutate(['conversation', conversationId]);
+}
+
+function showDesktopNotification({ title, body, icon }) {
+  if (Notification.permission !== 'granted') return;
+
+  const options = {
+    body,
+    icon,      // URL string for sender’s avatar or your app icon
+    tag: title,   // prevents duplicate notifications with the same tag
+  };
+
+  const notif = new Notification(title, options);
+
+  // Optional: focus your window when it’s clicked
+  notif.onclick = () => {
+    window.focus();
+    // e.g. navigate to the chat thread:
+    // router.push(`/chat?id=${conversationId}`);
+    notif.close();
+  };
 }
