@@ -1,4 +1,5 @@
 import { mutate } from 'swr';
+import Linkify from 'react-linkify';
 import EmojiPicker from 'emoji-picker-react'; // ✅ New Emoji Picker
 import { useRef, useEffect, useState } from 'react';
 
@@ -354,7 +355,15 @@ export function ChatMessageItem({
             ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
           }}
         >
-          {body}
+          <Linkify
+            componentDecorator={(decoratedHref, decoratedText, key) => (
+              <a href={decoratedHref} target="_blank" rel="noopener noreferrer" key={key}>
+                {decoratedText}
+              </a>
+            )}
+          >
+            {body}
+          </Linkify>
 
           {/* show tag if this message was edited */}
           {!isEditing && message.isEdited && (
