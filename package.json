@@ -98,6 +98,7 @@
     "i18next-resources-to-backend": "^1.2.1",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
+    "jszip": "^3.10.1",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.471.0",
     "mapbox-gl": "^3.4.0",

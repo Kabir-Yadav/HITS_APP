@@ -1,14 +1,16 @@
 import 'jspdf-autotable';
 
+import JSZip from 'jszip';
 import jsPDF from 'jspdf';
 import PropTypes from 'prop-types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Menu from '@mui/material/Menu';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Modal from '@mui/material/Modal';
 import Button from '@mui/material/Button';
 import { visuallyHidden } from '@mui/utils';
 import Tooltip from '@mui/material/Tooltip';
@@ -22,6 +24,8 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import TableContainer from '@mui/material/TableContainer';
 import TableSortLabel from '@mui/material/TableSortLabel';
+import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
 
@@ -39,6 +43,10 @@ export function JobApplications({ jobId }) {
   const [selected, setSelected] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [jobInfo, setJobInfo] = useState({ title: '', id: '' });
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+  const cancelRequested = useRef(false);
 
   useEffect(() => {
     const fetchApplications = async () => {
@@ -125,6 +133,11 @@ export function JobApplications({ jobId }) {
     setAnchorEl(null);
   };
 
+  const handleCancelDownload = () => {
+    cancelRequested.current = true;
+    setProgressMessage('Cancelling...');
+  };
+
   const downloadAsCSV = () => {
     const applicationsToDownload = selected.length > 0 
       ? applications.filter(app => selected.includes(app.id))
@@ -176,6 +189,75 @@ export function JobApplications({ jobId }) {
     handleDownloadMenuClose();
   };
 
+  const downloadAsZIP = async () => {
+    cancelRequested.current = false;
+    const applicationsToDownload = selected.length > 0 
+      ? applications.filter(app => selected.includes(app.id))
+      : applications;
+
+    setDownloading(true);
+    setProgress(0);
+    setProgressMessage('Preparing to download resumes...');
+
+    if (applicationsToDownload.length === 0) {
+      setProgressMessage('No applications to download.');
+      setTimeout(() => setDownloading(false), 2000);
+      return;
+    }
+
+    const zip = new JSZip();
+    try {
+      const resumesFolder = zip.folder('resumes');
+      let completed = 0;
+      for (const app of applicationsToDownload) {
+        if (cancelRequested.current) {
+          setProgressMessage('Download cancelled.');
+          setTimeout(() => setDownloading(false), 1200);
+          return;
+        }
+        if (app.resume_url) {
+          const fileName = `${app.applicant_name.replace(/[^a-zA-Z0-9]/g, '_')}_resume.pdf`;
+          setProgressMessage(`Fetching resume for: ${app.applicant_name}`);
+          try {
+            const response = await fetch(app.resume_url);
+            if (!response.ok) {
+              setProgressMessage(`Failed to fetch resume for ${app.applicant_name}`);
+              continue;
+            }
+            const blob = await response.blob();
+            resumesFolder.file(fileName, blob);
+          } catch (error) {
+            setProgressMessage(`Error downloading resume for ${app.applicant_name}`);
+            continue;
+          }
+        }
+        completed++;
+        setProgress(Math.round((completed / applicationsToDownload.length) * 100));
+      }
+      if (cancelRequested.current) {
+        setProgressMessage('Download cancelled.');
+        setTimeout(() => setDownloading(false), 1200);
+        return;
+      }
+      setProgressMessage('Generating ZIP file...');
+      setProgress(100);
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `resumes_${jobInfo.title.replace(/[^a-zA-Z0-9]/g, '_')}-${jobInfo.id}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setProgressMessage('Download complete!');
+      setTimeout(() => setDownloading(false), 1500);
+    } catch (error) {
+      setProgressMessage('Error creating or downloading ZIP file.');
+      setTimeout(() => setDownloading(false), 2500);
+    }
+  };
+
   if (loading) {
     return null;
   }
@@ -197,28 +279,31 @@ export function JobApplications({ jobId }) {
 
   return (
     <Card>
+      {/* Progress Modal Overlay */}
+      <Modal open={downloading} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+        <Box sx={{ bgcolor: 'background.paper', width: 340, height: 240, p: 4, borderRadius: 2, boxShadow: 24, textAlign: 'center', opacity: 0.97, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <Typography 
+            variant="h6" 
+            sx={{ mb: 3, minHeight: 32, maxWidth: 280, wordBreak: 'break-word', overflowWrap: 'break-word', lineHeight: 1.3 }}
+          >
+            {progressMessage}
+          </Typography>
+          <CircularProgress variant="determinate" value={progress} size={70} thickness={5} sx={{ mb: 2 }} />
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{progress}%</Typography>
+          <Button variant="outlined" color="error" onClick={handleCancelDownload} disabled={progress >= 100 || progressMessage === 'Download complete!'}>
+            Cancel
+          </Button>
+        </Box>
+      </Modal>
       <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="contained"
           startIcon={<Iconify icon="eva:download-fill" />}
-          onClick={handleDownloadMenuOpen}
+          onClick={downloadAsZIP}
+          disabled={downloading}
         >
-          Download {selected.length > 0 ? `(${selected.length} selected)` : 'All'}
+          Download {selected.length > 0 ? `(${selected.length} selected)` : 'All'} Resumes
         </Button>
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleDownloadMenuClose}
-        >
-          <MenuItem onClick={downloadAsCSV}>
-            <Iconify icon="mdi:file-delimited" sx={{ mr: 1 }} />
-            Download as CSV
-          </MenuItem>
-          <MenuItem onClick={downloadAsPDF}>
-            <Iconify icon="mdi:file-pdf" sx={{ mr: 1 }} />
-            Download as PDF
-          </MenuItem>
-        </Menu>
       </Box>
       <TableContainer>
         <Table>
