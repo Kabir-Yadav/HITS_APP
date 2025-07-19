@@ -7,7 +7,6 @@ import { SvgColor } from 'src/components/svg-color';
 
 import { MailNavLabel } from 'src/sections/mail/mail-nav-label';
 
-
 // ----------------------------------------------------------------------
 
 const icon = (name) => <SvgColor src={`${CONFIG.assetsDir}/assets/icons/navbar/${name}.svg`} />;
@@ -41,6 +40,8 @@ const ICONS = {
   parameter: icon('ic-parameter'),
   application: icon('ic-file'),
   recruitment: icon('ic-user'),
+  cctv: icon('ic-monitor'),
+  reimbersement: icon('ic-hand-money'),
   employee: <Iconify icon="mdi:employee" />,
   userManagement: <Iconify icon="mdi:account-cog" />,
 };
@@ -59,8 +60,10 @@ export const navData = [
         title: 'Hirings',
         path: paths.dashboard.root,
         icon: ICONS.dashboard,
-        roles: ['ADMIN', 'HR']
+        roles: ['ADMIN', 'HR'],
       },
+      { title: 'CCTV', path: paths.dashboard.general.course, icon: ICONS.cctv },
+      {title: 'Reimbeursement', path: paths.dashboard.general.file, icon: ICONS.reimbersement},
     ],
   },
   /**
@@ -76,35 +79,19 @@ export const navData = [
         icon: ICONS.chat,
       },
       {
-        title: 'File Manager',
-        path: paths.dashboard.fileManager,
-        icon: ICONS.folder,
-      },
-      {
-        title: 'Calendar', path: paths.dashboard.calendar, icon: ICONS.calendar
-      },
-      {
-        title: 'Mail',
-        path: paths.dashboard.mail,
-        icon: ICONS.mail,
-        info: MailNavLabel
-      },
-      {
-        title: 'LOR Generation',
+        title: 'Bills',
         path: paths.dashboard.invoice.root,
         icon: ICONS.invoice,
-        roles: ['ADMIN', 'HR']
+        children: [
+          { title: 'List', path: paths.dashboard.invoice.root },
+          { title: 'Create', path: paths.dashboard.invoice.new },
+          { title: 'Edit', path: paths.dashboard.invoice.demo.edit },
+        ],
       },
       {
-        title: 'Recruitment',
-        path: paths.dashboard.recruitment.root,
-        icon: ICONS.external,
-        children: [
-          { title: 'Job Postings', path: paths.dashboard.job.root },
-          { title: 'Job Applications', path: paths.dashboard.application.root },
-          { title: 'Interview Scheduling', path: paths.dashboard.recruitment.root },
-        ],
-        roles: ['ADMIN', 'HR']
+        title: 'Calendar',
+        path: paths.dashboard.calendar,
+        icon: ICONS.calendar,
       },
       {
         title: 'User Management',
@@ -114,15 +101,14 @@ export const navData = [
           {
             title: 'Create',
             path: paths.dashboard.user.new,
-            roles: ['ADMIN', 'HR']
+            roles: ['ADMIN', 'HR'],
           },
           {
             title: 'Account',
-            path: paths.dashboard.user.account
+            path: paths.dashboard.user.account,
           },
           { title: 'Profile', path: paths.dashboard.user.profile },
-          { title: 'Card', path: paths.dashboard.user.cards }
-
+          { title: 'Card', path: paths.dashboard.user.cards },
         ],
       },
     ],

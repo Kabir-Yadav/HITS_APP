@@ -1,82 +1,84 @@
-import { useState } from 'react';
-import PropTypes from 'prop-types';
-import { useBoolean } from 'minimal-shared/hooks';
+import { useBoolean, usePopover } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
-import Avatar from '@mui/material/Avatar';
+import Link from '@mui/material/Link';
 import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import Tooltip from '@mui/material/Tooltip';
-import Checkbox from '@mui/material/Checkbox';
+import Avatar from '@mui/material/Avatar';
+import Divider from '@mui/material/Divider';
+import MenuList from '@mui/material/MenuList';
+import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
+import Checkbox from '@mui/material/Checkbox';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
-import DialogActions from '@mui/material/DialogActions';
+import ListItemText from '@mui/material/ListItemText';
 
 import { RouterLink } from 'src/routes/components';
 
-import { fDateTime } from 'src/utils/format-time';
+import { fCurrency } from 'src/utils/format-number';
+import { fDate, fTime } from 'src/utils/format-time';
 
-import { supabase } from 'src/lib/supabase';
-
+import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
+import { CustomPopover } from 'src/components/custom-popover';
 
 // ----------------------------------------------------------------------
 
-export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow }) {
-  const { intern_name, created_at, id } = row;
-  const confirm = useBoolean();
-  const [pdfOpen, setPdfOpen] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState('');
 
-  const handleViewPDF = async () => {
-    try {
-      const { data: { publicUrl } } = supabase
-        .storage
-        .from('lor-pdfs')
-        .getPublicUrl(`${id}.pdf`);
+export function InvoiceTableRow({
+  row,
+  selected,
+  editHref,
+  onSelectRow,
+  onDeleteRow,
+  detailsHref,
+}) {
+  const menuActions = usePopover();
+  const confirmDialog = useBoolean();
 
-      setPdfUrl(publicUrl);
-      setPdfOpen(true);
-    } catch (error) {
-      console.error('Error fetching PDF:', error);
-    }
-  };
-
-  const handleClosePDF = () => {
-    setPdfOpen(false);
-  };
-
-  const renderPDFDialog = () => (
-    <Dialog 
-      fullScreen 
-      open={pdfOpen} 
-      onClose={handleClosePDF}
+  const renderMenuActions = () => (
+    <CustomPopover
+      open={menuActions.open}
+      anchorEl={menuActions.anchorEl}
+      onClose={menuActions.onClose}
+      slotProps={{ arrow: { placement: 'right-top' } }}
     >
-      <DialogActions sx={{ py: 2, px: 3 }}>
-        <Button color="inherit" variant="contained" onClick={handleClosePDF}>
-          Close
-        </Button>
-      </DialogActions>
+      <MenuList>
+        <li>
+          <MenuItem component={RouterLink} href={detailsHref} onClick={menuActions.onClose}>
+            <Iconify icon="solar:eye-bold" />
+            View
+          </MenuItem>
+        </li>
 
-      <Box sx={{ height: 1, display: 'flex', flexGrow: 1 }}>
-        <iframe
-          src={pdfUrl}
-          title="LOR PDF"
-          width="100%"
-          height="100%"
-          style={{ border: 'none' }}
-        />
-      </Box>
-    </Dialog>
+        <li>
+          <MenuItem component={RouterLink} href={editHref} onClick={menuActions.onClose}>
+            <Iconify icon="solar:pen-bold" />
+            Edit
+          </MenuItem>
+        </li>
+
+        <Divider sx={{ borderStyle: 'dashed' }} />
+
+        <MenuItem
+          onClick={() => {
+            confirmDialog.onTrue();
+            menuActions.onClose();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <Iconify icon="solar:trash-bin-trash-bold" />
+          Delete
+        </MenuItem>
+      </MenuList>
+    </CustomPopover>
   );
 
-  const renderDeleteDialog = (
+  const renderConfirmDialog = () => (
     <ConfirmDialog
-      open={confirm.value}
-      onClose={confirm.onFalse}
+      open={confirmDialog.value}
+      onClose={confirmDialog.onFalse}
       title="Delete"
       content="Are you sure want to delete?"
       action={
@@ -88,58 +90,89 @@ export function InvoiceTableRow({ row, selected, onSelectRow, onDeleteRow }) {
   );
 
   return (
+    <>
       <TableRow hover selected={selected}>
         <TableCell padding="checkbox">
-        <Checkbox checked={selected} onClick={onSelectRow} />
+          <Checkbox
+            checked={selected}
+            onClick={onSelectRow}
+            inputProps={{
+              id: `${row.id}-checkbox`,
+              'aria-label': `${row.id} checkbox`,
+            }}
+          />
         </TableCell>
 
         <TableCell>
-        <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar variant="rounded">
-            {intern_name.charAt(0).toUpperCase()}
-          </Avatar>
+          <Box sx={{ gap: 2, display: 'flex', alignItems: 'center' }}>
+            <Avatar alt={row.invoiceTo.name}>{row.invoiceTo.name.charAt(0).toUpperCase()}</Avatar>
 
-          <Box sx={{ typography: 'body2', minWidth: 160 }}>
-            {intern_name}
+            <ListItemText
+              primary={row.invoiceTo.name}
+              secondary={
+                <Link component={RouterLink} href={detailsHref} color="inherit">
+                  {row.invoiceNumber}
+                </Link>
+              }
+              slotProps={{
+                primary: { noWrap: true, sx: { typography: 'body2' } },
+                secondary: {
+                  sx: { color: 'text.disabled', '&:hover': { color: 'text.secondary' } },
+                },
+              }}
+            />
           </Box>
-        </Stack>
         </TableCell>
 
         <TableCell>
-        <Box sx={{ typography: 'body2' }}>{fDateTime(created_at)}</Box>
+          <ListItemText
+            primary={fDate(row.createDate)}
+            secondary={fTime(row.createDate)}
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { sx: { mt: 0.5, typography: 'caption' } },
+            }}
+          />
         </TableCell>
 
-      <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
-          <Tooltip title="View PDF">
-            <IconButton 
-              color="info"
-              onClick={handleViewPDF}
-            >
-              <Iconify icon="solar:eye-bold" />
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Delete">
-            <IconButton 
-              color="error"
-              onClick={confirm.onTrue}
-            >
-              <Iconify icon="solar:trash-bin-trash-bold" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        <TableCell>
+          <ListItemText
+            primary={fDate(row.dueDate)}
+            secondary={fTime(row.dueDate)}
+            slotProps={{
+              primary: { noWrap: true, sx: { typography: 'body2' } },
+              secondary: { sx: { mt: 0.5, typography: 'caption' } },
+            }}
+          />
         </TableCell>
 
-      {renderDeleteDialog}
-      {renderPDFDialog()}
+        <TableCell>{fCurrency(row.totalAmount)}</TableCell>
+
+        <TableCell align="center">{row.sent}</TableCell>
+
+        <TableCell>
+          <Label
+            variant="soft"
+            color={
+              (row.status === 'paid' && 'success') ||
+              (row.status === 'pending' && 'warning') ||
+              (row.status === 'overdue' && 'error') ||
+              'default'
+            }
+          >
+            {row.status}
+          </Label>
+        </TableCell>
+
+        <TableCell align="right" sx={{ px: 1 }}>
+          <IconButton color={menuActions.open ? 'inherit' : 'default'} onClick={menuActions.onOpen}>
+            <Iconify icon="eva:more-vertical-fill" />
+          </IconButton>
+        </TableCell>
       </TableRow>
+
+      {renderMenuActions()}
+      {renderConfirmDialog()}
+    </>
   );
 }
-
-InvoiceTableRow.propTypes = {
-  onDeleteRow: PropTypes.func,
-  onSelectRow: PropTypes.func,
-  row: PropTypes.object,
-  selected: PropTypes.bool,
-};

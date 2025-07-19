@@ -2,7 +2,7 @@ import { Helmet } from 'react-helmet-async';
 
 import { CONFIG } from 'src/global-config';
 
-import { OverviewFileView } from 'src/sections/overview/file/view';
+import { OverviewReimbursementView } from 'src/sections/overview/file/view';
 
 // ----------------------------------------------------------------------
 
@@ -15,7 +15,7 @@ export default function Page() {
         <title> {metadata.title}</title>
       </Helmet>
 
-      <OverviewFileView />
+      <OverviewReimbursementView />
     </>
   );
 }
